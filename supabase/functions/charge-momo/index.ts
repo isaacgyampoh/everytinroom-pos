@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const PAYSTACK_SECRET = 'sk_test_31dc1d98736dd0c3d10bd6a781b69b358297fd35'
+const PAYSTACK_SECRET = Deno.env.get('PAYSTACK_SECRET_KEY') || ''
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
