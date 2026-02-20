@@ -19,6 +19,9 @@ import BundlesPage from './pages/BundlesPage'
 import PerformancePage from './pages/PerformancePage'
 import RefundsPage from './pages/RefundsPage'
 import ReportsPage from './pages/ReportsPage'
+import PromosPage from './pages/PromosPage'
+import InvoicesPage from './pages/InvoicesPage'
+import StockTakesPage from './pages/StockTakesPage'
 
 export default function App() {
   const { user, page, loading, loadAll } = useStore()
@@ -57,6 +60,9 @@ export default function App() {
     performance: <PerformancePage />,
     refunds: <RefundsPage />,
     reports: <ReportsPage />,
+    promos: <PromosPage />,
+    invoices: <InvoicesPage />,
+    stocktakes: <StockTakesPage />,
   }
 
   return (
