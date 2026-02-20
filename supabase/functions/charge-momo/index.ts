@@ -15,7 +15,58 @@ serve(async (req) => {
     const url = new URL(req.url)
     const action = url.searchParams.get('action')
 
-    // ACTION 1: Initialize a mobile money charge
+    // ACTION 1: Initialize a transaction (works in test mode)
+    if (action === 'initialize') {
+      const { phone, amount, email, reference, callbackUrl } = await req.json()
+
+      if (!phone || !amount) {
+        return new Response(JSON.stringify({ success: false, error: 'Phone and amount required' }), { headers: CORS })
+      }
+
+      let formattedPhone = phone.replace(/\s+/g, '').replace(/^0/, '233').replace(/^\+/, '')
+      if (!formattedPhone.startsWith('233')) formattedPhone = '233' + formattedPhone
+
+      const ref = reference || 'ETR-MOMO-' + Date.now().toString(36).toUpperCase()
+      const customerEmail = email || formattedPhone + '@everytinroom.shop'
+
+      const initRes = await fetch('https://api.paystack.co/transaction/initialize', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + PAYSTACK_SECRET,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: customerEmail,
+          amount: Math.round(amount * 100),
+          currency: 'GHS',
+          reference: ref,
+          channels: ['mobile_money'],
+          callback_url: callbackUrl || 'https://everytinroom-pos.vercel.app',
+          metadata: {
+            source: 'everytinroom-pos',
+            phone: phone,
+            custom_fields: [
+              { display_name: 'Phone', variable_name: 'phone', value: phone }
+            ]
+          },
+        }),
+      })
+
+      const initData = await initRes.json()
+
+      if (!initData.status) {
+        return new Response(JSON.stringify({ success: false, error: initData.message || 'Init failed' }), { headers: CORS })
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        authorizationUrl: initData.data?.authorization_url,
+        accessCode: initData.data?.access_code,
+        reference: initData.data?.reference || ref,
+      }), { headers: CORS })
+    }
+
+    // ACTION 2: Charge with mobile money directly (for live mode)
     if (action === 'charge') {
       const { phone, amount, email, reference } = await req.json()
 
@@ -23,14 +74,12 @@ serve(async (req) => {
         return new Response(JSON.stringify({ success: false, error: 'Phone and amount required' }), { headers: CORS })
       }
 
-      // Format phone: ensure it starts with 233 (Ghana)
       let formattedPhone = phone.replace(/\s+/g, '').replace(/^0/, '233').replace(/^\+/, '')
       if (!formattedPhone.startsWith('233')) formattedPhone = '233' + formattedPhone
 
       const ref = reference || 'ETR-MOMO-' + Date.now().toString(36).toUpperCase()
       const customerEmail = email || formattedPhone + '@everytinroom.shop'
 
-      // Paystack charge with mobile_money
       const chargeRes = await fetch('https://api.paystack.co/charge', {
         method: 'POST',
         headers: {
@@ -39,17 +88,11 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           email: customerEmail,
-          amount: Math.round(amount * 100), // Paystack uses pesewas
+          amount: Math.round(amount * 100),
           currency: 'GHS',
-          mobile_money: {
-            phone: formattedPhone,
-            provider: 'mtn', // Will auto-detect provider
-          },
+          mobile_money: { phone: formattedPhone, provider: 'mtn' },
           reference: ref,
-          metadata: {
-            source: 'everytinroom-pos',
-            phone: phone,
-          },
+          metadata: { source: 'everytinroom-pos', phone: phone },
         }),
       })
 
@@ -67,7 +110,7 @@ serve(async (req) => {
       }), { headers: CORS })
     }
 
-    // ACTION 2: Verify payment status
+    // ACTION 3: Verify payment status
     if (action === 'verify') {
       const { reference } = await req.json()
 
@@ -81,44 +124,17 @@ serve(async (req) => {
 
       const verifyData = await verifyRes.json()
 
-      if (!verifyData.status) {
-        return new Response(JSON.stringify({ success: false, error: verifyData.message || 'Verify failed', paymentStatus: 'unknown' }), { headers: CORS })
-      }
-
-      const txStatus = verifyData.data?.status // 'success', 'failed', 'pending', 'abandoned'
-
       return new Response(JSON.stringify({
-        success: true,
-        paymentStatus: txStatus,
-        amount: (verifyData.data?.amount || 0) / 100, // Convert back from pesewas
+        success: verifyData.status || false,
+        paymentStatus: verifyData.data?.status || 'unknown',
+        amount: (verifyData.data?.amount || 0) / 100,
         reference: verifyData.data?.reference,
         paidAt: verifyData.data?.paid_at,
+        message: verifyData.message,
       }), { headers: CORS })
     }
 
-    // ACTION 3: Submit OTP (if required by Paystack)
-    if (action === 'submit-otp') {
-      const { reference, otp } = await req.json()
-
-      const otpRes = await fetch('https://api.paystack.co/charge/submit_otp', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + PAYSTACK_SECRET,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ reference, otp }),
-      })
-
-      const otpData = await otpRes.json()
-
-      return new Response(JSON.stringify({
-        success: otpData.status,
-        status: otpData.data?.status,
-        message: otpData.data?.display_text || otpData.message,
-      }), { headers: CORS })
-    }
-
-    return new Response(JSON.stringify({ error: 'Invalid action. Use ?action=charge, verify, or submit-otp' }), { headers: CORS })
+    return new Response(JSON.stringify({ error: 'Use ?action=initialize, charge, or verify' }), { headers: CORS })
 
   } catch (e) {
     return new Response(JSON.stringify({ success: false, error: e.message }), { status: 500, headers: CORS })
