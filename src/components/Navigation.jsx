@@ -37,7 +37,7 @@ export default function Navigation({ onOpenCart }) {
   }
   return (<>
     <nav className="hidden md:flex fixed top-0 left-0 right-0 h-[72px] glass border-b border-white/50 px-6 items-center z-[100]">
-      <div className="flex items-center gap-3 text-xl font-extrabold"><span className="w-11 h-11 bg-brand-500 rounded-xl flex items-center justify-center text-xl">🛒</span>Everytin Room</div>
+      <div className="flex items-center gap-3 text-xl font-extrabold"><img src="/logo.png" alt="" className="w-11 h-11 rounded-xl object-contain" />Everytin Room</div>
       <div className="flex gap-1 ml-6 flex-wrap">{NAV_ITEMS.filter(n=>!n.admin||isAdmin).map(n=>(
         <button key={n.id} onClick={()=>go(n.id)} className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold relative transition ${page===n.id?(n.wa?'bg-wa text-white':'bg-brand-500 text-white'):'text-gray-500 hover:bg-brand-50 hover:text-brand-500'}`}>
           {n.icon} {n.label}{n.wa&&pendingWA>0&&<span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center justify-center">{pendingWA}</span>}
@@ -48,7 +48,7 @@ export default function Navigation({ onOpenCart }) {
       </div>
     </nav>
     <header className="flex md:hidden fixed top-0 left-0 right-0 h-16 safe-top glass px-4 items-center gap-3 z-[100]">
-      <div className="flex items-center gap-2.5 text-lg font-extrabold flex-1"><span className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center text-xl">🛒</span>Everytin Room</div>
+      <div className="flex items-center gap-2.5 text-lg font-extrabold flex-1"><img src="/logo.png" alt="" className="w-10 h-10 rounded-xl object-contain" />Everytin Room</div>
       <button onClick={()=>go('whatsapp')} className="w-11 h-11 rounded-xl bg-wa/10 flex items-center justify-center text-xl relative">📱{pendingWA>0&&<span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center justify-center">{pendingWA}</span>}</button>
       <button onClick={()=>setDrawerOpen(true)} className="w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center text-xl">☰</button>
     </header>

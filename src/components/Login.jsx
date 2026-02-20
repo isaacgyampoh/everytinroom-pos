@@ -44,7 +44,7 @@ export default function Login() {
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center p-6 z-[1000]">
       <div className="text-center">
-        <div className="w-24 h-24 bg-white/20 rounded-3xl flex items-center justify-center text-5xl mx-auto mb-6">🛒</div>
+        <img src="/logo.png" alt="Everytin Room" className="w-36 h-36 rounded-3xl mx-auto mb-6 object-contain" />
         <h1 className="text-white text-3xl font-extrabold mb-1">Everytin Room</h1>
         <p className="text-white/80 text-sm mb-10">Your One Stop Shop • Point of Sale</p>
 
