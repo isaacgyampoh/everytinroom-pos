@@ -11,8 +11,20 @@ const mapCustomer = c => ({ id: c.id, phone: c.phone, visitCount: num(c.visit_co
 const mapWAOrder = o => ({ id: o.id, orderNo: o.order_no, date: o.date, customerName: o.customer_name, customerPhone: o.customer_phone, items: typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || []), subtotal: num(o.subtotal), deliveryFee: num(o.delivery_fee), total: num(o.total), address: o.address, notes: o.notes, status: o.status, paystackRef: o.paystack_ref, paidAt: o.paid_at, processedBy: o.processed_by, processedAt: o.processed_at })
 const mapRefund = r => ({ id: r.id, refundNo: r.refund_no, date: r.date, originalReceiptNo: r.original_receipt_no, items: typeof r.items === 'string' ? JSON.parse(r.items) : (r.items || []), refundAmount: num(r.refund_amount), reason: r.reason, processedBy: r.processed_by, customer: r.customer, status: r.status })
 const mapPromo = p => ({ id: p.id, name: p.name, startDate: p.start_date, endDate: p.end_date, items: typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || []), active: p.active })
-const mapInvoice = i => ({ id: i.id, invoiceId: i.invoice_id, date: i.date, supplier: i.supplier, amount: num(i.amount), notes: i.notes, image: i.image || '', photoIndex: num(i.photo_index), totalPhotos: num(i.total_photos) })
+const mapInvoice = i => ({ id: i.id, invoiceId: i.invoice_id, date: i.date, supplier: i.supplier, amount: num(i.amount), notes: i.notes, image: i.image || '' })
 const mapStockTake = s => ({ id: s.id, date: s.date, items: typeof s.items === 'string' ? JSON.parse(s.items) : (s.items || []), notes: s.notes, conductedBy: s.conducted_by })
+
+// Safe query - returns empty array if table doesn't exist
+const safeQuery = async (sb, table, opts = {}) => {
+  try {
+    let q = sb.from(table).select('*')
+    if (opts.order) q = q.order(opts.order, { ascending: opts.asc ?? false })
+    if (opts.limit) q = q.limit(opts.limit)
+    const { data, error } = await q
+    if (error) { console.warn(`Table ${table}:`, error.message); return [] }
+    return data || []
+  } catch (e) { console.warn(`Table ${table} failed:`, e.message); return [] }
+}
 
 export const useStore = create((set, get) => ({
   products: [], bundles: [], sales: [], staff: [], expenses: [],
@@ -48,42 +60,59 @@ export const useStore = create((set, get) => ({
   clearCart: () => set({ cart: [] }),
 
   loadAll: async () => {
-    const sb = getSupabase(); if (!sb) return
+    const sb = getSupabase(); if (!sb) { set({ loading: false }); return }
     set({ loading: true, loadingText: 'Loading data...' })
     try {
-      const [products, bundles, sales, staff, expenses, customers, waOrders, refunds, promos, invoices, stockTakes] = await Promise.all([
-        sb.from('products').select('*').order('name'), sb.from('bundles').select('*'),
-        sb.from('sales').select('*').order('date', { ascending: false }).limit(500), sb.from('staff').select('*'),
-        sb.from('expenses').select('*').order('date', { ascending: false }),
-        sb.from('customers').select('*').order('total_spent', { ascending: false }),
-        sb.from('whatsapp_orders').select('*').order('date', { ascending: false }),
-        sb.from('refunds').select('*').order('date', { ascending: false }),
-        sb.from('promos').select('*').order('created_at', { ascending: false }),
-        sb.from('invoices').select('*').order('date', { ascending: false }),
-        sb.from('stock_takes').select('*').order('date', { ascending: false }),
+      // Load core tables first (these must exist)
+      const [prodData, bunData, saleData, staffData, expData, custData, waData, refData] = await Promise.all([
+        safeQuery(sb, 'products', { order: 'name', asc: true }),
+        safeQuery(sb, 'bundles'),
+        safeQuery(sb, 'sales', { order: 'date', limit: 500 }),
+        safeQuery(sb, 'staff'),
+        safeQuery(sb, 'expenses', { order: 'date' }),
+        safeQuery(sb, 'customers', { order: 'total_spent' }),
+        safeQuery(sb, 'whatsapp_orders', { order: 'date' }),
+        safeQuery(sb, 'refunds', { order: 'date' }),
       ])
+
+      // Load optional tables (may not exist yet)
+      const [promoData, invData, stData] = await Promise.all([
+        safeQuery(sb, 'promos', { order: 'created_at' }),
+        safeQuery(sb, 'invoices', { order: 'date' }),
+        safeQuery(sb, 'stock_takes', { order: 'date' }),
+      ])
+
       set({
-        products: (products.data || []).map(mapProduct), bundles: (bundles.data || []).map(mapBundle),
-        sales: (sales.data || []).map(mapSale), staff: (staff.data || []).map(mapStaff),
-        expenses: (expenses.data || []).map(mapExpense), customers: (customers.data || []).map(mapCustomer),
-        waOrders: (waOrders.data || []).map(mapWAOrder), refunds: (refunds.data || []).map(mapRefund),
-        promos: (promos.data || []).map(mapPromo), invoices: (invoices.data || []).map(mapInvoice),
-        stockTakes: (stockTakes.data || []).map(mapStockTake), loading: false,
+        products: prodData.map(mapProduct),
+        bundles: bunData.map(mapBundle),
+        sales: saleData.map(mapSale),
+        staff: staffData.map(mapStaff),
+        expenses: expData.map(mapExpense),
+        customers: custData.map(mapCustomer),
+        waOrders: waData.map(mapWAOrder),
+        refunds: refData.map(mapRefund),
+        promos: promoData.map(mapPromo),
+        invoices: invData.map(mapInvoice),
+        stockTakes: stData.map(mapStockTake),
+        loading: false,
       })
-    } catch (e) { console.error('Load error:', e); set({ loading: false }) }
+    } catch (e) {
+      console.error('Load error:', e)
+      set({ loading: false })
+    }
   },
 
-  refreshProducts: async () => { const sb = getSupabase(); if (!sb) return; const { data } = await sb.from('products').select('*').order('name'); set({ products: (data || []).map(mapProduct) }) },
-  refreshSales: async () => { const sb = getSupabase(); if (!sb) return; const { data } = await sb.from('sales').select('*').order('date', { ascending: false }).limit(500); set({ sales: (data || []).map(mapSale) }) },
-  refreshWAOrders: async () => { const sb = getSupabase(); if (!sb) return; const { data } = await sb.from('whatsapp_orders').select('*').order('date', { ascending: false }); set({ waOrders: (data || []).map(mapWAOrder) }) },
-  refreshStaff: async () => { const sb = getSupabase(); if (!sb) return; const { data } = await sb.from('staff').select('*'); set({ staff: (data || []).map(mapStaff) }) },
-  refreshBundles: async () => { const sb = getSupabase(); if (!sb) return; const { data } = await sb.from('bundles').select('*'); set({ bundles: (data || []).map(mapBundle) }) },
-  refreshExpenses: async () => { const sb = getSupabase(); if (!sb) return; const { data } = await sb.from('expenses').select('*').order('date', { ascending: false }); set({ expenses: (data || []).map(mapExpense) }) },
-  refreshCustomers: async () => { const sb = getSupabase(); if (!sb) return; const { data } = await sb.from('customers').select('*').order('total_spent', { ascending: false }); set({ customers: (data || []).map(mapCustomer) }) },
-  refreshRefunds: async () => { const sb = getSupabase(); if (!sb) return; const { data } = await sb.from('refunds').select('*').order('date', { ascending: false }); set({ refunds: (data || []).map(mapRefund) }) },
-  refreshPromos: async () => { const sb = getSupabase(); if (!sb) return; const { data } = await sb.from('promos').select('*').order('created_at', { ascending: false }); set({ promos: (data || []).map(mapPromo) }) },
-  refreshInvoices: async () => { const sb = getSupabase(); if (!sb) return; const { data } = await sb.from('invoices').select('*').order('date', { ascending: false }); set({ invoices: (data || []).map(mapInvoice) }) },
-  refreshStockTakes: async () => { const sb = getSupabase(); if (!sb) return; const { data } = await sb.from('stock_takes').select('*').order('date', { ascending: false }); set({ stockTakes: (data || []).map(mapStockTake) }) },
+  refreshProducts: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'products', { order: 'name', asc: true }); set({ products: d.map(mapProduct) }) },
+  refreshSales: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'sales', { order: 'date', limit: 500 }); set({ sales: d.map(mapSale) }) },
+  refreshWAOrders: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'whatsapp_orders', { order: 'date' }); set({ waOrders: d.map(mapWAOrder) }) },
+  refreshStaff: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'staff'); set({ staff: d.map(mapStaff) }) },
+  refreshBundles: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'bundles'); set({ bundles: d.map(mapBundle) }) },
+  refreshExpenses: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'expenses', { order: 'date' }); set({ expenses: d.map(mapExpense) }) },
+  refreshCustomers: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'customers', { order: 'total_spent' }); set({ customers: d.map(mapCustomer) }) },
+  refreshRefunds: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'refunds', { order: 'date' }); set({ refunds: d.map(mapRefund) }) },
+  refreshPromos: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'promos', { order: 'created_at' }); set({ promos: d.map(mapPromo) }) },
+  refreshInvoices: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'invoices', { order: 'date' }); set({ invoices: d.map(mapInvoice) }) },
+  refreshStockTakes: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'stock_takes', { order: 'date' }); set({ stockTakes: d.map(mapStockTake) }) },
 
   deductStock: (cartItems) => {
     const products = [...get().products]
