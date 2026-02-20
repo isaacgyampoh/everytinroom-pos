@@ -28,14 +28,10 @@ export default function App() {
   const [cartOpen, setCartOpen] = useState(false)
   const [receipt, setReceipt] = useState(null)
 
-  useEffect(() => {
-    loadAll()
-    setupRealtime()
-  }, [])
+  useEffect(() => { loadAll(); setupRealtime() }, [])
 
   const setupRealtime = () => {
-    const sb = getSupabase()
-    if (!sb) return
+    const sb = getSupabase(); if (!sb) return
     const store = useStore.getState()
     sb.channel('pos-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_orders' }, () => store.refreshWAOrders())
