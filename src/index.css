@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 * { -webkit-font-smoothing: antialiased; }
-body { font-family: 'Outfit', system-ui, sans-serif; font-size: 14px; }
+body { font-family: 'Outfit', system-ui, sans-serif; font-size: 14px; background: #f8f9fb; }
 
 @media (min-width: 768px) {
   body { font-size: 16px; }
@@ -13,6 +13,8 @@ body { font-family: 'Outfit', system-ui, sans-serif; font-size: 14px; }
   .safe-top { padding-top: env(safe-area-inset-top); }
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
   .glass { background: rgba(255,255,255,.85); backdrop-filter: blur(20px); }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
 /* Scrollbar */
