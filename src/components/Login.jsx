@@ -6,25 +6,26 @@ export default function Login() {
   const { staff, login } = useStore()
   const [pin, setPin] = useState('')
 
-  const handleSubmit = (e) => {
-    e?.preventDefault()
-    if (pin.length !== 4) { toast.error('Enter 4-digit PIN'); return }
-    const match = staff.find(s => s.pin === pin && s.active)
-    if (match) { login(match, match.role === 'admin'); toast.success('Welcome, ' + match.name + '!') }
-    else { toast.error('Invalid PIN'); setPin('') }
+  const tryLogin = (pinVal) => {
+    if (pinVal.length !== 4) return
+    // Compare as strings - trim whitespace just in case
+    const match = staff.find(s => String(s.pin).trim() === String(pinVal).trim() && s.active !== false)
+    if (match) {
+      login(match, match.role === 'admin')
+      toast.success('Welcome, ' + match.name + '!')
+    } else {
+      toast.error('Invalid PIN')
+      setPin('')
+    }
   }
 
   const handleChange = (e) => {
     const val = e.target.value.replace(/\D/g, '').slice(0, 4)
     setPin(val)
-    if (val.length === 4) {
-      setTimeout(() => {
-        const match = staff.find(s => s.pin === val && s.active)
-        if (match) { login(match, match.role === 'admin'); toast.success('Welcome, ' + match.name + '!') }
-        else { toast.error('Invalid PIN'); setPin('') }
-      }, 200)
-    }
+    if (val.length === 4) setTimeout(() => tryLogin(val), 200)
   }
+
+  const handleSubmit = (e) => { e?.preventDefault(); tryLogin(pin) }
 
   return (
     <div className="fixed inset-0 brand-gradient flex flex-col items-center justify-center p-6 overflow-hidden">
@@ -64,6 +65,9 @@ export default function Login() {
         <button type="submit" className="w-full h-13 mt-4 brand-gradient-green rounded-xl text-white text-base font-bold hover:opacity-90 active:scale-[.97] transition-all shadow-lg shadow-brand-500/20">
           🔓 Unlock
         </button>
+        {staff.length === 0 && (
+          <p className="text-amber-400 text-xs text-center mt-3">⏳ Loading staff data...</p>
+        )}
       </form>
 
       {/* Footer */}
