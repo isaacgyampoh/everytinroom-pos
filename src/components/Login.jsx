@@ -6,17 +6,25 @@ export default function Login() {
   const { staff, login } = useStore()
   const [pin, setPin] = useState('')
 
-  const handleDigit = (d) => {
-    const newPin = pin + d
-    setPin(newPin)
-    if (newPin.length === 4) {
-      const match = staff.find(s => s.pin === newPin && s.active)
-      if (match) { login(match, match.role === 'admin'); toast.success('Welcome, ' + match.name + '!') }
-      else { toast.error('Invalid PIN'); setPin('') }
-    }
+  const handleSubmit = (e) => {
+    e?.preventDefault()
+    if (pin.length !== 4) { toast.error('Enter 4-digit PIN'); return }
+    const match = staff.find(s => s.pin === pin && s.active)
+    if (match) { login(match, match.role === 'admin'); toast.success('Welcome, ' + match.name + '!') }
+    else { toast.error('Invalid PIN'); setPin('') }
   }
 
-  const handleDelete = () => setPin(pin.slice(0, -1))
+  const handleChange = (e) => {
+    const val = e.target.value.replace(/\D/g, '').slice(0, 4)
+    setPin(val)
+    if (val.length === 4) {
+      setTimeout(() => {
+        const match = staff.find(s => s.pin === val && s.active)
+        if (match) { login(match, match.role === 'admin'); toast.success('Welcome, ' + match.name + '!') }
+        else { toast.error('Invalid PIN'); setPin('') }
+      }, 200)
+    }
+  }
 
   return (
     <div className="fixed inset-0 brand-gradient flex flex-col items-center justify-center p-6 overflow-hidden">
@@ -32,44 +40,34 @@ export default function Login() {
       </div>
 
       {/* Title */}
-      <div className="relative z-10 text-center mb-8">
+      <div className="relative z-10 text-center mb-10">
         <h1 className="text-3xl md:text-4xl font-extrabold">
           <span className="text-brand-500">Everytin</span> <span className="text-accent-500">Room</span>
         </h1>
         <p className="text-gold-500 text-sm font-semibold mt-1">— Your One Stop Shop —</p>
       </div>
 
-      {/* PIN Label */}
-      <p className="relative z-10 text-white/50 text-sm font-medium mb-4">Enter your 4-digit PIN</p>
-
-      {/* PIN Dots */}
-      <div className="relative z-10 flex justify-center gap-5 mb-10">
-        {[0, 1, 2, 3].map(i => (
-          <div key={i} className={`w-5 h-5 rounded-full transition-all duration-300 ${i < pin.length ? 'bg-brand-500 scale-125 shadow-lg shadow-brand-500/50' : 'bg-white/15 border-2 border-white/20'}`} />
-        ))}
-      </div>
-
-      {/* Number Pad - no card, just buttons */}
-      <div className="relative z-10 w-full max-w-[280px] grid grid-cols-3 gap-3">
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, null, 0, 'del'].map((d, i) => {
-          if (d === null) return <div key={i} />
-          if (d === 'del') return (
-            <button key={i} onClick={handleDelete}
-              className="h-16 md:h-18 rounded-2xl bg-white/5 text-white/50 text-xl font-semibold flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all">
-              ←
-            </button>
-          )
-          return (
-            <button key={i} onClick={() => handleDigit(String(d))}
-              className="h-16 md:h-18 rounded-2xl bg-white/8 text-white text-2xl font-bold flex items-center justify-center hover:bg-brand-500/30 active:scale-90 transition-all">
-              {d}
-            </button>
-          )
-        })}
-      </div>
+      {/* PIN Input */}
+      <form onSubmit={handleSubmit} className="relative z-10 w-full max-w-[260px]">
+        <p className="text-white/50 text-sm font-medium mb-3 text-center">Enter your 4-digit PIN</p>
+        <input
+          type="password"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={4}
+          autoFocus
+          value={pin}
+          onChange={handleChange}
+          className="w-full h-16 bg-white/10 border-2 border-white/15 rounded-2xl text-white text-center text-3xl font-bold tracking-[0.5em] placeholder:text-white/20 placeholder:tracking-[0.3em] placeholder:text-lg focus:outline-none focus:border-brand-500/60 focus:bg-white/15 transition-all"
+          placeholder="••••"
+        />
+        <button type="submit" className="w-full h-13 mt-4 brand-gradient-green rounded-xl text-white text-base font-bold hover:opacity-90 active:scale-[.97] transition-all shadow-lg shadow-brand-500/20">
+          🔓 Unlock
+        </button>
+      </form>
 
       {/* Footer */}
-      <p className="relative z-10 text-navy-300 text-xs mt-8">Adenta Aviation Road • Erbliving.shop</p>
+      <p className="relative z-10 text-navy-300 text-xs mt-10">Adenta Aviation Road • Erbliving.shop</p>
     </div>
   )
 }
