@@ -23,7 +23,6 @@ export default function ReceiptPreview({ sale, onClose }) {
 
         <div id="receipt-content" className="font-mono text-xs leading-tight text-black">
           <div className="hdr text-center pb-1 border-b border-dashed border-black">
-            <img src="/logo.png" alt="" style={{ width: '50mm', margin: '0 auto 2mm', display: 'block' }} />
             <div className="logo text-base font-bold tracking-wider">{SHOP.name}</div>
             <div className="inf text-[10px] font-bold">{SHOP.tagline}</div>
             <div className="inf text-[10px]">{SHOP.address}</div>
