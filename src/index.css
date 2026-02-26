@@ -2,24 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
-* { -webkit-font-smoothing: antialiased; }
-body { font-family: 'Outfit', system-ui, sans-serif; font-size: 14px; }
+* { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body { font-family: 'Inter', system-ui, -apple-system, sans-serif; font-size: 15px; background: #f7f8fa; color: #1a1a2e; letter-spacing: -0.01em; }
+h1, h2, h3, h4, h5, h6 { font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif; letter-spacing: -0.02em; }
 
-@media (min-width: 768px) {
-  body { font-size: 16px; }
-}
+@media (min-width: 768px) { body { font-size: 16px; } }
 
 @layer utilities {
   .safe-top { padding-top: env(safe-area-inset-top); }
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
   .glass { background: rgba(255,255,255,.85); backdrop-filter: blur(20px); }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
 
-/* Print receipt styles */
 @media print {
   @page { size: 80mm auto; margin: 0 4mm; }
   body * { visibility: hidden; }
@@ -27,9 +26,7 @@ body { font-family: 'Outfit', system-ui, sans-serif; font-size: 14px; }
   #print-receipt { position: absolute; left: 0; top: 0; width: 72mm; }
 }
 
-/* Animations */
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-@keyframes spin { to { transform: rotate(360deg); } }
 .animate-fade { animation: fadeIn .3s ease-out; }
 .animate-slide-up { animation: slideUp .3s ease-out; }

@@ -1,237 +1,312 @@
+import { useState } from 'react'
 import { useStore } from '../hooks/useStore'
-import { money, today, weekStartDate, monthStart, isoDate, fmtDate } from '../lib/utils'
+import { money, num, today, weekStartDate, monthStart, isoDate, fmtDate } from '../lib/utils'
 
-function StatCard({ icon, label, value, color }) {
-  return (
-    <div className="bg-white rounded-2xl p-5 md:p-6 shadow-sm">
-      <div className="text-xs md:text-sm font-bold text-gray-400 uppercase mb-1">{icon} {label}</div>
-      <div className="text-xl md:text-2xl font-extrabold" style={color ? { color } : {}}>{value}</div>
-    </div>
-  )
-}
+const Section = ({ title, children, icon }) => (
+  <div className="bg-white rounded-2xl p-5 md:p-6 border border-gray-100 shadow-sm">
+    <h3 className="text-base md:text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">{icon && <span>{icon}</span>}{title}</h3>
+    {children}
+  </div>
+)
 
-function Section({ title, borderColor, data, exp, refundAmt }) {
-  return (
-    <div className="bg-white rounded-3xl p-6 md:p-8 shadow-md mb-5" style={{ borderLeft: '5px solid ' + borderColor }}>
-      <h3 className="text-lg md:text-xl font-bold mb-5">{title}</h3>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <StatCard icon="💰" label="Total Sales" value={money(data.total)} />
-        <StatCard icon="💵" label="Cash" value={money(data.cash)} color="#16a34a" />
-        <StatCard icon="📱" label="Momo" value={money(data.momo)} color="#ca8a04" />
-        <StatCard icon="🧾" label="Transactions" value={data.txn} />
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard icon="📈" label="Profit" value={money(data.profit)} color="#22c55e" />
-        <StatCard icon="💸" label="Expenses" value={money(exp)} color="#ef4444" />
-        <StatCard icon="↩️" label="Refunds" value={money(refundAmt)} color="#8b5cf6" />
-        <StatCard icon="💎" label="Net Profit" value={money(data.profit - exp)} color={data.profit - exp >= 0 ? '#22c55e' : '#ef4444'} />
-      </div>
-      {data.paystack > 0 && <div className="mt-3 px-3 py-2 bg-cyan-50 rounded-lg text-sm md:text-base text-cyan-600 font-semibold inline-block">💳 Paystack: {money(data.paystack)}</div>}
-    </div>
-  )
-}
+const Stat = ({ label, value, sub, color = 'text-gray-900' }) => (
+  <div className="text-center p-3 md:p-4 bg-gray-50 rounded-xl">
+    <div className="text-xs md:text-sm text-gray-400 font-medium">{label}</div>
+    <div className={`text-lg md:text-2xl font-extrabold mt-1 ${color}`}>{value}</div>
+    {sub && <div className="text-[11px] md:text-xs text-gray-400 mt-0.5">{sub}</div>}
+  </div>
+)
 
 export default function ReportsPage() {
-  const { sales, expenses, refunds } = useStore()
+  const { sales, expenses, refunds, products } = useStore()
+  const [tab, setTab] = useState('today')
+
   const t = today(), ws = weekStartDate(), ms = monthStart()
 
-  const calc = (arr) => {
-    let total = 0, cash = 0, momo = 0, paystack = 0, profit = 0, txn = 0
-    for (const s of arr) {
-      if (s.voided) continue
-      total += s.total; profit += s.profit; txn++
-      if (s.payment === 'Cash') cash += s.total
-      else if (s.payment === 'Momo') momo += s.total
-      else paystack += s.total
-    }
-    return { total, cash, momo, paystack, profit, txn }
+  const filterSales = (list) => {
+    if (tab === 'today') return list.filter(s => isoDate(s.date) === t)
+    if (tab === 'week') return list.filter(s => isoDate(s.date) >= ws && isoDate(s.date) <= t)
+    if (tab === 'month') return list.filter(s => isoDate(s.date) >= ms && isoDate(s.date) <= t)
+    return list // overall
+  }
+  const filterByDate = (list, dateFn) => {
+    if (tab === 'today') return list.filter(e => dateFn(e) === t)
+    if (tab === 'week') return list.filter(e => dateFn(e) >= ws && dateFn(e) <= t)
+    if (tab === 'month') return list.filter(e => dateFn(e) >= ms && dateFn(e) <= t)
+    return list
   }
 
-  const expTotal = (from, to) => expenses.filter(e => isoDate(e.date) >= from && isoDate(e.date) <= to).reduce((a, e) => a + e.amount, 0)
-  const refTotal = (from, to) => refunds.filter(r => isoDate(r.date) >= from && isoDate(r.date) <= to).reduce((a, r) => a + r.refundAmount, 0)
+  const fSales = filterSales(sales.filter(s => !s.voided))
+  const fExpenses = filterByDate(expenses, e => isoDate(e.date))
+  const fRefunds = filterByDate(refunds, r => isoDate(r.date))
 
-  const todayData = calc(sales.filter(s => isoDate(s.date) === t))
-  const weekData = calc(sales.filter(s => isoDate(s.date) >= ws && isoDate(s.date) <= t))
-  const monthData = calc(sales.filter(s => isoDate(s.date) >= ms && isoDate(s.date) <= t))
+  const totalRev = fSales.reduce((a, s) => a + s.total, 0)
+  const totalProfit = fSales.reduce((a, s) => a + s.profit, 0)
+  const totalDiscount = fSales.reduce((a, s) => a + s.discount, 0)
+  const totalExp = fExpenses.reduce((a, e) => a + e.amount, 0)
+  const totalRefAmt = fRefunds.reduce((a, r) => a + r.refundAmount, 0)
+  const netCashFlow = totalRev - totalExp - totalRefAmt
 
-  const todayExp = expTotal(t, t), weekExp = expTotal(ws, t), monthExp = expTotal(ms, t)
-  const todayRef = refTotal(t, t), weekRef = refTotal(ws, t), monthRef = refTotal(ms, t)
+  const cashSales = fSales.filter(s => s.payment === 'Cash')
+  const momoSales = fSales.filter(s => s.payment === 'Momo')
+  const splitSales = fSales.filter(s => s.payment === 'Split')
+  const cashTotal = cashSales.reduce((a, s) => a + s.total, 0) + splitSales.reduce((a, s) => a + (s.splitCash || 0), 0)
+  const momoTotal = momoSales.reduce((a, s) => a + s.total, 0) + splitSales.reduce((a, s) => a + (s.splitMomo || 0), 0)
 
-  // Daily breakdown for the week
-  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-  const weekDays = []
-  const wsDate = new Date(ws + 'T00:00:00')
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(wsDate); d.setDate(wsDate.getDate() + i)
-    const ds = isoDate(d)
-    if (ds > t) break
-    const dayData = calc(sales.filter(s => isoDate(s.date) === ds))
-    weekDays.push({ name: dayNames[i], date: ds, ...dayData })
-  }
+  const retailSales = fSales.filter(s => s.type === 'Retail')
+  const wholesaleSales = fSales.filter(s => s.type === 'Wholesale')
+  const waSales = fSales.filter(s => s.type === 'WhatsApp')
 
-  // Top Selling Products (this month)
-  const monthSales = sales.filter(s => !s.voided && isoDate(s.date) >= ms && isoDate(s.date) <= t)
-  const productMap = {}
-  for (const s of monthSales) {
-    const items = Array.isArray(s.items) ? s.items : []
-    for (const it of items) {
-      const key = it.name || 'Unknown'
-      if (!productMap[key]) productMap[key] = { name: key, qty: 0, revenue: 0 }
-      productMap[key].qty += (it.qty || 1)
-      productMap[key].revenue += (it.price || 0) * (it.qty || 1)
-    }
-  }
-  const topProducts = Object.values(productMap).sort((a, b) => b.qty - a.qty).slice(0, 15)
-  const maxQty = topProducts.length > 0 ? topProducts[0].qty : 1
+  // Top selling products
+  const prodMap = {}
+  fSales.forEach(s => s.items?.forEach(it => {
+    const key = it.name || it.productId
+    if (!prodMap[key]) prodMap[key] = { name: it.name, qty: 0, revenue: 0 }
+    prodMap[key].qty += num(it.qty)
+    prodMap[key].revenue += num(it.price) * num(it.qty)
+  }))
+  const topProducts = Object.values(prodMap).sort((a, b) => b.qty - a.qty).slice(0, 15)
+  const maxQty = topProducts[0]?.qty || 1
+
+  // Daily breakdown
+  const dayMap = {}
+  fSales.forEach(s => {
+    const d = isoDate(s.date)
+    if (!dayMap[d]) dayMap[d] = { date: d, sales: 0, revenue: 0, profit: 0, cash: 0, momo: 0 }
+    dayMap[d].sales++
+    dayMap[d].revenue += s.total
+    dayMap[d].profit += s.profit
+    if (s.payment === 'Cash') dayMap[d].cash += s.total
+    else if (s.payment === 'Momo') dayMap[d].momo += s.total
+    else if (s.payment === 'Split') { dayMap[d].cash += (s.splitCash || 0); dayMap[d].momo += (s.splitMomo || 0) }
+  })
+  const days = Object.values(dayMap).sort((a, b) => b.date.localeCompare(a.date))
+
+  // Expense categories
+  const expCatMap = {}
+  fExpenses.forEach(e => {
+    const cat = e.category || 'Other'
+    if (!expCatMap[cat]) expCatMap[cat] = { category: cat, total: 0, count: 0 }
+    expCatMap[cat].total += e.amount
+    expCatMap[cat].count++
+  })
+  const expCats = Object.values(expCatMap).sort((a, b) => b.total - a.total)
+
+  // Staff performance
+  const staffMap = {}
+  fSales.forEach(s => {
+    const name = s.cashier || 'Unknown'
+    if (!staffMap[name]) staffMap[name] = { name, sales: 0, revenue: 0 }
+    staffMap[name].sales++
+    staffMap[name].revenue += s.total
+  })
+  const staffPerf = Object.values(staffMap).sort((a, b) => b.revenue - a.revenue)
+
+  const tabs = [
+    { id: 'today', label: '📅 Today' },
+    { id: 'week', label: '📆 This Week' },
+    { id: 'month', label: '🗓️ This Month' },
+    { id: 'overall', label: '📊 Overall' },
+  ]
 
   return (
     <div className="animate-fade">
-      <h1 className="text-3xl md:text-4xl font-extrabold mb-6">📈 Reports</h1>
+      <h1 className="text-2xl md:text-3xl font-extrabold mb-1 tracking-tight">📈 Reports</h1>
+      <p className="text-gray-400 text-sm mb-5">Business analytics & insights</p>
 
-      <Section title="📅 Today" borderColor="#0ea5e9" data={todayData} exp={todayExp} refundAmt={todayRef} />
-      <Section title="📆 This Week" borderColor="#22c55e" data={weekData} exp={weekExp} refundAmt={weekRef} />
-      <Section title="📊 This Month" borderColor="#f59e0b" data={monthData} exp={monthExp} refundAmt={monthRef} />
+      {/* Period Tabs */}
+      <div className="flex gap-2 overflow-x-auto mb-6 pb-1 scrollbar-hide">
+        {tabs.map(tb => (
+          <button key={tb.id} onClick={() => setTab(tb.id)}
+            className={`h-10 md:h-11 px-4 md:px-5 rounded-xl text-[13px] md:text-sm font-semibold whitespace-nowrap transition-all ${tab === tb.id ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20' : 'bg-white border border-gray-200 text-gray-500 hover:border-brand-200'}`}>
+            {tb.label}
+          </button>
+        ))}
+      </div>
 
-      {/* Top Selling Products */}
-      <div className="bg-white rounded-3xl p-6 md:p-8 shadow-md mb-5" style={{ borderLeft: '5px solid #22c55e' }}>
-        <h3 className="text-lg md:text-xl font-bold mb-2">🔥 Top Selling Products</h3>
-        <p className="text-sm md:text-base text-gray-400 mb-5">Most popular products this month — use this to know what to restock</p>
-        {topProducts.length === 0 && <div className="text-center py-8 text-gray-400 md:text-lg">No sales data this month</div>}
-        {topProducts.map((p, i) => {
-          const barWidth = Math.max(8, (p.qty / maxQty) * 100)
-          return (
-            <div key={i} className="mb-3">
-              <div className="flex justify-between items-center mb-1.5">
+      {/* Revenue Summary */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-5">
+        <Stat label="Total Revenue" value={money(totalRev)} sub={fSales.length + ' sales'} color="text-brand-600" />
+        <Stat label="Gross Profit" value={money(totalProfit)} color="text-green-600" />
+        <Stat label="Expenses" value={money(totalExp)} sub={fExpenses.length + ' entries'} color="text-red-500" />
+        <Stat label="Net Cash Flow" value={money(netCashFlow)} color={netCashFlow >= 0 ? 'text-green-600' : 'text-red-500'} />
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+        <Stat label="Cash Collected" value={money(cashTotal)} sub={cashSales.length + ' cash sales'} color="text-green-600" />
+        <Stat label="Momo Collected" value={money(momoTotal)} sub={momoSales.length + ' momo sales'} color="text-amber-600" />
+        <Stat label="Refunds" value={money(totalRefAmt)} sub={fRefunds.length + ' refunds'} color="text-violet-500" />
+        <Stat label="Discounts Given" value={money(totalDiscount)} color="text-gray-500" />
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-5 mb-5">
+        {/* Payment Breakdown */}
+        <Section title="Payment Breakdown" icon="💳">
+          <div className="space-y-3">
+            {[
+              { label: 'Cash', count: cashSales.length, amount: cashTotal, color: 'bg-green-500', pct: totalRev ? (cashTotal / totalRev * 100) : 0 },
+              { label: 'Mobile Money', count: momoSales.length, amount: momoTotal, color: 'bg-amber-500', pct: totalRev ? (momoTotal / totalRev * 100) : 0 },
+              { label: 'Split', count: splitSales.length, amount: splitSales.reduce((a, s) => a + s.total, 0), color: 'bg-violet-500', pct: totalRev ? (splitSales.reduce((a, s) => a + s.total, 0) / totalRev * 100) : 0 },
+            ].map((p, i) => (
+              <div key={i}>
+                <div className="flex justify-between text-sm mb-1.5">
+                  <span className="font-semibold text-gray-700">{p.label} <span className="text-gray-400 font-normal">({p.count})</span></span>
+                  <span className="font-bold">{money(p.amount)} <span className="text-gray-400 text-xs">({p.pct.toFixed(0)}%)</span></span>
+                </div>
+                <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${p.color} transition-all`} style={{ width: Math.max(1, p.pct) + '%' }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+
+        {/* Sales Type Breakdown */}
+        <Section title="Sales Type" icon="🏷️">
+          <div className="space-y-3">
+            {[
+              { label: 'Retail', count: retailSales.length, amount: retailSales.reduce((a, s) => a + s.total, 0), color: 'bg-brand-500' },
+              { label: 'Wholesale', count: wholesaleSales.length, amount: wholesaleSales.reduce((a, s) => a + s.total, 0), color: 'bg-amber-500' },
+              { label: 'WhatsApp', count: waSales.length, amount: waSales.reduce((a, s) => a + s.total, 0), color: 'bg-green-500' },
+            ].map((p, i) => (
+              <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                 <div className="flex items-center gap-3">
-                  <span className={'w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center text-sm md:text-base font-bold text-white ' + (i < 3 ? 'bg-green-500' : 'bg-gray-400')}>{i + 1}</span>
-                  <span className="text-sm md:text-base font-semibold">{p.name}</span>
+                  <div className={`w-3 h-3 rounded-full ${p.color}`} />
+                  <span className="text-sm font-semibold text-gray-700">{p.label}</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-sm md:text-base font-extrabold text-green-600">{p.qty} sold</span>
-                  <span className="text-xs md:text-sm text-gray-400 ml-2">{money(p.revenue)}</span>
+                  <div className="text-sm font-bold">{money(p.amount)}</div>
+                  <div className="text-xs text-gray-400">{p.count} sales</div>
                 </div>
               </div>
-              <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                <div className={'h-full rounded-full transition-all ' + (i < 3 ? 'bg-green-500' : 'bg-gray-300')} style={{ width: barWidth + '%' }} />
+            ))}
+          </div>
+        </Section>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-5 mb-5">
+        {/* Top Selling Products */}
+        <Section title="Top Selling Products" icon="🔥">
+          {topProducts.length === 0 ? <p className="text-gray-400 text-sm text-center py-4">No sales data</p> : (
+            <div className="space-y-2.5">
+              {topProducts.map((p, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${i < 3 ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-500'}`}>{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-baseline mb-1">
+                      <span className="text-sm font-semibold text-gray-700 truncate pr-2">{p.name}</span>
+                      <span className="text-xs text-gray-400 whitespace-nowrap">{p.qty} sold • {money(p.revenue)}</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: (p.qty / maxQty * 100) + '%' }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+
+        {/* Expense Breakdown */}
+        <Section title="Expense Categories" icon="💸">
+          {expCats.length === 0 ? <p className="text-gray-400 text-sm text-center py-4">No expenses</p> : (
+            <div className="space-y-2.5">
+              {expCats.map((c, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div>
+                    <div className="text-sm font-semibold text-gray-700">{c.category}</div>
+                    <div className="text-xs text-gray-400">{c.count} entries</div>
+                  </div>
+                  <span className="text-sm font-bold text-red-500">{money(c.total)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between p-3 bg-red-50 rounded-xl border border-red-100">
+                <span className="text-sm font-bold text-red-600">Total Expenses</span>
+                <span className="text-sm font-extrabold text-red-600">{money(totalExp)}</span>
               </div>
             </div>
-          )
-        })}
+          )}
+        </Section>
       </div>
 
-      {/* Daily Breakdown */}
-      <div className="bg-white rounded-3xl p-6 md:p-8 shadow-md mb-5" style={{ borderLeft: '5px solid #8b5cf6' }}>
-        <h3 className="text-lg md:text-xl font-bold mb-5">📊 Daily Breakdown (This Week)</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[500px]">
+      <div className="grid md:grid-cols-2 gap-5 mb-5">
+        {/* Staff Performance */}
+        <Section title="Staff Performance" icon="👥">
+          {staffPerf.length === 0 ? <p className="text-gray-400 text-sm text-center py-4">No data</p> : (
+            <div className="space-y-2.5">
+              {staffPerf.map((s, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 text-sm font-bold">{s.name.charAt(0)}</div>
+                    <div>
+                      <div className="text-sm font-semibold text-gray-700">{s.name}</div>
+                      <div className="text-xs text-gray-400">{s.sales} sales</div>
+                    </div>
+                  </div>
+                  <span className="text-sm font-bold text-brand-600">{money(s.revenue)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+
+        {/* Refund Summary */}
+        <Section title="Refunds" icon="↩️">
+          {fRefunds.length === 0 ? <p className="text-gray-400 text-sm text-center py-4">No refunds</p> : (
+            <div className="space-y-2.5">
+              {fRefunds.slice(0, 8).map((r, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div>
+                    <div className="text-sm font-semibold text-violet-600">{r.refundNo}</div>
+                    <div className="text-xs text-gray-400">{r.reason || '-'} • {fmtDate(r.date)}</div>
+                  </div>
+                  <span className="text-sm font-bold text-red-500">-{money(r.refundAmount)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between p-3 bg-violet-50 rounded-xl border border-violet-100">
+                <span className="text-sm font-bold text-violet-600">Total Refunds</span>
+                <span className="text-sm font-extrabold text-violet-600">{money(totalRefAmt)}</span>
+              </div>
+            </div>
+          )}
+        </Section>
+      </div>
+
+      {/* Daily Breakdown Table */}
+      <Section title="Daily Breakdown" icon="📅">
+        <div className="overflow-x-auto -mx-2">
+          <table className="w-full min-w-[600px]">
             <thead>
               <tr>
-                <th className="p-3 bg-gray-50 text-left text-xs md:text-sm font-bold text-gray-500 uppercase">Day</th>
-                <th className="p-3 bg-gray-50 text-right text-xs md:text-sm font-bold text-gray-500 uppercase">Sales</th>
-                <th className="p-3 bg-gray-50 text-right text-xs md:text-sm font-bold text-gray-500 uppercase">Cash</th>
-                <th className="p-3 bg-gray-50 text-right text-xs md:text-sm font-bold text-gray-500 uppercase">Momo</th>
-                <th className="p-3 bg-gray-50 text-right text-xs md:text-sm font-bold text-gray-500 uppercase">Profit</th>
-                <th className="p-3 bg-gray-50 text-center text-xs md:text-sm font-bold text-gray-500 uppercase">Txn</th>
+                {['Date', 'Sales', 'Revenue', 'Cash', 'Momo', 'Profit'].map(h => (
+                  <th key={h} className="p-3 bg-gray-50 text-left text-[11px] md:text-xs font-bold text-gray-400 uppercase tracking-wide first:rounded-l-xl last:rounded-r-xl">{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {weekDays.map(d => (
-                <tr key={d.date} className={'border-b border-gray-50 ' + (d.date === t ? 'bg-brand-50/50' : '')}>
-                  <td className="p-3 text-sm md:text-base"><b>{d.name}</b><br /><span className="text-gray-400 text-xs md:text-sm">{fmtDate(d.date)}</span></td>
-                  <td className="p-3 text-sm md:text-base text-right font-bold">{money(d.total)}</td>
-                  <td className="p-3 text-sm md:text-base text-right text-green-600">{money(d.cash)}</td>
-                  <td className="p-3 text-sm md:text-base text-right text-amber-600">{money(d.momo)}</td>
-                  <td className="p-3 text-sm md:text-base text-right text-green-600 font-semibold">{money(d.profit)}</td>
-                  <td className="p-3 text-sm md:text-base text-center"><span className="px-3 py-1.5 bg-brand-50 text-brand-500 rounded-lg text-xs md:text-sm font-bold">{d.txn}</span></td>
-                </tr>
-              ))}
-              {weekDays.length === 0 && <tr><td colSpan={6} className="text-center py-8 text-gray-400 md:text-lg">No sales this week</td></tr>}
-            </tbody>
-            <tfoot>
-              <tr className="bg-gray-50 font-bold">
-                <td className="p-3 text-sm md:text-base">Total</td>
-                <td className="p-3 text-sm md:text-base text-right">{money(weekData.total)}</td>
-                <td className="p-3 text-sm md:text-base text-right text-green-600">{money(weekData.cash)}</td>
-                <td className="p-3 text-sm md:text-base text-right text-amber-600">{money(weekData.momo)}</td>
-                <td className="p-3 text-sm md:text-base text-right text-green-600">{money(weekData.profit)}</td>
-                <td className="p-3 text-sm md:text-base text-center">{weekData.txn}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
-
-      {/* Expenses This Month */}
-      <div className="bg-white rounded-3xl p-6 md:p-8 shadow-md mb-5" style={{ borderLeft: '5px solid #ef4444' }}>
-        <h3 className="text-lg md:text-xl font-bold mb-5">💸 Expenses This Month</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[400px]">
-            <thead>
-              <tr>
-                <th className="p-3 bg-gray-50 text-left text-xs md:text-sm font-bold text-gray-500 uppercase">Date</th>
-                <th className="p-3 bg-gray-50 text-left text-xs md:text-sm font-bold text-gray-500 uppercase">Category</th>
-                <th className="p-3 bg-gray-50 text-left text-xs md:text-sm font-bold text-gray-500 uppercase">Description</th>
-                <th className="p-3 bg-gray-50 text-right text-xs md:text-sm font-bold text-gray-500 uppercase">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {expenses.filter(e => isoDate(e.date) >= ms).length === 0 && (
-                <tr><td colSpan={4} className="text-center py-6 text-gray-400 md:text-lg">No expenses this month</td></tr>
-              )}
-              {expenses.filter(e => isoDate(e.date) >= ms).map(e => (
-                <tr key={e.id} className="border-b border-gray-50">
-                  <td className="p-3 text-sm md:text-base">{fmtDate(e.date)}</td>
-                  <td className="p-3"><span className="px-2.5 py-1.5 bg-red-50 text-red-500 rounded-lg text-xs md:text-sm font-bold">{e.category}</span></td>
-                  <td className="p-3 text-sm md:text-base">{e.description}</td>
-                  <td className="p-3 text-sm md:text-base text-right font-bold text-red-500">{money(e.amount)}</td>
+              {days.length === 0 && <tr><td colSpan={6} className="text-center py-8 text-gray-400 text-sm">No data for this period</td></tr>}
+              {days.map((d, i) => (
+                <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50 transition">
+                  <td className="p-3 text-sm font-semibold text-gray-700">{fmtDate(d.date)}</td>
+                  <td className="p-3"><span className="px-2.5 py-1 bg-brand-50 text-brand-600 rounded-lg text-xs font-bold">{d.sales}</span></td>
+                  <td className="p-3 text-sm font-bold text-gray-800">{money(d.revenue)}</td>
+                  <td className="p-3 text-sm font-semibold text-green-600">{money(d.cash)}</td>
+                  <td className="p-3 text-sm font-semibold text-amber-600">{money(d.momo)}</td>
+                  <td className="p-3 text-sm font-bold text-green-600">{money(d.profit)}</td>
                 </tr>
               ))}
             </tbody>
-            <tfoot>
-              <tr className="bg-gray-50 font-bold">
-                <td colSpan={3} className="p-3 text-sm md:text-base">Total Expenses</td>
-                <td className="p-3 text-sm md:text-base text-right text-red-500">{money(monthExp)}</td>
-              </tr>
-            </tfoot>
           </table>
         </div>
-      </div>
-
-      {/* Refunds This Month */}
-      <div className="bg-white rounded-3xl p-6 md:p-8 shadow-md" style={{ borderLeft: '5px solid #8b5cf6' }}>
-        <h3 className="text-lg md:text-xl font-bold mb-5">↩️ Refunds This Month</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[400px]">
-            <thead>
-              <tr>
-                <th className="p-3 bg-gray-50 text-left text-xs md:text-sm font-bold text-gray-500 uppercase">Date</th>
-                <th className="p-3 bg-gray-50 text-left text-xs md:text-sm font-bold text-gray-500 uppercase">Refund #</th>
-                <th className="p-3 bg-gray-50 text-left text-xs md:text-sm font-bold text-gray-500 uppercase">Reason</th>
-                <th className="p-3 bg-gray-50 text-right text-xs md:text-sm font-bold text-gray-500 uppercase">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {refunds.filter(r => isoDate(r.date) >= ms).length === 0 && (
-                <tr><td colSpan={4} className="text-center py-6 text-gray-400 md:text-lg">No refunds this month</td></tr>
-              )}
-              {refunds.filter(r => isoDate(r.date) >= ms).map(r => (
-                <tr key={r.id} className="border-b border-gray-50">
-                  <td className="p-3 text-sm md:text-base">{fmtDate(r.date)}</td>
-                  <td className="p-3 text-sm md:text-base font-bold text-violet-500">{r.refundNo}</td>
-                  <td className="p-3 text-sm md:text-base">{r.reason}</td>
-                  <td className="p-3 text-sm md:text-base text-right font-bold text-violet-500">{money(r.refundAmount)}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="bg-gray-50 font-bold">
-                <td colSpan={3} className="p-3 text-sm md:text-base">Total Refunds</td>
-                <td className="p-3 text-sm md:text-base text-right text-violet-500">{money(monthRef)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
+        {days.length > 0 && (
+          <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-gray-100">
+            <div className="text-sm"><span className="text-gray-400">Total Days:</span> <span className="font-bold">{days.length}</span></div>
+            <div className="text-sm"><span className="text-gray-400">Avg Revenue/Day:</span> <span className="font-bold text-brand-600">{money(totalRev / days.length)}</span></div>
+            <div className="text-sm"><span className="text-gray-400">Avg Sales/Day:</span> <span className="font-bold">{(fSales.length / days.length).toFixed(1)}</span></div>
+            <div className="text-sm"><span className="text-gray-400">Avg Profit/Day:</span> <span className="font-bold text-green-600">{money(totalProfit / days.length)}</span></div>
+          </div>
+        )}
+      </Section>
     </div>
   )
 }
