@@ -74,7 +74,7 @@ export default function POS() {
           if (mode === 'bundle') return (
             <button key={item.id} onClick={() => handleAdd(item)} className="bg-white rounded-2xl p-3 md:p-4 text-left border border-gray-100 hover:border-brand-200 hover:shadow-lg active:scale-[.97] transition-all">
               <div className="w-full aspect-[4/3] bg-gray-50 rounded-xl mb-3 flex items-center justify-center text-4xl">🎁</div>
-              <div className="text-sm md:text-[15px] font-bold text-gray-800 truncate">{item.name}</div>
+              <div className="text-sm md:text-[15px] font-bold text-gray-800">{item.name}</div>
               <div className="text-base md:text-lg font-extrabold text-brand-500 mt-1">{money(item.bundlePrice)}</div>
             </button>
           )
@@ -89,8 +89,8 @@ export default function POS() {
               </div>
               {/* Info */}
               <div className="p-3 md:p-3.5">
-                <div className="text-[13px] md:text-sm font-bold text-gray-800 truncate leading-tight">{item.name}</div>
-                {item.category && <div className="text-[11px] md:text-xs text-gray-400 mt-0.5 truncate">{item.category}</div>}
+                <div className="text-[13px] md:text-sm font-bold text-gray-800 leading-tight">{item.name}</div>
+                {item.category && <div className="text-[11px] md:text-xs text-gray-400 mt-0.5">{item.category}</div>}
                 <div className="flex items-end justify-between mt-2">
                   <div className="text-base md:text-lg font-extrabold text-brand-500 leading-none">{money(price)}</div>
                   <span className={`px-2 py-0.5 rounded-md text-[10px] md:text-[11px] font-bold leading-tight ${qty === 0 ? 'bg-red-50 text-red-500' : qty <= 5 ? 'bg-amber-50 text-amber-600' : 'bg-green-50 text-green-600'}`}>
