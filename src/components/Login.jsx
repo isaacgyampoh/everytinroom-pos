@@ -1,77 +1,73 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useStore } from '../hooks/useStore'
-import toast from 'react-hot-toast'
+import { ADMIN_PIN } from '../lib/utils'
 
 export default function Login() {
-  const { staff, login } = useStore()
-  const [pin, setPin] = useState('')
+  const [pins, setPins] = useState(['', '', '', ''])
+  const [error, setError] = useState(false)
+  const refs = [useRef(), useRef(), useRef(), useRef()]
+  const { staff, login, setPage } = useStore()
 
-  const tryLogin = (pinVal) => {
-    if (pinVal.length !== 4) return
-    // Compare as strings - trim whitespace just in case
-    const match = staff.find(s => String(s.pin).trim() === String(pinVal).trim() && s.active !== false)
-    if (match) {
-      login(match, match.role === 'admin')
-      toast.success('Welcome, ' + match.name + '!')
-    } else {
-      toast.error('Invalid PIN')
-      setPin('')
+  useEffect(() => { refs[0].current?.focus() }, [])
+
+  const handleInput = (i, val) => {
+    if (!/^\d*$/.test(val)) return
+    const newPins = [...pins]
+    newPins[i] = val.slice(-1)
+    setPins(newPins)
+    if (val && i < 3) refs[i + 1].current?.focus()
+    if (i === 3 && val) {
+      const pin = newPins.join('')
+      tryLogin(pin)
     }
   }
 
-  const handleChange = (e) => {
-    const val = e.target.value.replace(/\D/g, '').slice(0, 4)
-    setPin(val)
-    if (val.length === 4) setTimeout(() => tryLogin(val), 200)
+  const handleKeyDown = (i, e) => {
+    if (e.key === 'Backspace' && !pins[i] && i > 0) refs[i - 1].current?.focus()
   }
 
-  const handleSubmit = (e) => { e?.preventDefault(); tryLogin(pin) }
+  const tryLogin = (pin) => {
+    let u = staff.find(s => String(s.pin) === pin && s.active)
+    if (!u && pin === ADMIN_PIN) u = { name: 'Admin', role: 'Admin' }
+    if (u) {
+      const isAdmin = u.role === 'Admin'
+      login(u, isAdmin)
+      setPage(isAdmin ? 'dash' : 'pos')
+      setError(false)
+    } else {
+      setError(true)
+      setPins(['', '', '', ''])
+      refs[0].current?.focus()
+    }
+  }
 
   return (
-    <div className="fixed inset-0 brand-gradient flex flex-col items-center justify-center p-6 overflow-hidden">
-      {/* Background glow */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute -top-20 -right-20 w-80 h-80 bg-brand-500/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-32 -left-20 w-96 h-96 bg-accent-500/10 rounded-full blur-3xl" />
+    <div className="fixed inset-0 bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center p-6 z-[1000]">
+      <div className="text-center">
+        <img src="/logo.png" alt="Everytin Room" className="w-36 h-36 rounded-3xl mx-auto mb-6 object-contain" />
+        <h1 className="text-white text-3xl font-extrabold mb-1">Everytin Room</h1>
+        <p className="text-white/80 text-sm mb-10">Your One Stop Shop • Point of Sale</p>
+
+        <div className="bg-white rounded-3xl p-10 max-w-[380px] shadow-2xl">
+          <h2 className="text-2xl font-bold mb-2">Welcome Back!</h2>
+          <p className="text-gray-400 mb-8">Enter your 4-digit PIN</p>
+
+          {error && (
+            <div className="bg-red-50 text-red-600 p-3.5 rounded-xl mb-5 text-sm font-semibold animate-fade">
+              Invalid PIN. Try again.
+            </div>
+          )}
+
+          <div className="flex gap-3.5 justify-center mb-6">
+            {pins.map((v, i) => (
+              <input key={i} ref={refs[i]} type="tel" maxLength={1} value={v}
+                className="w-[60px] h-[70px] border-[3px] border-gray-200 rounded-2xl text-3xl font-bold text-center bg-gray-50 focus:outline-none focus:border-brand-500 transition"
+                onChange={e => handleInput(i, e.target.value)}
+                onKeyDown={e => handleKeyDown(i, e)} />
+            ))}
+          </div>
+        </div>
       </div>
-
-      {/* Logo */}
-      <div className="relative z-10 mb-6">
-        <img src="/logo.png" alt="Everytin Room" className="w-40 h-40 md:w-48 md:h-48 rounded-3xl object-contain animate-float" />
-      </div>
-
-      {/* Title */}
-      <div className="relative z-10 text-center mb-10">
-        <h1 className="text-3xl md:text-4xl font-extrabold">
-          <span className="text-brand-500">Everytin</span> <span className="text-accent-500">Room</span>
-        </h1>
-        <p className="text-gold-500 text-sm font-semibold mt-1">— Your One Stop Shop —</p>
-      </div>
-
-      {/* PIN Input */}
-      <form onSubmit={handleSubmit} className="relative z-10 w-full max-w-[260px]">
-        <p className="text-white/50 text-sm font-medium mb-3 text-center">Enter your 4-digit PIN</p>
-        <input
-          type="password"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={4}
-          autoFocus
-          value={pin}
-          onChange={handleChange}
-          className="w-full h-16 bg-white/10 border-2 border-white/15 rounded-2xl text-white text-center text-3xl font-bold tracking-[0.5em] placeholder:text-white/20 placeholder:tracking-[0.3em] placeholder:text-lg focus:outline-none focus:border-brand-500/60 focus:bg-white/15 transition-all"
-          placeholder="••••"
-        />
-        <button type="submit" className="w-full h-13 mt-4 brand-gradient-green rounded-xl text-white text-base font-bold hover:opacity-90 active:scale-[.97] transition-all shadow-lg shadow-brand-500/20">
-          🔓 Unlock
-        </button>
-        {staff.length === 0 && (
-          <p className="text-amber-400 text-xs text-center mt-3">⏳ Loading staff data...</p>
-        )}
-      </form>
-
-      {/* Footer */}
-      <p className="relative z-10 text-navy-300 text-xs mt-10">Adenta Aviation Road • Erbliving.shop</p>
     </div>
   )
 }
