@@ -1,101 +1,170 @@
 import { useState } from 'react'
 import { useStore } from '../hooks/useStore'
-import { money, today, weekStartDate, monthStart, isoDate } from '../lib/utils'
+import { money, num, today, weekStartDate, monthStart, isoDate } from '../lib/utils'
 
 export default function PerformancePage() {
   const { sales, staff, perfPeriod, setPerfPeriod } = useStore()
   const [expanded, setExpanded] = useState(null)
-  const range = perfPeriod === 'today' ? { from: today(), to: today() } : perfPeriod === 'week' ? { from: weekStartDate(), to: today() } : { from: monthStart(), to: today() }
-  const names = new Set(); sales.forEach(s => { if (s.cashier) names.add(s.cashier) }); staff.forEach(s => names.add(s.name))
-  const colors = ['#0ea5e9', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
-  let ci = 0
 
-  // Get products sold by a staff member
+  const range = perfPeriod === 'today' ? { from: today(), to: today() }
+    : perfPeriod === 'week' ? { from: weekStartDate(), to: today() }
+    : perfPeriod === 'month' ? { from: monthStart(), to: today() }
+    : { from: '2000-01-01', to: today() }
+
+  const names = new Set()
+  sales.forEach(s => { if (s.cashier) names.add(s.cashier) })
+  staff.forEach(s => names.add(s.name))
+
   const getProductsSold = (staffSales) => {
     const map = {}
     for (const s of staffSales) {
-      const items = Array.isArray(s.items) ? s.items : []
-      for (const it of items) {
+      for (const it of (Array.isArray(s.items) ? s.items : [])) {
         const key = it.name || it.productId || 'Unknown'
         if (!map[key]) map[key] = { name: key, qty: 0, revenue: 0 }
-        map[key].qty += (it.qty || 1)
-        map[key].revenue += (it.price || 0) * (it.qty || 1)
+        map[key].qty += num(it.qty || 1)
+        map[key].revenue += num(it.price) * num(it.qty || 1)
       }
     }
     return Object.values(map).sort((a, b) => b.qty - a.qty)
   }
 
+  const staffData = [...names].map(name => {
+    const ss = sales.filter(s => !s.voided && isoDate(s.date) >= range.from && isoDate(s.date) <= range.to && s.cashier === name)
+    return { name, sales: ss, count: ss.length, revenue: ss.reduce((a, s) => a + s.total, 0), profit: ss.reduce((a, s) => a + s.profit, 0), cash: ss.filter(s => s.payment === 'Cash').reduce((a, s) => a + s.total, 0), momo: ss.filter(s => s.payment === 'Momo').reduce((a, s) => a + s.total, 0) }
+  }).filter(s => s.count > 0 || staff.find(st => st.name === s.name)).sort((a, b) => b.revenue - a.revenue)
+
+  const totalRevAll = staffData.reduce((a, s) => a + s.revenue, 0)
+
   return (
     <div className="animate-fade">
-      <h1 className="text-3xl md:text-4xl font-extrabold mb-6">👥 Staff Sales</h1>
-      <div className="flex gap-2.5 mb-6">
-        {[['today', '📅 Today'], ['week', '📆 Week'], ['month', '📊 Month']].map(([p, l]) => (
-          <button key={p} onClick={() => setPerfPeriod(p)} className={`h-12 px-6 rounded-xl text-sm md:text-base font-semibold border-2 transition ${perfPeriod === p ? 'bg-brand-500 text-white border-transparent' : 'bg-white border-gray-200 text-gray-500'}`}>{l}</button>
+      <h1 className="text-2xl md:text-3xl font-extrabold mb-1 tracking-tight">👥 Staff Sales</h1>
+      <p className="text-gray-400 text-sm mb-5">Performance & sales breakdown per staff member</p>
+
+      {/* Period Tabs */}
+      <div className="flex gap-2 overflow-x-auto mb-6 pb-1 scrollbar-hide">
+        {[['today', '📅 Today'], ['week', '📆 This Week'], ['month', '🗓️ This Month'], ['overall', '📊 Overall']].map(([p, l]) => (
+          <button key={p} onClick={() => setPerfPeriod(p)}
+            className={`h-10 md:h-11 px-4 md:px-5 rounded-xl text-[13px] md:text-sm font-semibold whitespace-nowrap transition-all ${perfPeriod === p ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20' : 'bg-white border border-gray-200 text-gray-500 hover:border-brand-200'}`}>
+            {l}
+          </button>
         ))}
       </div>
-      {[...names].map(name => {
-        if (!name) return null
-        const ss = sales.filter(s => !s.voided && isoDate(s.date) >= range.from && isoDate(s.date) <= range.to && s.cashier === name)
-        if (!ss.length && !staff.find(s => s.name === name)) return null
-        let rev = 0, prof = 0, cash = 0, momo = 0
-        ss.forEach(s => { rev += s.total; prof += s.profit; if (s.payment === 'Cash') cash += s.total; else momo += s.total })
-        const color = colors[ci++ % colors.length]
-        const isOpen = expanded === name
-        const productsSold = isOpen ? getProductsSold(ss) : []
 
-        return (
-          <div key={name} className="bg-white rounded-3xl p-6 md:p-8 mb-4 shadow-md" style={{ borderLeft: `5px solid ${color}` }}>
-            <div className="flex justify-between items-center flex-wrap gap-3 mb-5">
-              <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold text-white" style={{ background: color }}>{name.charAt(0)}</div>
-                <span className="text-xl md:text-2xl font-extrabold">{name}</span>
-              </div>
-              <span className="px-4 py-2 bg-brand-50 text-brand-500 rounded-xl text-sm font-bold">{ss.length} sales</span>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-              {[['Revenue', money(rev), color], ['Profit', money(prof), '#22c55e'], ['💵 Cash', money(cash), null], ['📱 Momo', money(momo), null]].map(([l, v, c], i) => (
-                <div key={i} className="bg-gray-50 rounded-xl p-4 md:p-5 text-center">
-                  <div className="text-xs md:text-sm font-bold text-gray-400 uppercase mb-1.5">{l}</div>
-                  <div className="text-xl md:text-2xl font-extrabold" style={c ? { color: c } : {}}>{v}</div>
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="bg-white rounded-2xl p-4 md:p-5 text-center border border-gray-100">
+          <div className="text-xs md:text-sm text-gray-400 font-medium">Total Staff</div>
+          <div className="text-2xl md:text-3xl font-extrabold mt-1">{staffData.length}</div>
+        </div>
+        <div className="bg-white rounded-2xl p-4 md:p-5 text-center border border-gray-100">
+          <div className="text-xs md:text-sm text-gray-400 font-medium">Total Sales</div>
+          <div className="text-2xl md:text-3xl font-extrabold mt-1">{staffData.reduce((a, s) => a + s.count, 0)}</div>
+        </div>
+        <div className="bg-white rounded-2xl p-4 md:p-5 text-center border border-gray-100">
+          <div className="text-xs md:text-sm text-gray-400 font-medium">Total Revenue</div>
+          <div className="text-xl md:text-2xl font-extrabold text-brand-500 mt-1">{money(totalRevAll)}</div>
+        </div>
+      </div>
+
+      {/* Staff Cards */}
+      {staffData.length === 0 && <div className="text-center py-16 text-gray-300"><span className="text-5xl block mb-3">👥</span>No sales data for this period</div>}
+
+      <div className="space-y-4">
+        {staffData.map((s, idx) => {
+          const isOpen = expanded === s.name
+          const productsSold = isOpen ? getProductsSold(s.sales) : []
+          const revPct = totalRevAll ? (s.revenue / totalRevAll * 100) : 0
+
+          return (
+            <div key={s.name} className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+              {/* Header */}
+              <div className="p-4 md:p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-11 h-11 md:w-12 md:h-12 rounded-xl flex items-center justify-center text-lg md:text-xl font-bold text-white ${idx === 0 ? 'bg-brand-500' : idx === 1 ? 'bg-amber-500' : 'bg-gray-400'}`}>
+                      {s.name.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="text-base md:text-lg font-bold text-gray-800">{s.name}</div>
+                      <div className="text-xs md:text-sm text-gray-400">{s.count} transactions • {revPct.toFixed(0)}% of revenue</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg md:text-xl font-extrabold text-brand-500">{money(s.revenue)}</div>
+                  </div>
                 </div>
-              ))}
-            </div>
 
-            {/* Toggle Products Sold */}
-            <button onClick={() => setExpanded(isOpen ? null : name)} className={`w-full h-12 rounded-xl text-sm md:text-base font-semibold transition ${isOpen ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-              {isOpen ? '▲ Hide Products Sold' : '▼ View Products Sold (' + getProductsSold(ss).length + ')'}
-            </button>
+                {/* Stats Grid */}
+                <div className="grid grid-cols-4 gap-2 md:gap-3">
+                  {[
+                    { label: 'Revenue', value: money(s.revenue), color: 'text-brand-500' },
+                    { label: 'Profit', value: money(s.profit), color: 'text-green-600' },
+                    { label: '💵 Cash', value: money(s.cash), color: 'text-gray-700' },
+                    { label: '📱 Momo', value: money(s.momo), color: 'text-amber-600' },
+                  ].map((stat, i) => (
+                    <div key={i} className="bg-gray-50 rounded-xl p-2.5 md:p-3 text-center">
+                      <div className="text-[10px] md:text-xs text-gray-400 font-medium">{stat.label}</div>
+                      <div className={`text-sm md:text-base font-bold mt-0.5 ${stat.color}`}>{stat.value}</div>
+                    </div>
+                  ))}
+                </div>
 
-            {isOpen && productsSold.length > 0 && (
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[400px]">
-                  <thead>
-                    <tr>
-                      <th className="p-3 bg-gray-50 text-left text-xs md:text-sm font-bold text-gray-500">Product</th>
-                      <th className="p-3 bg-gray-50 text-center text-xs md:text-sm font-bold text-gray-500">Qty Sold</th>
-                      <th className="p-3 bg-gray-50 text-right text-xs md:text-sm font-bold text-gray-500">Revenue</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {productsSold.map((p, i) => (
-                      <tr key={i} className="border-b border-gray-50">
-                        <td className="p-3 text-sm md:text-base font-semibold">{p.name}</td>
-                        <td className="p-3 text-center">
-                          <span className="px-3 py-1.5 bg-brand-50 text-brand-500 rounded-lg text-sm font-bold">{p.qty}</span>
-                        </td>
-                        <td className="p-3 text-right text-sm md:text-base font-bold" style={{ color }}>{money(p.revenue)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                {/* Revenue Bar */}
+                <div className="mt-3">
+                  <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: Math.max(1, revPct) + '%' }} />
+                  </div>
+                </div>
               </div>
-            )}
-            {isOpen && productsSold.length === 0 && (
-              <div className="mt-4 text-center py-6 text-gray-400">No product data available</div>
-            )}
-          </div>
-        )
-      })}
+
+              {/* Toggle Products */}
+              <button onClick={() => setExpanded(isOpen ? null : s.name)}
+                className={`w-full h-11 border-t text-sm font-semibold transition-all ${isOpen ? 'bg-gray-800 text-white border-gray-800' : 'bg-gray-50 text-gray-500 border-gray-100 hover:bg-gray-100'}`}>
+                {isOpen ? '▲ Hide Products Sold' : '▼ View Products Sold'}
+              </button>
+
+              {/* Products Table */}
+              {isOpen && (
+                <div className="border-t border-gray-100">
+                  {productsSold.length === 0 ? (
+                    <div className="text-center py-6 text-gray-400 text-sm">No product data</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-gray-50">
+                            <th className="p-3 text-left text-[11px] md:text-xs font-bold text-gray-400 uppercase tracking-wide">#</th>
+                            <th className="p-3 text-left text-[11px] md:text-xs font-bold text-gray-400 uppercase tracking-wide">Product</th>
+                            <th className="p-3 text-center text-[11px] md:text-xs font-bold text-gray-400 uppercase tracking-wide">Qty</th>
+                            <th className="p-3 text-right text-[11px] md:text-xs font-bold text-gray-400 uppercase tracking-wide">Revenue</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {productsSold.map((p, i) => (
+                            <tr key={i} className="border-b border-gray-50">
+                              <td className="p-3 text-sm text-gray-400">{i + 1}</td>
+                              <td className="p-3 text-sm font-semibold text-gray-700">{p.name}</td>
+                              <td className="p-3 text-center"><span className="px-2.5 py-1 bg-brand-50 text-brand-600 rounded-lg text-xs font-bold">{p.qty}</span></td>
+                              <td className="p-3 text-right text-sm font-bold text-gray-800">{money(p.revenue)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-gray-50">
+                            <td colSpan={2} className="p-3 text-sm font-bold text-gray-600">Total</td>
+                            <td className="p-3 text-center text-sm font-bold text-brand-600">{productsSold.reduce((a, p) => a + p.qty, 0)}</td>
+                            <td className="p-3 text-right text-sm font-bold text-brand-600">{money(productsSold.reduce((a, p) => a + p.revenue, 0))}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
