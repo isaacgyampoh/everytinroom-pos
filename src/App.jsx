@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { getSupabase } from './lib/supabase'
 import { useStore } from './hooks/useStore'
@@ -22,13 +22,45 @@ import ReportsPage from './pages/ReportsPage'
 import PromosPage from './pages/PromosPage'
 import InvoicesPage from './pages/InvoicesPage'
 import StockTakesPage from './pages/StockTakesPage'
+import toast from 'react-hot-toast'
+
+const INACTIVITY_TIMEOUT = 30 * 60 * 1000 // 30 minutes
+const ADMIN_PAGES = ['products', 'staff', 'promos', 'invoices', 'stocktakes']
 
 export default function App() {
-  const { user, page, loading, loadAll } = useStore()
+  const { user, page, setPage, loading, loadAll, logout, isAdmin } = useStore()
   const [cartOpen, setCartOpen] = useState(false)
   const [receipt, setReceipt] = useState(null)
+  const [lastActivity, setLastActivity] = useState(Date.now())
 
   useEffect(() => { loadAll(); setupRealtime() }, [])
+
+  // Auto-logout on inactivity
+  const resetActivity = useCallback(() => setLastActivity(Date.now()), [])
+
+  useEffect(() => {
+    if (!user) return
+    const events = ['mousedown', 'keydown', 'touchstart', 'scroll']
+    events.forEach(e => window.addEventListener(e, resetActivity))
+    const timer = setInterval(() => {
+      if (Date.now() - lastActivity > INACTIVITY_TIMEOUT) {
+        logout()
+        toast('Session expired — please log in again', { icon: '🔒' })
+      }
+    }, 60000) // Check every minute
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetActivity))
+      clearInterval(timer)
+    }
+  }, [user, lastActivity, logout, resetActivity])
+
+  // Guard admin pages — redirect non-admin users
+  useEffect(() => {
+    if (user && !isAdmin && ADMIN_PAGES.includes(page)) {
+      setPage('pos')
+      toast.error('Admin access required')
+    }
+  }, [page, user, isAdmin, setPage])
 
   const setupRealtime = () => {
     const sb = getSupabase(); if (!sb) return
@@ -62,13 +94,13 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 to-blue-100 text-sky-950 font-outfit">
-      <Toaster position="top-center" toastOptions={{ duration: 2500, style: { borderRadius: '50px', padding: '16px 32px', fontWeight: 600 } }} />
+    <div className="min-h-screen bg-[#f7f8fa] text-gray-900">
+      <Toaster position="top-center" toastOptions={{ duration: 2500, style: { borderRadius: '14px', padding: '14px 24px', fontWeight: 600, fontSize: '14px' } }} />
       <Navigation onOpenCart={() => setCartOpen(true)} />
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} onReceipt={setReceipt} />
       {receipt && <ReceiptPreview sale={receipt} onClose={() => setReceipt(null)} />}
       <main className="pt-16 md:pt-[72px] pb-24 md:pb-10 min-h-screen">
-        <div className="px-4 md:px-10 py-6 max-w-[1200px] mx-auto">
+        <div className="px-4 md:px-8 lg:px-10 py-5 md:py-6 max-w-[1200px] mx-auto">
           {pages[page] || <POS />}
         </div>
       </main>
