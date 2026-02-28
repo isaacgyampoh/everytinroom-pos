@@ -38,7 +38,36 @@ export default function POS() {
       {/* Search */}
       <div className="relative mb-4">
         <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-        <input className="w-full h-12 md:h-13 pl-12 pr-4 bg-white border border-gray-200 rounded-2xl text-[15px] md:text-base font-medium focus:outline-none focus:border-brand-400 focus:ring-3 focus:ring-brand-50 transition shadow-sm" placeholder="Search products..." value={query} onChange={e => setQuery(e.target.value)} />
+        <input className="w-full h-12 md:h-13 pl-12 pr-4 bg-white border border-gray-200 rounded-2xl text-[15px] md:text-base font-medium focus:outline-none focus:border-brand-400 focus:ring-3 focus:ring-brand-50 transition shadow-sm" placeholder="Search or scan barcode..." value={query}
+          onChange={e => {
+            setQuery(e.target.value)
+            // Auto-add if barcode scanner enters exact product name/code
+            const val = e.target.value.trim()
+            if (val.length > 3) {
+              const exact = products.find(p => p.name.toLowerCase() === val.toLowerCase())
+              if (exact && exact.quantity > 0) {
+                const price = mode === 'wholesale' && exact.wholesalePrice > 0 ? exact.wholesalePrice : exact.price
+                if (addToCart({ productId: exact.id, name: exact.name, price, costPrice: exact.costPrice, image: exact.image })) {
+                  toast.success('Added: ' + exact.name)
+                  setQuery('')
+                }
+              }
+            }
+          }}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && query.trim()) {
+              const match = filtered[0]
+              if (match && mode !== 'bundle') {
+                if (match.quantity === 0) return
+                const price = mode === 'wholesale' && match.wholesalePrice > 0 ? match.wholesalePrice : match.price
+                if (addToCart({ productId: match.id, name: match.name, price, costPrice: match.costPrice, image: match.image })) {
+                  toast.success('Added: ' + match.name)
+                  setQuery('')
+                }
+              }
+            }
+          }}
+        />
       </div>
 
       {/* Categories */}

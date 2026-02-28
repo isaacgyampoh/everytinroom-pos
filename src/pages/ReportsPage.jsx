@@ -111,8 +111,23 @@ export default function ReportsPage() {
 
   return (
     <div className="animate-fade">
-      <h1 className="text-2xl md:text-3xl font-extrabold mb-1 tracking-tight">📈 Reports</h1>
-      <p className="text-gray-400 text-sm mb-5">Business analytics & insights</p>
+      <div className="flex justify-between items-start flex-wrap gap-3 mb-5">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">📈 Reports</h1>
+          <p className="text-gray-400 text-sm mt-0.5">Business analytics & insights</p>
+        </div>
+        <button onClick={() => {
+          const rows = [['Date','Receipt','Customer','Staff','Payment','Type','Items','Subtotal','Discount','Total','Profit']]
+          fSales.forEach(s => rows.push([isoDate(s.date), s.receiptNo, s.customer, s.cashier, s.payment, s.type, (s.items||[]).map(i=>i.name).join('; '), s.total+s.discount, s.discount, s.total, s.profit]))
+          rows.push([]); rows.push(['','','','','','','TOTAL','',totalDiscount,totalRev,totalProfit])
+          const csv = rows.map(r => r.map(c => '"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n')
+          const blob = new Blob([csv], { type: 'text/csv' })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a'); a.href = url; a.download = `everytin-room-report-${tab}-${today()}.csv`; a.click()
+        }} className="h-10 px-4 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 active:scale-[.97] transition">
+          📥 Export CSV
+        </button>
+      </div>
 
       {/* Period Tabs */}
       <div className="flex gap-2 overflow-x-auto mb-6 pb-1 scrollbar-hide">
