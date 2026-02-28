@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { id: 'bundles', icon: '🎁', label: 'Bundles', admin: true },
   { id: 'promos', icon: '🏷️', label: 'Promos', admin: true },
   { id: 'stocktakes', icon: '📋', label: 'Stock Takes', admin: true },
+  { id: 'stockadjustments', icon: '🔧', label: 'Adjustments', admin: true },
   { id: 'invoices', icon: '🧾', label: 'Invoices', admin: true },
   { id: 'customers', icon: '👤', label: 'Customers', admin: true },
   { id: 'expenses', icon: '💸', label: 'Expenses', admin: true },

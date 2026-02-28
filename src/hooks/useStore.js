@@ -13,6 +13,7 @@ const mapRefund = r => ({ id: r.id, refundNo: r.refund_no, date: r.date, origina
 const mapPromo = p => ({ id: p.id, name: p.name, startDate: p.start_date, endDate: p.end_date, items: typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || []), active: p.active })
 const mapInvoice = i => ({ id: i.id, invoiceId: i.invoice_id, date: i.date, supplier: i.supplier, amount: num(i.amount), notes: i.notes, image: i.image || '' })
 const mapStockTake = s => ({ id: s.id, date: s.date, items: typeof s.items === 'string' ? JSON.parse(s.items) : (s.items || []), notes: s.notes, conductedBy: s.conducted_by })
+const mapStockAdj = a => ({ id: a.id, date: a.date, productId: a.product_id, productName: a.product_name, qty: num(a.qty), reason: a.reason, notes: a.notes, adjustedBy: a.adjusted_by })
 
 // Safe query - returns empty array if table doesn't exist
 const safeQuery = async (sb, table, opts = {}) => {
@@ -28,7 +29,7 @@ const safeQuery = async (sb, table, opts = {}) => {
 
 export const useStore = create((set, get) => ({
   products: [], bundles: [], sales: [], staff: [], expenses: [],
-  customers: [], waOrders: [], refunds: [], promos: [], invoices: [], stockTakes: [],
+  customers: [], waOrders: [], refunds: [], promos: [], invoices: [], stockTakes: [], stockAdjustments: [],
   loading: true, loadingText: 'Connecting...',
   user: null, isAdmin: false,
   page: 'pos', cart: [], mode: 'retail', selectedCat: 'all', waFilter: 'Pending', perfPeriod: 'today',
@@ -76,10 +77,11 @@ export const useStore = create((set, get) => ({
       ])
 
       // Load optional tables (may not exist yet)
-      const [promoData, invData, stData] = await Promise.all([
+      const [promoData, invData, stData, adjData] = await Promise.all([
         safeQuery(sb, 'promos', { order: 'created_at' }),
         safeQuery(sb, 'invoices', { order: 'date' }),
         safeQuery(sb, 'stock_takes', { order: 'date' }),
+        safeQuery(sb, 'stock_adjustments', { order: 'date' }),
       ])
 
       set({
@@ -94,6 +96,7 @@ export const useStore = create((set, get) => ({
         promos: promoData.map(mapPromo),
         invoices: invData.map(mapInvoice),
         stockTakes: stData.map(mapStockTake),
+        stockAdjustments: adjData.map(mapStockAdj),
         loading: false,
       })
     } catch (e) {
@@ -113,6 +116,7 @@ export const useStore = create((set, get) => ({
   refreshPromos: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'promos', { order: 'created_at' }); set({ promos: d.map(mapPromo) }) },
   refreshInvoices: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'invoices', { order: 'date' }); set({ invoices: d.map(mapInvoice) }) },
   refreshStockTakes: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'stock_takes', { order: 'date' }); set({ stockTakes: d.map(mapStockTake) }) },
+  refreshStockAdjustments: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'stock_adjustments', { order: 'date' }); set({ stockAdjustments: d.map(mapStockAdj) }) },
 
   deductStock: (cartItems) => {
     const products = [...get().products]
