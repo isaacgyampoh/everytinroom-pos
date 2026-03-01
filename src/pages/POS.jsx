@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useStore } from '../hooks/useStore'
 import { money, num } from '../lib/utils'
 import toast from 'react-hot-toast'
@@ -7,15 +7,17 @@ export default function POS() {
   const { products, bundles, mode, setMode, selectedCat, setCat, addToCart } = useStore()
   const [query, setQuery] = useState('')
 
-  const categories = ['all', ...new Set(products.filter(p => p.category).map(p => p.category))]
+  const categories = useMemo(() => ['all', ...new Set(products.filter(p => p.category).map(p => p.category))], [products])
 
-  const filtered = mode === 'bundle'
-    ? bundles.filter(b => b.active && b.name.toLowerCase().includes(query.toLowerCase()))
-    : products.filter(p => {
-        if (!p.name.toLowerCase().includes(query.toLowerCase())) return false
-        if (selectedCat !== 'all' && p.category !== selectedCat) return false
-        return true
-      })
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase()
+    if (mode === 'bundle') return bundles.filter(b => b.active && b.name.toLowerCase().includes(q))
+    return products.filter(p => {
+      if (q && !p.name.toLowerCase().includes(q)) return false
+      if (selectedCat !== 'all' && p.category !== selectedCat) return false
+      return true
+    })
+  }, [products, bundles, mode, query, selectedCat])
 
   const handleAdd = (item) => {
     if (mode === 'bundle') {

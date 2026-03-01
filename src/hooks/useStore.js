@@ -15,16 +15,17 @@ const mapInvoice = i => ({ id: i.id, invoiceId: i.invoice_id, date: i.date, supp
 const mapStockTake = s => ({ id: s.id, date: s.date, items: typeof s.items === 'string' ? JSON.parse(s.items) : (s.items || []), notes: s.notes, conductedBy: s.conducted_by })
 const mapStockAdj = a => ({ id: a.id, date: a.date, productId: a.product_id, productName: a.product_name, qty: num(a.qty), reason: a.reason, notes: a.notes, adjustedBy: a.adjusted_by })
 
-// Safe query - returns empty array if table doesn't exist
-const safeQuery = async (sb, table, opts = {}) => {
+// Fast query with select only needed columns where possible
+const q = async (sb, table, opts = {}) => {
   try {
-    let q = sb.from(table).select('*')
-    if (opts.order) q = q.order(opts.order, { ascending: opts.asc ?? false })
-    if (opts.limit) q = q.limit(opts.limit)
-    const { data, error } = await q
-    if (error) { console.warn(`Table ${table}:`, error.message); return [] }
+    let query = sb.from(table).select(opts.select || '*')
+    if (opts.order) query = query.order(opts.order, { ascending: opts.asc ?? false })
+    if (opts.limit) query = query.limit(opts.limit)
+    if (opts.gt) query = query.gt(opts.gt[0], opts.gt[1])
+    const { data, error } = await query
+    if (error) return []
     return data || []
-  } catch (e) { console.warn(`Table ${table} failed:`, e.message); return [] }
+  } catch { return [] }
 }
 
 export const useStore = create((set, get) => ({
@@ -33,8 +34,17 @@ export const useStore = create((set, get) => ({
   loading: true, loadingText: 'Connecting...',
   user: null, isAdmin: false,
   page: 'pos', cart: [], mode: 'retail', selectedCat: 'all', waFilter: 'Pending', perfPeriod: 'today',
+  _secondaryLoaded: false,
 
-  setPage: page => set({ page }), setMode: mode => set({ mode }), setCat: cat => set({ selectedCat: cat }),
+  setPage: page => {
+    set({ page })
+    // Lazy load secondary data when navigating to those pages
+    const s = get()
+    if (!s._secondaryLoaded && ['reports', 'invoices', 'stocktakes', 'stockadjustments', 'promos', 'customers'].includes(page)) {
+      s._loadSecondary()
+    }
+  },
+  setMode: mode => set({ mode }), setCat: cat => set({ selectedCat: cat }),
   setWAFilter: f => set({ waFilter: f }), setPerfPeriod: p => set({ perfPeriod: p }),
   setLoading: (loading, text) => set({ loading, loadingText: text || 'Loading...' }),
   login: (user, isAdmin) => set({ user, isAdmin }),
@@ -60,35 +70,50 @@ export const useStore = create((set, get) => ({
   removeFromCart: index => { const cart = [...get().cart]; cart.splice(index, 1); set({ cart }) },
   clearCart: () => set({ cart: [] }),
 
+  // PHASE 1: Load only essential data (products, staff, sales, bundles)
   loadAll: async () => {
     const sb = getSupabase(); if (!sb) { set({ loading: false }); return }
-    set({ loading: true, loadingText: 'Loading data...' })
+    set({ loading: true, loadingText: 'Loading...' })
     try {
-      // Load core tables first (these must exist)
-      const [prodData, bunData, saleData, staffData, expData, custData, waData, refData] = await Promise.all([
-        safeQuery(sb, 'products', { order: 'name', asc: true }),
-        safeQuery(sb, 'bundles'),
-        safeQuery(sb, 'sales', { order: 'date', limit: 500 }),
-        safeQuery(sb, 'staff'),
-        safeQuery(sb, 'expenses', { order: 'date' }),
-        safeQuery(sb, 'customers', { order: 'total_spent' }),
-        safeQuery(sb, 'whatsapp_orders', { order: 'date' }),
-        safeQuery(sb, 'refunds', { order: 'date' }),
-      ])
-
-      // Load optional tables (may not exist yet)
-      const [promoData, invData, stData, adjData] = await Promise.all([
-        safeQuery(sb, 'promos', { order: 'created_at' }),
-        safeQuery(sb, 'invoices', { order: 'date' }),
-        safeQuery(sb, 'stock_takes', { order: 'date' }),
-        safeQuery(sb, 'stock_adjustments', { order: 'date' }),
+      const [prodData, staffData, saleData, bunData] = await Promise.all([
+        q(sb, 'products', { order: 'name', asc: true }),
+        q(sb, 'staff'),
+        q(sb, 'sales', { order: 'date', limit: 300 }),
+        q(sb, 'bundles'),
       ])
 
       set({
         products: prodData.map(mapProduct),
-        bundles: bunData.map(mapBundle),
-        sales: saleData.map(mapSale),
         staff: staffData.map(mapStaff),
+        sales: saleData.map(mapSale),
+        bundles: bunData.map(mapBundle),
+        loading: false,
+      })
+
+      // PHASE 2: Load secondary data in background (non-blocking)
+      get()._loadSecondary()
+    } catch (e) {
+      console.error('Load error:', e)
+      set({ loading: false })
+    }
+  },
+
+  // Background load for secondary tables
+  _loadSecondary: async () => {
+    if (get()._secondaryLoaded) return
+    const sb = getSupabase(); if (!sb) return
+    try {
+      const [expData, custData, waData, refData, promoData, invData, stData, adjData] = await Promise.all([
+        q(sb, 'expenses', { order: 'date', limit: 200 }),
+        q(sb, 'customers', { order: 'total_spent', limit: 500 }),
+        q(sb, 'whatsapp_orders', { order: 'date', limit: 100 }),
+        q(sb, 'refunds', { order: 'date', limit: 100 }),
+        q(sb, 'promos', { order: 'created_at', limit: 50 }),
+        q(sb, 'invoices', { order: 'date', limit: 100 }),
+        q(sb, 'stock_takes', { order: 'date', limit: 50 }),
+        q(sb, 'stock_adjustments', { order: 'date', limit: 200 }),
+      ])
+      set({
         expenses: expData.map(mapExpense),
         customers: custData.map(mapCustomer),
         waOrders: waData.map(mapWAOrder),
@@ -97,26 +122,23 @@ export const useStore = create((set, get) => ({
         invoices: invData.map(mapInvoice),
         stockTakes: stData.map(mapStockTake),
         stockAdjustments: adjData.map(mapStockAdj),
-        loading: false,
+        _secondaryLoaded: true,
       })
-    } catch (e) {
-      console.error('Load error:', e)
-      set({ loading: false })
-    }
+    } catch (e) { console.warn('Secondary load:', e) }
   },
 
-  refreshProducts: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'products', { order: 'name', asc: true }); set({ products: d.map(mapProduct) }) },
-  refreshSales: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'sales', { order: 'date', limit: 500 }); set({ sales: d.map(mapSale) }) },
-  refreshWAOrders: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'whatsapp_orders', { order: 'date' }); set({ waOrders: d.map(mapWAOrder) }) },
-  refreshStaff: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'staff'); set({ staff: d.map(mapStaff) }) },
-  refreshBundles: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'bundles'); set({ bundles: d.map(mapBundle) }) },
-  refreshExpenses: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'expenses', { order: 'date' }); set({ expenses: d.map(mapExpense) }) },
-  refreshCustomers: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'customers', { order: 'total_spent' }); set({ customers: d.map(mapCustomer) }) },
-  refreshRefunds: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'refunds', { order: 'date' }); set({ refunds: d.map(mapRefund) }) },
-  refreshPromos: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'promos', { order: 'created_at' }); set({ promos: d.map(mapPromo) }) },
-  refreshInvoices: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'invoices', { order: 'date' }); set({ invoices: d.map(mapInvoice) }) },
-  refreshStockTakes: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'stock_takes', { order: 'date' }); set({ stockTakes: d.map(mapStockTake) }) },
-  refreshStockAdjustments: async () => { const sb = getSupabase(); if (!sb) return; const d = await safeQuery(sb, 'stock_adjustments', { order: 'date' }); set({ stockAdjustments: d.map(mapStockAdj) }) },
+  refreshProducts: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'products', { order: 'name', asc: true }); set({ products: d.map(mapProduct) }) },
+  refreshSales: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'sales', { order: 'date', limit: 300 }); set({ sales: d.map(mapSale) }) },
+  refreshWAOrders: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'whatsapp_orders', { order: 'date', limit: 100 }); set({ waOrders: d.map(mapWAOrder) }) },
+  refreshStaff: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'staff'); set({ staff: d.map(mapStaff) }) },
+  refreshBundles: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'bundles'); set({ bundles: d.map(mapBundle) }) },
+  refreshExpenses: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'expenses', { order: 'date', limit: 200 }); set({ expenses: d.map(mapExpense) }) },
+  refreshCustomers: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'customers', { order: 'total_spent', limit: 500 }); set({ customers: d.map(mapCustomer) }) },
+  refreshRefunds: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'refunds', { order: 'date', limit: 100 }); set({ refunds: d.map(mapRefund) }) },
+  refreshPromos: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'promos', { order: 'created_at', limit: 50 }); set({ promos: d.map(mapPromo) }) },
+  refreshInvoices: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'invoices', { order: 'date', limit: 100 }); set({ invoices: d.map(mapInvoice) }) },
+  refreshStockTakes: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'stock_takes', { order: 'date', limit: 50 }); set({ stockTakes: d.map(mapStockTake) }) },
+  refreshStockAdjustments: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'stock_adjustments', { order: 'date', limit: 200 }); set({ stockAdjustments: d.map(mapStockAdj) }) },
 
   deductStock: (cartItems) => {
     const products = [...get().products]
