@@ -14,27 +14,19 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
   const [payOpen, setPayOpen] = useState(false)
   const [payMethod, setPayMethod] = useState('Cash')
   const [processing, setProcessing] = useState(false)
-
-  // Split payment
   const [splitMode, setSplitMode] = useState(false)
   const [splitCash, setSplitCash] = useState('')
-
-  // Hold cart
-  const [heldCarts, setHeldCarts] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('heldCarts') || '[]') } catch { return [] }
-  })
+  const [heldCarts, setHeldCarts] = useState(() => { try { return JSON.parse(localStorage.getItem('heldCarts') || '[]') } catch { return [] } })
   const [showHeld, setShowHeld] = useState(false)
-
-  // Momo states
   const [momoStep, setMomoStep] = useState('idle')
   const [momoMessage, setMomoMessage] = useState('')
-  const [momoRef, setMomoRef] = useState('')
   const pollRef = useRef(null)
 
   const sub = cart.reduce((a, c) => a + c.lineTotal, 0)
   const total = Math.max(0, sub - num(discount))
   const cnt = cart.reduce((a, c) => a + c.qty, 0)
   const splitRemainder = total - num(splitCash)
+  const phoneValid = phone.trim().length >= 9
 
   useEffect(() => { return () => { if (pollRef.current) clearInterval(pollRef.current) } }, [])
   useEffect(() => { localStorage.setItem('heldCarts', JSON.stringify(heldCarts)) }, [heldCarts])
@@ -43,45 +35,46 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
     const sb = getSupabase(); if (!sb) return null
     try {
       const { data, error } = await sb.rpc('record_sale', {
-        p_items: cart, p_customer: phone.trim() || 'Walk-in', p_payment: paymentMethod,
+        p_items: cart, p_customer: phone.trim(), p_payment: paymentMethod,
         p_discount: num(discount), p_type: mode === 'wholesale' ? 'Wholesale' : 'Retail', p_cashier: user?.name || '',
       })
       if (data?.success) {
-        if (splitMode && extraData.splitCash !== undefined) {
+        if (extraData.splitCash !== undefined) {
           await sb.from('sales').update({ split_cash: num(extraData.splitCash), split_momo: num(extraData.splitMomo) }).eq('receipt_no', data.receiptNo)
         }
         deductStock(cart)
-        return { receiptNo: data.receiptNo, date: new Date().toISOString(), customer: phone.trim() || 'Walk-in', cashier: user?.name || '', payment: paymentMethod, type: mode === 'wholesale' ? 'Wholesale' : 'Retail', items: cart, total: data.total, discount: data.discount, splitCash: extraData.splitCash, splitMomo: extraData.splitMomo }
+        return { receiptNo: data.receiptNo, date: new Date().toISOString(), customer: phone.trim(), cashier: user?.name || '', payment: paymentMethod, type: mode === 'wholesale' ? 'Wholesale' : 'Retail', items: cart, total: data.total, discount: data.discount, splitCash: extraData.splitCash, splitMomo: extraData.splitMomo }
       } else { toast.error(data?.error || error?.message || 'Error'); return null }
     } catch (e) { toast.error('Error: ' + e.message); return null }
   }
 
   const finishSale = (saleData) => {
-    clearCart(); setDiscount(0); setPhone(''); setPayOpen(false); setSplitMode(false); setSplitCash(''); setMomoStep('idle'); setMomoMessage(''); setMomoRef('')
+    clearCart(); setDiscount(0); setPhone(''); setPayOpen(false); setSplitMode(false); setSplitCash(''); setMomoStep('idle'); setMomoMessage('')
     onClose()
     if (onReceipt) onReceipt(saleData)
   }
 
-  const completeCashSale = async () => {
+  // Cash or manual Momo — just record directly
+  const completeDirectSale = async (method) => {
     setProcessing(true)
     const extra = splitMode ? { splitCash: num(splitCash), splitMomo: splitRemainder } : {}
-    const saleData = await recordSale(splitMode ? 'Split' : 'Cash', extra)
+    const saleData = await recordSale(splitMode ? 'Split' : method, extra)
     if (saleData) { toast.success('Sale done! ' + saleData.receiptNo); finishSale(saleData) }
     setProcessing(false)
   }
 
-  const startMomoPayment = async () => {
-    if (!phone.trim() || phone.trim().length < 9) { toast.error('Enter customer phone for Momo'); return }
-    setMomoStep('charging'); setMomoMessage('Initializing payment...')
+  // Paystack online payment
+  const startPaystackPayment = async () => {
+    setMomoStep('charging'); setMomoMessage('Opening Paystack...')
     try {
-      const momoAmount = splitMode ? splitRemainder : total
+      const paystackAmount = splitMode ? splitRemainder : total
       const res = await fetch(CHARGE_URL + '?action=initialize', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone.trim(), amount: momoAmount, callbackUrl: window.location.origin }),
+        body: JSON.stringify({ phone: phone.trim(), amount: paystackAmount, callbackUrl: window.location.origin }),
       })
       const data = await res.json()
       if (!data.success || !data.authorizationUrl) { setMomoStep('failed'); setMomoMessage(data.error || 'Failed to initialize'); return }
-      setMomoRef(data.reference); setMomoStep('waiting'); setMomoMessage('Customer completing payment...')
+      setMomoStep('waiting'); setMomoMessage('Customer completing payment...')
       const popup = window.open(data.authorizationUrl, 'paystack_checkout', 'width=500,height=700,scrollbars=yes')
       let attempts = 0
       pollRef.current = setInterval(async () => {
@@ -90,7 +83,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
           try {
             const vRes = await fetch(CHARGE_URL + '?action=verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reference: data.reference }) })
             const vData = await vRes.json()
-            if (vData.paymentStatus === 'success') { clearInterval(pollRef.current); await handlePaymentSuccess(); return }
+            if (vData.paymentStatus === 'success') { clearInterval(pollRef.current); await handlePaystackSuccess(); return }
           } catch {}
           clearInterval(pollRef.current); setMomoStep('failed'); setMomoMessage('Payment not completed.'); return
         }
@@ -98,28 +91,27 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
         try {
           const vRes = await fetch(CHARGE_URL + '?action=verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reference: data.reference }) })
           const vData = await vRes.json()
-          if (vData.paymentStatus === 'success') { clearInterval(pollRef.current); if (popup && !popup.closed) popup.close(); await handlePaymentSuccess() }
+          if (vData.paymentStatus === 'success') { clearInterval(pollRef.current); if (popup && !popup.closed) popup.close(); await handlePaystackSuccess() }
           else if (vData.paymentStatus === 'failed') { clearInterval(pollRef.current); if (popup && !popup.closed) popup.close(); setMomoStep('failed'); setMomoMessage('Payment failed.') }
         } catch {}
       }, 2000)
     } catch (e) { setMomoStep('failed'); setMomoMessage('Network error: ' + e.message) }
   }
 
-  const handlePaymentSuccess = async () => {
-    setMomoStep('success'); setMomoMessage('Payment received!')
+  const handlePaystackSuccess = async () => {
+    setMomoStep('success'); setMomoMessage('Payment confirmed!')
     const extra = splitMode ? { splitCash: num(splitCash), splitMomo: splitRemainder } : {}
-    const saleData = await recordSale(splitMode ? 'Split' : 'Momo', extra)
-    if (saleData) { toast.success('Momo confirmed! ' + saleData.receiptNo); finishSale(saleData) }
+    const saleData = await recordSale(splitMode ? 'Split' : 'Paystack', extra)
+    if (saleData) { toast.success('Paystack confirmed! ' + saleData.receiptNo); finishSale(saleData) }
     else { setMomoStep('failed'); setMomoMessage('Payment received but recording failed.') }
   }
 
-  const cancelMomo = () => { if (pollRef.current) clearInterval(pollRef.current); setMomoStep('idle'); setMomoMessage(''); setMomoRef('') }
+  const cancelPaystack = () => { if (pollRef.current) clearInterval(pollRef.current); setMomoStep('idle'); setMomoMessage('') }
 
   const holdCart = () => {
     if (!cart.length) return
     setHeldCarts(prev => [...prev, { id: Date.now(), items: [...cart], phone: phone.trim(), discount: num(discount), time: new Date().toLocaleTimeString() }])
-    clearCart(); setDiscount(0); setPhone('')
-    toast.success('Cart held!')
+    clearCart(); setDiscount(0); setPhone(''); toast.success('Cart held!')
   }
 
   const recallCart = (held) => {
@@ -128,20 +120,29 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
     const { addToCart } = useStore.getState()
     for (const item of held.items) { for (let i = 0; i < item.qty; i++) addToCart({ ...item, qty: undefined, lineTotal: undefined }) }
     setPhone(held.phone || ''); setDiscount(held.discount || 0)
-    setHeldCarts(prev => prev.filter(h => h.id !== held.id))
-    setShowHeld(false)
-    toast.success('Cart recalled!')
+    setHeldCarts(prev => prev.filter(h => h.id !== held.id)); setShowHeld(false); toast.success('Cart recalled!')
   }
 
   const deleteHeld = (id) => { setHeldCarts(prev => prev.filter(h => h.id !== id)) }
 
-  const completeSale = () => {
+  const handleCompleteSale = () => {
+    // PHONE IS REQUIRED
+    if (!phoneValid) { toast.error('⚠️ Customer phone number is required!'); return }
+
     if (splitMode) {
       if (num(splitCash) < 0 || num(splitCash) > total) { toast.error('Invalid cash amount'); return }
-      if (splitRemainder > 0 && (!phone.trim() || phone.trim().length < 9)) { toast.error('Enter phone for Momo portion'); return }
-      if (splitRemainder > 0) startMomoPayment(); else completeCashSale()
-    } else if (payMethod === 'Cash') completeCashSale()
-    else startMomoPayment()
+      if (splitRemainder > 0) startPaystackPayment() // Paystack for momo portion of split
+      else completeDirectSale('Cash') // All cash in split
+    } else if (payMethod === 'Cash') completeDirectSale('Cash')
+    else if (payMethod === 'Momo') completeDirectSale('Momo') // Manual momo — just record it
+    else startPaystackPayment() // Paystack online
+  }
+
+  // Block "Complete Sale" if no phone
+  const handleOpenPayment = () => {
+    if (!phoneValid) { toast.error('⚠️ Enter customer phone number first!'); return }
+    if (cnt === 0) return
+    setPayOpen(true)
   }
 
   return (
@@ -149,7 +150,6 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
       {open && <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[300]" onClick={onClose} />}
       <div className={`fixed bottom-0 left-0 right-0 md:left-auto md:top-0 md:w-[400px] bg-white md:border-l border-gray-200 max-h-[92vh] md:max-h-full z-[301] flex flex-col transition-transform duration-300 ${open ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:translate-y-0 md:translate-x-full'} md:rounded-none rounded-t-2xl shadow-2xl`}>
 
-        {/* Header */}
         <div className="md:hidden w-10 h-1 bg-gray-200 rounded-full mx-auto mt-2.5" />
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2.5">
@@ -208,10 +208,15 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             </div>
           </div>
 
-          <input type="tel" className="w-full h-11 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium mb-3 focus:outline-none focus:border-brand-400 placeholder:text-gray-300"
-            placeholder="📱 Customer phone (required for Momo)" value={phone} onChange={e => setPhone(e.target.value)} />
+          {/* Phone - REQUIRED */}
+          <div className="relative mb-3">
+            <input type="tel" className={`w-full h-11 px-4 bg-gray-50 border rounded-xl text-sm font-medium focus:outline-none placeholder:text-gray-300 ${phoneValid ? 'border-green-300 bg-green-50/30' : 'border-red-300 bg-red-50/30'}`}
+              placeholder="📱 Customer phone number (REQUIRED)" value={phone} onChange={e => setPhone(e.target.value)} />
+            {phoneValid && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 text-sm">✓</span>}
+          </div>
+          {!phoneValid && phone.length > 0 && <p className="text-red-500 text-xs font-medium mb-2 -mt-1">Enter at least 9 digits</p>}
 
-          <button onClick={() => cnt > 0 && setPayOpen(true)} disabled={cnt === 0}
+          <button onClick={handleOpenPayment} disabled={cnt === 0 || !phoneValid}
             className="w-full h-12 bg-brand-500 hover:bg-brand-600 rounded-xl text-white text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm shadow-brand-500/20">
             Complete Sale — {money(total)}
           </button>
@@ -219,81 +224,98 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
       </div>
 
       {/* Payment Modal */}
-      <Modal open={payOpen} onClose={() => { if (momoStep === 'idle' || momoStep === 'failed') { setPayOpen(false); cancelMomo() } }} title="Payment">
+      <Modal open={payOpen} onClose={() => { if (momoStep === 'idle' || momoStep === 'failed') { setPayOpen(false); cancelPaystack() } }} title="Payment">
         <div className="space-y-4">
           {(momoStep === 'idle' || momoStep === 'failed') && (<>
-            {/* Amount */}
             <div className="bg-gray-50 rounded-xl p-5 text-center border border-gray-100">
               <div className="text-xs text-gray-400 font-medium">Amount Due</div>
               <div className="text-3xl font-extrabold text-gray-900 mt-1">{money(total)}</div>
+              <div className="text-xs text-gray-400 mt-1">📱 {phone}</div>
             </div>
 
-            {/* Payment Methods */}
+            {/* 4 Payment Methods */}
             <div>
               <label className="block text-xs font-semibold text-gray-400 mb-2.5">Payment Method</label>
-              <div className="grid grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-2 gap-2.5">
                 {[
-                  { id: 'Cash', icon: '💵', label: 'Cash', color: 'bg-green-500', border: 'border-green-500' },
-                  { id: 'Momo', icon: '📱', label: 'Momo', color: 'bg-amber-500', border: 'border-amber-500' },
-                  { id: 'Split', icon: '✂️', label: 'Split', color: 'bg-violet-500', border: 'border-violet-500' },
+                  { id: 'Cash', icon: '💵', label: 'Cash', sub: 'Manual', color: 'bg-green-500', border: 'border-green-500' },
+                  { id: 'Momo', icon: '📱', label: 'Momo', sub: 'Manual', color: 'bg-amber-500', border: 'border-amber-500' },
+                  { id: 'Paystack', icon: '💳', label: 'Paystack', sub: 'Online', color: 'bg-blue-500', border: 'border-blue-500' },
+                  { id: 'Split', icon: '✂️', label: 'Split', sub: 'Cash + Paystack', color: 'bg-violet-500', border: 'border-violet-500' },
                 ].map(m => {
                   const active = m.id === 'Split' ? splitMode : (!splitMode && payMethod === m.id)
                   return (
                     <button key={m.id} onClick={() => { if (m.id === 'Split') { setSplitMode(true); setSplitCash('') } else { setPayMethod(m.id); setSplitMode(false) } }}
-                      className={`h-20 rounded-xl text-sm font-bold border-2 flex flex-col items-center justify-center gap-1 transition-all ${active ? m.color + ' text-white ' + m.border + ' shadow-md' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
-                      <span className="text-xl">{m.icon}</span>{m.label}
+                      className={`h-20 rounded-xl text-sm font-bold border-2 flex flex-col items-center justify-center gap-0.5 transition-all ${active ? m.color + ' text-white ' + m.border + ' shadow-md' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                      <span className="text-xl">{m.icon}</span>
+                      <span>{m.label}</span>
+                      <span className={`text-[10px] font-medium ${active ? 'opacity-70' : 'opacity-40'}`}>{m.sub}</span>
                     </button>
                   )
                 })}
               </div>
             </div>
 
+            {/* Momo Manual Info */}
+            {!splitMode && payMethod === 'Momo' && (
+              <div className="bg-amber-50 rounded-xl p-3.5 border border-amber-100">
+                <div className="text-sm font-bold text-amber-700 mb-1">📱 Manual Momo</div>
+                <div className="text-xs text-amber-600">Confirm you've received {money(total)} via Mobile Money from {phone}, then click to complete.</div>
+              </div>
+            )}
+
+            {/* Paystack Info */}
+            {!splitMode && payMethod === 'Paystack' && (
+              <div className="bg-blue-50 rounded-xl p-3.5 border border-blue-100">
+                <div className="text-sm font-bold text-blue-700 mb-1">💳 Paystack Online</div>
+                <div className="text-xs text-blue-600">A Paystack checkout window will open. Customer pays via Momo online. Payment auto-confirmed.</div>
+              </div>
+            )}
+
             {/* Split Details */}
             {splitMode && (
               <div className="bg-violet-50 rounded-xl p-4 border border-violet-100 space-y-3">
-                <div className="text-sm font-bold text-violet-700">Split Payment — {money(total)}</div>
+                <div className="text-sm font-bold text-violet-700">✂️ Split Payment — {money(total)}</div>
                 <div>
                   <label className="block text-xs font-semibold text-violet-600 mb-1.5">💵 Cash Amount</label>
                   <input type="number" className="w-full h-11 px-4 bg-white border border-violet-200 rounded-xl text-sm font-bold focus:outline-none focus:border-violet-400" placeholder="0.00" value={splitCash} min={0} max={total} onChange={e => setSplitCash(e.target.value)} />
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-violet-200">
-                  <span className="text-sm font-semibold text-amber-600">📱 Momo Portion</span>
-                  <span className="text-lg font-extrabold text-amber-600">{money(Math.max(0, splitRemainder))}</span>
+                  <span className="text-sm font-semibold text-blue-600">💳 Paystack Portion</span>
+                  <span className="text-lg font-extrabold text-blue-600">{money(Math.max(0, splitRemainder))}</span>
                 </div>
+                <div className="text-xs text-violet-500">Cash collected manually. Paystack handles the rest online.</div>
               </div>
             )}
 
-            {/* Warnings */}
-            {!splitMode && payMethod === 'Momo' && !phone.trim() && <div className="bg-amber-50 rounded-xl p-3.5 text-amber-700 text-sm font-medium border border-amber-100">⚠️ Enter customer phone number above</div>}
             {momoStep === 'failed' && <div className="bg-red-50 rounded-xl p-3.5 text-red-600 text-sm font-medium border border-red-100">❌ {momoMessage}</div>}
 
-            <button onClick={completeSale}
-              disabled={processing || (!splitMode && payMethod === 'Momo' && (!phone.trim() || phone.trim().length < 9)) || (splitMode && splitRemainder > 0 && (!phone.trim() || phone.trim().length < 9))}
+            <button onClick={handleCompleteSale} disabled={processing}
               className="w-full h-12 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm">
-              {processing ? 'Processing...' : splitMode ? '✂️ Confirm Split' : payMethod === 'Cash' ? '💵 Confirm Cash' : '📱 Pay with Momo'}
+              {processing ? 'Processing...' : splitMode ? '✂️ Confirm Split' : payMethod === 'Cash' ? '💵 Confirm Cash' : payMethod === 'Momo' ? '📱 Confirm Momo Received' : '💳 Open Paystack'}
             </button>
           </>)}
 
-          {momoStep === 'charging' && <div className="text-center py-10"><div className="w-14 h-14 border-4 border-amber-100 border-t-amber-500 rounded-full animate-spin mx-auto mb-4" /><h3 className="text-lg font-bold mb-1">Initializing...</h3><p className="text-gray-400 text-sm">{momoMessage}</p></div>}
+          {momoStep === 'charging' && <div className="text-center py-10"><div className="w-14 h-14 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" /><h3 className="text-lg font-bold mb-1">Opening Paystack...</h3><p className="text-gray-400 text-sm">{momoMessage}</p></div>}
           {momoStep === 'waiting' && (
             <div className="text-center py-6">
-              <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 animate-pulse">📱</div>
-              <h3 className="text-lg font-bold mb-1">Waiting for Payment</h3>
-              <p className="text-gray-400 text-sm mb-4">Paystack checkout window is open</p>
-              <div className="bg-amber-50 rounded-xl p-4 mb-4 border border-amber-100">
-                <div className="text-lg font-extrabold text-amber-700">{money(splitMode ? splitRemainder : total)}</div>
-                <div className="text-sm text-amber-600 mt-0.5">{phone}</div>
+              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 animate-pulse">💳</div>
+              <h3 className="text-lg font-bold mb-1">Waiting for Paystack</h3>
+              <p className="text-gray-400 text-sm mb-4">Customer is completing payment</p>
+              <div className="bg-blue-50 rounded-xl p-4 mb-4 border border-blue-100">
+                <div className="text-lg font-extrabold text-blue-700">{money(splitMode ? splitRemainder : total)}</div>
+                <div className="text-sm text-blue-600 mt-0.5">📱 {phone}</div>
               </div>
-              <div className="flex items-center justify-center gap-1.5 text-amber-500 mb-4">
-                <div className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-                <div className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }} />
-                <div className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
+              <div className="flex items-center justify-center gap-1.5 text-blue-500 mb-4">
+                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }} />
+                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
                 <span className="text-xs font-medium ml-1.5">Verifying</span>
               </div>
-              <button onClick={() => { cancelMomo(); setMomoStep('idle') }} className="h-10 px-5 bg-gray-100 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-200 transition">Cancel</button>
+              <button onClick={() => { cancelPaystack(); setMomoStep('idle') }} className="h-10 px-5 bg-gray-100 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-200 transition">Cancel</button>
             </div>
           )}
-          {momoStep === 'success' && <div className="text-center py-10"><div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">✅</div><h3 className="text-lg font-bold text-green-600 mb-1">Payment Received!</h3><p className="text-gray-400 text-sm">Recording sale...</p></div>}
+          {momoStep === 'success' && <div className="text-center py-10"><div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">✅</div><h3 className="text-lg font-bold text-green-600 mb-1">Payment Confirmed!</h3><p className="text-gray-400 text-sm">Recording sale...</p></div>}
         </div>
       </Modal>
 
