@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { getSupabase } from '../lib/supabase'
 import { num } from '../lib/utils'
 
-const mapProduct = p => ({ id: p.id, name: p.name, category: p.category || '', costPrice: num(p.cost_price), price: num(p.price), wholesalePrice: num(p.wholesale_price), quantity: num(p.quantity), image: p.image || '' })
+const mapProduct = p => ({ id: p.id, name: p.name, category: p.category || '', costPrice: num(p.cost_price), price: num(p.price), wholesalePrice: num(p.wholesale_price), wholesaleMinQty: num(p.wholesale_min_qty) || 0, quantity: num(p.quantity), image: p.image || '' })
 const mapBundle = b => ({ id: b.id, name: b.name, products: typeof b.products === 'string' ? JSON.parse(b.products) : (b.products || []), bundlePrice: num(b.bundle_price), active: b.active })
 const mapSale = s => ({ id: s.id, receiptNo: s.receipt_no, date: s.date, items: typeof s.items === 'string' ? JSON.parse(s.items) : (s.items || []), subtotal: num(s.subtotal), discount: num(s.discount), total: num(s.total), profit: num(s.profit), payment: s.payment, splitCash: num(s.split_cash), splitMomo: num(s.split_momo), customer: s.customer || 'Walk-in', type: s.type || 'Retail', cashier: s.cashier || '', voided: s.voided })
 const mapStaff = s => ({ id: s.id, name: s.name, role: s.role, pin: s.pin, active: s.active })
@@ -55,16 +55,37 @@ export const useStore = create((set, get) => ({
     const existing = cart.find(c => c.isBundle ? c.bundleId === item.bundleId : c.productId === item.productId)
     if (existing) {
       if (!item.isBundle) { const prod = get().products.find(p => p.id === item.productId); if (prod && existing.qty >= prod.quantity) return false }
-      existing.qty++; existing.lineTotal = existing.qty * existing.price
-    } else { cart.push({ ...item, qty: 1, lineTotal: item.price }) }
+      existing.qty++
+      // Auto-switch price based on wholesale min qty
+      if (!existing.isBundle) {
+        const prod = get().products.find(p => p.id === existing.productId)
+        if (prod && prod.wholesalePrice > 0 && prod.wholesaleMinQty > 0 && existing.qty >= prod.wholesaleMinQty) {
+          existing.price = prod.wholesalePrice
+        } else if (prod) {
+          existing.price = item.originalPrice || prod.price
+        }
+      }
+      existing.lineTotal = existing.qty * existing.price
+    } else { cart.push({ ...item, qty: 1, lineTotal: item.price, originalPrice: item.price }) }
     set({ cart }); return true
   },
   updateCartQty: (index, delta) => {
     const cart = [...get().cart]; const item = cart[index]; if (!item) return
     const newQty = item.qty + delta
     if (newQty < 1) { cart.splice(index, 1) }
-    else { if (!item.isBundle) { const prod = get().products.find(p => p.id === item.productId); if (prod && newQty > prod.quantity) return false }
-      item.qty = newQty; item.lineTotal = newQty * item.price }
+    else {
+      if (!item.isBundle) {
+        const prod = get().products.find(p => p.id === item.productId)
+        if (prod && newQty > prod.quantity) return false
+        // Auto-switch price based on wholesale min qty
+        if (prod && prod.wholesalePrice > 0 && prod.wholesaleMinQty > 0 && newQty >= prod.wholesaleMinQty) {
+          item.price = prod.wholesalePrice
+        } else if (prod) {
+          item.price = item.originalPrice || prod.price
+        }
+      }
+      item.qty = newQty; item.lineTotal = newQty * item.price
+    }
     set({ cart }); return true
   },
   removeFromCart: index => { const cart = [...get().cart]; cart.splice(index, 1); set({ cart }) },

@@ -179,7 +179,10 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                 <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50/80 border border-gray-100 hover:bg-gray-50 transition">
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold text-gray-800 leading-tight">{c.name}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">{money(c.price)} each</div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      {money(c.price)} each
+                      {c.originalPrice && c.price < c.originalPrice && <span className="ml-1 text-green-600 font-bold">• Wholesale ✓</span>}
+                    </div>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button onClick={() => updateCartQty(i, -1)} className="w-8 h-8 rounded-lg bg-white border border-gray-200 text-gray-500 text-sm font-bold flex items-center justify-center hover:bg-gray-50 active:scale-90 transition">−</button>
