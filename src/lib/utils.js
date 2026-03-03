@@ -12,7 +12,7 @@ export const weekStartDate = () => format(startOfWeek(new Date(), { weekStartsOn
 export const SHOP = {
   name: 'Everytin Room',
   tagline: 'Your One Stop Shop',
-  phone: '054 920 7471 / 024 531 5581',
+  phone: '054 812 4978 / 055 480 8341',
   address: 'Adenta Aviation Road',
   website: 'www.Erbliving.shop',
 }
