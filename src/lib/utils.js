@@ -15,6 +15,8 @@ export const SHOP = {
   phone: '054 812 4978 / 055 480 8341',
   address: 'Adenta Aviation Road',
   website: 'www.Erbliving.shop',
+  // Seasonal message on receipts (set to '' to remove)
+  promoMsg: '🇬🇭 Happy Ghana Month! EVERYTINROOM&BEDTIME wishes you a blessed celebration! 🇬🇭',
 }
 
 export const ADMIN_PIN = '1024'

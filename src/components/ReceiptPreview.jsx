@@ -28,6 +28,7 @@ export default function ReceiptPreview({ sale, onClose }) {
       .grand-total{font-size:20px;font-weight:900;border-top:2px dashed #000;padding-top:4mm;margin-top:4mm}
       .footer{text-align:center;border-top:2px dashed #000;padding-top:4mm;margin-top:5mm;font-size:12px;font-weight:700}
       .footer p{margin:2px 0}
+      .promo-msg{text-align:center;padding:3mm 2mm;margin:3mm 0;border:2px dashed #000;border-radius:2mm;font-size:11px;font-weight:900;line-height:1.4}
       @media print{@page{size:80mm auto;margin:0mm 3mm}}
     </style></head><body>${content}</body></html>`)
     w.document.close()
@@ -49,6 +50,13 @@ export default function ReceiptPreview({ sale, onClose }) {
             <div className="shop-info text-xs font-bold text-gray-700">Tel: {SHOP.phone}</div>
             <div className="shop-info text-xs font-bold text-gray-700">{SHOP.website}</div>
           </div>
+
+          {/* Seasonal Message */}
+          {SHOP.promoMsg && (
+            <div className="text-center py-2.5 my-2 border-2 border-dashed border-gray-800 rounded-lg bg-gray-50">
+              <p className="text-xs font-extrabold text-gray-800 leading-snug px-2">{SHOP.promoMsg}</p>
+            </div>
+          )}
 
           {/* Title */}
           <div className="title text-center font-black text-base tracking-[3px] uppercase my-3">SALES RECEIPT</div>
@@ -95,6 +103,7 @@ export default function ReceiptPreview({ sale, onClose }) {
           <div className="footer text-center border-t-2 border-dashed border-gray-800 pt-3 mt-4">
             <p className="text-sm font-bold">Thank you for shopping with us!</p>
             <p className="text-xs font-bold text-gray-500 mt-1">{SHOP.website}</p>
+            {SHOP.promoMsg && <p className="text-xs font-bold text-gray-600 mt-2">🇬🇭 Happy Ghana Month! 🇬🇭</p>}
             <p className="text-xs text-gray-400 mt-1">Goods sold are not returnable</p>
           </div>
         </div>
