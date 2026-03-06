@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { id: 'bundles', icon: '🎁', label: 'Bundles', admin: true },
   { id: 'promos', icon: '🏷️', label: 'Promos', admin: true },
   { id: 'stocktakes', icon: '📋', label: 'Stock Takes', admin: true },
+  { id: 'restock', icon: '🚚', label: 'Restock', admin: true },
   { id: 'stockadjustments', icon: '🔧', label: 'Adjustments', admin: true },
   { id: 'invoices', icon: '🧾', label: 'Invoices', admin: true },
   { id: 'customers', icon: '👤', label: 'Customers', admin: true },
@@ -33,7 +34,7 @@ export default function Navigation({ onOpenCart }) {
   const pendingWA = waOrders.filter(o => o.status === 'Pending').length
   const cartCount = cart.reduce((a, c) => a + c.qty, 0)
   const go = (pg) => {
-    const ap = ['dash','products','bundles','staff','expenses','reports','customers','performance','promos','invoices','stocktakes']
+    const ap = ['dash','products','bundles','staff','expenses','reports','customers','performance','promos','invoices','stocktakes','restock']
     if (!isAdmin && ap.includes(pg)) return; setPage(pg); setDrawerOpen(false)
   }
   return (<>

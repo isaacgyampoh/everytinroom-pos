@@ -23,10 +23,11 @@ import PromosPage from './pages/PromosPage'
 import InvoicesPage from './pages/InvoicesPage'
 import StockTakesPage from './pages/StockTakesPage'
 import StockAdjustmentsPage from './pages/StockAdjustmentsPage'
+import RestockPage from './pages/RestockPage'
 import toast from 'react-hot-toast'
 
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000 // 30 minutes
-const ADMIN_PAGES = ['products', 'staff', 'promos', 'invoices', 'stocktakes', 'stockadjustments']
+const ADMIN_PAGES = ['products', 'staff', 'promos', 'invoices', 'stocktakes', 'stockadjustments', 'restock']
 
 export default function App() {
   const { user, page, setPage, loading, loadAll, logout, isAdmin } = useStore()
@@ -93,6 +94,7 @@ export default function App() {
     invoices: <InvoicesPage />,
     stocktakes: <StockTakesPage />,
     stockadjustments: <StockAdjustmentsPage />,
+    restock: <RestockPage />,
   }
 
   return (
