@@ -181,7 +181,8 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                     <div className="text-sm font-semibold text-gray-800 leading-tight">{c.name}</div>
                     <div className="text-xs text-gray-400 mt-0.5">
                       {money(c.price)} each
-                      {c.originalPrice && c.price < c.originalPrice && <span className="ml-1 text-green-600 font-bold">• Wholesale ✓</span>}
+                      {c.isPromo && <span className="ml-1 text-orange-500 font-bold">• Promo 🏷️</span>}
+                      {!c.isPromo && c.originalPrice && c.price < c.originalPrice && <span className="ml-1 text-green-600 font-bold">• Wholesale ✓</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
