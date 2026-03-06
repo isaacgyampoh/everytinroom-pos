@@ -96,22 +96,23 @@ export const useStore = create((set, get) => ({
     const sb = getSupabase(); if (!sb) { set({ loading: false }); return }
     set({ loading: true, loadingText: 'Loading...' })
     try {
-      const [prodData, staffData, saleData, bunData] = await Promise.all([
-        q(sb, 'products', { order: 'name', asc: true }),
-        q(sb, 'staff'),
-        q(sb, 'sales', { order: 'date', limit: 300 }),
-        q(sb, 'bundles'),
+      // PHASE 1: Only what POS needs immediately
+      const [prodData, staffData, bunData, promoData] = await Promise.all([
+        q(sb, 'products', { select: 'id,name,category,cost_price,price,wholesale_price,wholesale_min_qty,quantity,image', order: 'name', asc: true }),
+        q(sb, 'staff', { select: 'id,name,role,pin,active' }),
+        q(sb, 'bundles', { select: 'id,name,products,bundle_price,active' }),
+        q(sb, 'promos', { select: 'id,name,start_date,end_date,items,active', limit: 50 }),
       ])
 
       set({
         products: prodData.map(mapProduct),
         staff: staffData.map(mapStaff),
-        sales: saleData.map(mapSale),
         bundles: bunData.map(mapBundle),
+        promos: promoData.map(mapPromo),
         loading: false,
       })
 
-      // PHASE 2: Load secondary data in background (non-blocking)
+      // PHASE 2: Load everything else in background (non-blocking)
       get()._loadSecondary()
     } catch (e) {
       console.error('Load error:', e)
@@ -124,22 +125,22 @@ export const useStore = create((set, get) => ({
     if (get()._secondaryLoaded) return
     const sb = getSupabase(); if (!sb) return
     try {
-      const [expData, custData, waData, refData, promoData, invData, stData, adjData] = await Promise.all([
+      const [saleData, expData, custData, waData, refData, invData, stData, adjData] = await Promise.all([
+        q(sb, 'sales', { order: 'date', limit: 200 }),
         q(sb, 'expenses', { order: 'date', limit: 200 }),
         q(sb, 'customers', { order: 'total_spent', limit: 500 }),
         q(sb, 'whatsapp_orders', { order: 'date', limit: 100 }),
         q(sb, 'refunds', { order: 'date', limit: 100 }),
-        q(sb, 'promos', { order: 'created_at', limit: 50 }),
         q(sb, 'invoices', { order: 'date', limit: 100 }),
         q(sb, 'stock_takes', { order: 'date', limit: 50 }),
         q(sb, 'stock_adjustments', { order: 'date', limit: 200 }),
       ])
       set({
+        sales: saleData.map(mapSale),
         expenses: expData.map(mapExpense),
         customers: custData.map(mapCustomer),
         waOrders: waData.map(mapWAOrder),
         refunds: refData.map(mapRefund),
-        promos: promoData.map(mapPromo),
         invoices: invData.map(mapInvoice),
         stockTakes: stData.map(mapStockTake),
         stockAdjustments: adjData.map(mapStockAdj),

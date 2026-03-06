@@ -18,3 +18,10 @@ export const SHOP = {
 }
 
 export const ADMIN_PIN = '1024'
+
+// Generate thumbnail URL for Supabase images
+export const thumb = (url, w = 200) => {
+  if (!url) return ''
+  if (url.includes('supabase')) return url + (url.includes('?') ? '&' : '?') + `width=${w}&quality=60`
+  return url
+}

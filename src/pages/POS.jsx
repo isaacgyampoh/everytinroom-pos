@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useStore } from '../hooks/useStore'
-import { money, num, today } from '../lib/utils'
+import { money, num, today, thumb } from '../lib/utils'
 import toast from 'react-hot-toast'
 
 export default function POS() {
@@ -157,7 +157,7 @@ export default function POS() {
               )}
               {/* Image */}
               <div className="w-full aspect-[4/3] bg-gray-50 flex items-center justify-center overflow-hidden relative">
-                {item.image ? <img src={item.image} alt="" className="w-full h-full object-cover" loading="lazy" /> : <span className="text-4xl opacity-25">📦</span>}
+                {item.image ? <img src={thumb(item.image)} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" /> : <span className="text-4xl opacity-25">📦</span>}
               </div>
               {/* Info */}
               <div className="p-3 md:p-3.5">
