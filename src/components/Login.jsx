@@ -42,7 +42,7 @@ export default function Login() {
   }
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center p-6 z-[1000]">
+    <div className="fixed inset-0 bg-gray-900 flex items-center justify-center p-6 z-[1000]">
       <div className="text-center">
         <img src="/logo.png" alt="Everytin Room" className="w-36 h-36 rounded-3xl mx-auto mb-6 object-contain" />
         <h1 className="text-white text-3xl font-heading font-extrabold tracking-tight mb-1">Everytin Room</h1>

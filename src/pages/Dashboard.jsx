@@ -75,7 +75,7 @@ export default function Dashboard() {
       {/* Revenue Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         {[
-          { label: "Today", value: money(todayRev), sub: todaySales.length + ' sales', color: 'bg-brand-500' },
+          { label: "Today", value: money(todayRev), sub: todaySales.length + ' sales', color: 'bg-gray-900' },
           { label: "This Week", value: money(weekRev), sub: weekSales.length + ' sales', color: 'bg-amber-500' },
           { label: "This Month", value: money(monthRev), sub: monthSales.length + ' sales', color: 'bg-green-600' },
           { label: "All Time", value: money(allRev), sub: allSales.length + ' total', color: 'bg-gray-800' },
@@ -94,7 +94,7 @@ export default function Dashboard() {
           { label: "Today's Profit", value: money(todayProfit), color: 'text-green-600' },
           { label: 'Net Today', value: money(todayProfit - todayExp), color: todayProfit - todayExp >= 0 ? 'text-green-600' : 'text-red-500' },
           { label: 'Profit Margin', value: profitMargin + '%', color: Number(profitMargin) >= 30 ? 'text-green-600' : Number(profitMargin) >= 15 ? 'text-amber-500' : 'text-red-500' },
-          { label: 'Stock Value', value: money(stockValue), color: 'text-brand-500' },
+          { label: 'Stock Value', value: money(stockValue), color: 'text-amber-600' },
         ].map((s, i) => (
           <div key={i} className="bg-white rounded-2xl p-3.5 md:p-4 text-center border border-gray-100">
             <div className="text-[10px] md:text-xs text-gray-400 font-medium">{s.label}</div>
@@ -111,10 +111,10 @@ export default function Dashboard() {
             {last7.map((d, i) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-1">
                 <div className="text-[10px] font-bold text-gray-500">{d.revenue > 0 ? money(d.revenue).replace('GHS ', '') : ''}</div>
-                <div className="w-full rounded-t-lg bg-brand-500/20 relative overflow-hidden" style={{ height: Math.max(4, (d.revenue / maxRev) * 100) + '%' }}>
-                  <div className="absolute inset-0 bg-brand-500 rounded-t-lg" style={{ opacity: d.date === t ? 1 : 0.5 }} />
+                <div className="w-full rounded-t-lg bg-gray-900/20 relative overflow-hidden" style={{ height: Math.max(4, (d.revenue / maxRev) * 100) + '%' }}>
+                  <div className="absolute inset-0 bg-gray-900 rounded-t-lg" style={{ opacity: d.date === t ? 1 : 0.5 }} />
                 </div>
-                <div className={`text-[10px] font-bold ${d.date === t ? 'text-brand-500' : 'text-gray-400'}`}>{d.label}</div>
+                <div className={`text-[10px] font-bold ${d.date === t ? 'text-amber-600' : 'text-gray-400'}`}>{d.label}</div>
               </div>
             ))}
           </div>
@@ -161,7 +161,7 @@ export default function Dashboard() {
                 const count = hourMap[h] || 0
                 return (
                   <div key={h} className="flex-1 flex flex-col items-center gap-0.5">
-                    <div className="w-full rounded-t bg-brand-500" style={{ height: Math.max(2, (count / maxHour) * 100) + '%', opacity: count > 0 ? 0.4 + (count / maxHour) * 0.6 : 0.1 }} />
+                    <div className="w-full rounded-t bg-gray-900" style={{ height: Math.max(2, (count / maxHour) * 100) + '%', opacity: count > 0 ? 0.4 + (count / maxHour) * 0.6 : 0.1 }} />
                     <div className="text-[8px] text-gray-400">{h > 12 ? (h - 12) + 'p' : h + 'a'}</div>
                   </div>
                 )
@@ -196,7 +196,7 @@ export default function Dashboard() {
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <div className="flex justify-between items-center p-4 border-b border-gray-50">
             <h3 className="text-sm font-bold text-gray-800">Recent Sales</h3>
-            <button onClick={() => setPage('receipts')} className="text-xs font-semibold text-brand-500">View all →</button>
+            <button onClick={() => setPage('receipts')} className="text-xs font-semibold text-amber-600">View all →</button>
           </div>
           <div className="divide-y divide-gray-50">
             {recentSales.length === 0 && <div className="p-8 text-center text-gray-300 text-sm">No sales yet</div>}

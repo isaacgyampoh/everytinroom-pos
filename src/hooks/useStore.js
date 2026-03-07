@@ -126,14 +126,14 @@ export const useStore = create((set, get) => ({
     const sb = getSupabase(); if (!sb) return
     try {
       const [saleData, expData, custData, waData, refData, invData, stData, adjData] = await Promise.all([
-        q(sb, 'sales', { order: 'date', limit: 200 }),
-        q(sb, 'expenses', { order: 'date', limit: 200 }),
-        q(sb, 'customers', { order: 'total_spent', limit: 500 }),
-        q(sb, 'whatsapp_orders', { order: 'date', limit: 100 }),
-        q(sb, 'refunds', { order: 'date', limit: 100 }),
-        q(sb, 'invoices', { order: 'date', limit: 100 }),
-        q(sb, 'stock_takes', { order: 'date', limit: 50 }),
-        q(sb, 'stock_adjustments', { order: 'date', limit: 200 }),
+        q(sb, 'sales', { select: 'id,receipt_no,date,items,subtotal,discount,total,profit,payment,split_cash,split_momo,customer,type,cashier,voided', order: 'date', limit: 150 }),
+        q(sb, 'expenses', { select: 'id,date,category,description,amount', order: 'date', limit: 100 }),
+        q(sb, 'customers', { select: 'id,phone,visit_count,total_spent,last_visit', order: 'total_spent', limit: 300 }),
+        q(sb, 'whatsapp_orders', { order: 'date', limit: 50 }),
+        q(sb, 'refunds', { order: 'date', limit: 50 }),
+        q(sb, 'invoices', { order: 'date', limit: 50 }),
+        q(sb, 'stock_takes', { order: 'date', limit: 20 }),
+        q(sb, 'stock_adjustments', { select: 'id,date,product_id,product_name,qty,reason,notes,adjusted_by', order: 'date', limit: 100 }),
       ])
       set({
         sales: saleData.map(mapSale),
