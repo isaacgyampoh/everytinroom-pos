@@ -5,7 +5,8 @@ export default {
     extend: {
       fontFamily: { sans: ['DM Sans', 'system-ui', 'sans-serif'], heading: ['Outfit', 'DM Sans', 'system-ui', 'sans-serif'] },
       colors: {
-        brand: { 50: '#fef2f2', 100: '#fee2e2', 200: '#fecaca', 300: '#f87171', 400: '#e53e3e', 500: '#c41e2a', 600: '#b11a24', 700: '#9b1520', 800: '#7f1119', 900: '#5c0c12' },
+        brand: { 50: '#f0fdfa', 100: '#ccfbf1', 200: '#99f6e4', 300: '#5eead4', 400: '#2dd4bf', 500: '#14b8a6', 600: '#0d9488', 700: '#0f766e', 800: '#115e59', 900: '#134e4a' },
+        accent: { 50: '#fff7ed', 100: '#ffedd5', 200: '#fed7aa', 300: '#fdba74', 400: '#fb923c', 500: '#f97316', 600: '#ea580c' },
         wa: '#25d366',
         momo: '#f59e0b',
         paystack: '#00c3f7',
