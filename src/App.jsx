@@ -104,7 +104,7 @@ export default function App() {
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} onReceipt={setReceipt} />
       {receipt && <ReceiptPreview sale={receipt} onClose={() => setReceipt(null)} />}
       <main className="pt-16 md:pt-[72px] pb-24 md:pb-10 min-h-screen">
-        <div className="px-4 md:px-8 lg:px-10 py-5 md:py-6 max-w-[1200px] mx-auto">
+        <div className="px-4 md:px-8 lg:px-10 py-5 md:py-6">
           {pages[page] || <POS />}
         </div>
       </main>

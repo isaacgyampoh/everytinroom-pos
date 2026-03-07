@@ -57,8 +57,8 @@ export default function Navigation({ onOpenCart }) {
       <button onClick={()=>setOpen(true)} className="w-9 h-9 rounded-xl bg-gray-900 flex items-center justify-center text-white text-sm">☰</button>
     </header>
 
-    {/* Cart FAB */}
-    <button onClick={onOpenCart} className="fixed bottom-[calc(90px+env(safe-area-inset-bottom))] md:bottom-6 right-4 md:right-6 w-14 h-14 bg-gray-900 rounded-2xl flex items-center justify-center text-2xl text-white z-[99] shadow-lg active:scale-90 transition">🛒{cc>0&&<span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 bg-amber-400 rounded-full text-[10px] font-bold text-black flex items-center justify-center">{cc}</span>}</button>
+    {/* Cart FAB - only on POS */}
+    {page === 'pos' && <button onClick={onOpenCart} className="fixed bottom-[calc(90px+env(safe-area-inset-bottom))] md:bottom-6 right-4 md:right-6 w-14 h-14 bg-gray-900 rounded-2xl flex items-center justify-center text-2xl text-white z-[99] shadow-lg active:scale-90 transition">🛒{cc>0&&<span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 bg-amber-400 rounded-full text-[10px] font-bold text-black flex items-center justify-center">{cc}</span>}</button>}
 
     {/* Mobile bottom nav */}
     <nav className="flex md:hidden fixed bottom-0 left-0 right-0 glass safe-bottom px-3 pt-2 z-[100] border-t border-stone-200/30">{MOB.filter(n=>!n.admin||isAdmin).map(n=>(
