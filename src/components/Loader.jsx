@@ -4,9 +4,9 @@ export default function Loader() {
   const { loading, loadingText } = useStore()
   if (!loading) return null
   return (
-    <div className="fixed inset-0 bg-gray-900 z-[9999] flex items-center justify-center flex-col gap-5 transition-opacity">
-      <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin" />
-      <p className="text-white text-base font-semibold">{loadingText}</p>
+    <div className="fixed inset-0 bg-[#0a0a0a] z-[9999] flex items-center justify-center flex-col gap-5">
+      <div className="w-10 h-10 border-3 border-[#222] border-t-[#d4a017] rounded-full animate-spin" />
+      <p className="text-[#666] text-sm font-medium">{loadingText}</p>
     </div>
   )
 }

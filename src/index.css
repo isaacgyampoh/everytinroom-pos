@@ -4,15 +4,32 @@
 
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 body { font-family: 'DM Sans', system-ui, sans-serif; font-size: 15px; background: #f8f6f1; color: #1a1a1a; letter-spacing: -0.01em; transition: background .3s, color .3s; }
-body.dark { background: #111111; color: #e5e5e5; }
-body.dark .glass { background: rgba(17,17,17,.95); }
-body.dark input, body.dark select, body.dark textarea { background: #1e1e1e; color: #e5e5e5; border-color: #333; }
-body.dark .bg-white { background: #1a1a1a !important; }
-body.dark .bg-stone-100, body.dark .bg-gray-50, body.dark .bg-gray-100 { background: #222 !important; }
-body.dark .text-gray-900, body.dark .text-stone-900 { color: #e5e5e5 !important; }
-body.dark .text-gray-800 { color: #ddd !important; }
-body.dark .text-stone-400, body.dark .text-stone-500, body.dark .text-gray-400, body.dark .text-gray-500 { color: #888 !important; }
-body.dark .border-stone-200\/50, body.dark .border-stone-200\/30, body.dark .border-gray-100 { border-color: #2a2a2a !important; }
+
+/* DARK MODE - Premium dark with gold accent */
+body.dark { background: #0a0a0a; color: #f0ece4; }
+body.dark .glass { background: rgba(10,10,10,.95); border-color: rgba(255,255,255,.06) !important; }
+body.dark input, body.dark select, body.dark textarea { background: #161616; color: #f0ece4; border-color: #252525 !important; }
+body.dark input::placeholder, body.dark textarea::placeholder { color: #555 !important; }
+body.dark input:focus, body.dark select:focus { border-color: #d4a017 !important; }
+body.dark .bg-white { background: #141414 !important; }
+body.dark .bg-stone-100, body.dark .bg-gray-50, body.dark .bg-gray-100 { background: #1a1a1a !important; }
+body.dark .bg-stone-100\/50 { background: rgba(26,26,26,.5) !important; }
+body.dark .text-gray-900, body.dark .text-stone-900, body.dark .text-black { color: #f0ece4 !important; }
+body.dark .text-gray-800, body.dark .text-stone-700 { color: #ddd !important; }
+body.dark .text-stone-400, body.dark .text-stone-500, body.dark .text-gray-400, body.dark .text-gray-500, body.dark .text-stone-600, body.dark .text-gray-600 { color: #777 !important; }
+body.dark .text-stone-300 { color: #555 !important; }
+body.dark .border-stone-200\/50, body.dark .border-stone-200\/30, body.dark .border-gray-100, body.dark .border-gray-50 { border-color: #1e1e1e !important; }
+body.dark .bg-amber-400 { background: #d4a017 !important; }
+body.dark .bg-amber-100 { background: rgba(212,160,23,.15) !important; }
+body.dark .text-amber-600, body.dark .text-amber-700 { color: #d4a017 !important; }
+body.dark .bg-emerald-100 { background: rgba(34,197,94,.12) !important; }
+body.dark .bg-red-100, body.dark .bg-red-50 { background: rgba(239,68,68,.1) !important; }
+body.dark .bg-gray-900 { background: #f0ece4 !important; color: #0a0a0a !important; }
+body.dark .bg-gray-900.text-white { color: #0a0a0a !important; }
+body.dark .shadow-lg, body.dark .shadow-md, body.dark .shadow-sm { box-shadow: 0 2px 8px rgba(0,0,0,.4) !important; }
+body.dark .ring-amber-300 { --tw-ring-color: rgba(212,160,23,.4) !important; }
+body.dark ::-webkit-scrollbar-thumb { background: #333; }
+body.dark ::selection { background: #d4a017; color: #0a0a0a; }
 h1, h2, h3, h4, h5, h6 { font-family: 'Outfit', 'DM Sans', system-ui, sans-serif; letter-spacing: -0.04em; }
 
 @media (min-width: 768px) { body { font-size: 16px; } }
