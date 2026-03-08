@@ -3,7 +3,16 @@
 @tailwind utilities;
 
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-body { font-family: 'DM Sans', system-ui, sans-serif; font-size: 15px; background: #f8f6f1; color: #1a1a1a; letter-spacing: -0.01em; }
+body { font-family: 'DM Sans', system-ui, sans-serif; font-size: 15px; background: #f8f6f1; color: #1a1a1a; letter-spacing: -0.01em; transition: background .3s, color .3s; }
+body.dark { background: #111111; color: #e5e5e5; }
+body.dark .glass { background: rgba(17,17,17,.95); }
+body.dark input, body.dark select, body.dark textarea { background: #1e1e1e; color: #e5e5e5; border-color: #333; }
+body.dark .bg-white { background: #1a1a1a !important; }
+body.dark .bg-stone-100, body.dark .bg-gray-50, body.dark .bg-gray-100 { background: #222 !important; }
+body.dark .text-gray-900, body.dark .text-stone-900 { color: #e5e5e5 !important; }
+body.dark .text-gray-800 { color: #ddd !important; }
+body.dark .text-stone-400, body.dark .text-stone-500, body.dark .text-gray-400, body.dark .text-gray-500 { color: #888 !important; }
+body.dark .border-stone-200\/50, body.dark .border-stone-200\/30, body.dark .border-gray-100 { border-color: #2a2a2a !important; }
 h1, h2, h3, h4, h5, h6 { font-family: 'Outfit', 'DM Sans', system-ui, sans-serif; letter-spacing: -0.04em; }
 
 @media (min-width: 768px) { body { font-size: 16px; } }

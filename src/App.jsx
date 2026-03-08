@@ -30,10 +30,16 @@ const INACTIVITY_TIMEOUT = 30 * 60 * 1000 // 30 minutes
 const ADMIN_PAGES = ['products', 'staff', 'promos', 'invoices', 'stocktakes', 'stockadjustments', 'restock']
 
 export default function App() {
-  const { user, page, setPage, loading, loadAll, logout, isAdmin } = useStore()
+  const { user, page, setPage, loading, loadAll, logout, isAdmin, darkMode } = useStore()
   const [cartOpen, setCartOpen] = useState(false)
   const [receipt, setReceipt] = useState(null)
   const [lastActivity, setLastActivity] = useState(Date.now())
+  const [salePopup, setSalePopup] = useState(null)
+
+  // Apply dark mode
+  useEffect(() => {
+    document.body.classList.toggle('dark', darkMode)
+  }, [darkMode])
 
   useEffect(() => { loadAll(); setupRealtime() }, [])
 
@@ -64,13 +70,35 @@ export default function App() {
     }
   }, [page, user, isAdmin, setPage])
 
+  const playSaleSound = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      const osc = ctx.createOscillator(); const gain = ctx.createGain()
+      osc.connect(gain); gain.connect(ctx.destination)
+      osc.frequency.setValueAtTime(800, ctx.currentTime)
+      osc.frequency.setValueAtTime(1000, ctx.currentTime + 0.1)
+      osc.frequency.setValueAtTime(1200, ctx.currentTime + 0.2)
+      gain.gain.setValueAtTime(0.3, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5)
+      osc.start(); osc.stop(ctx.currentTime + 0.5)
+    } catch {}
+  }
+
   const setupRealtime = () => {
     const sb = getSupabase(); if (!sb) return
     const store = useStore.getState()
     sb.channel('pos-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_orders' }, () => store.refreshWAOrders())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => store.refreshProducts())
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sales' }, () => store.refreshSales())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sales' }, (payload) => {
+        store.refreshSales()
+        const s = payload.new
+        if (s) {
+          playSaleSound()
+          setSalePopup({ total: s.total, customer: s.customer, payment: s.payment, cashier: s.cashier })
+          setTimeout(() => setSalePopup(null), 4000)
+        }
+      })
       .subscribe()
   }
 
@@ -98,12 +126,27 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa] text-gray-900">
-      <Toaster position="top-center" toastOptions={{ duration: 2500, style: { borderRadius: '14px', padding: '14px 24px', fontWeight: 600, fontSize: '14px' } }} />
+    <div className="min-h-screen">
+      <Toaster position="top-center" toastOptions={{ duration: 2000, style: { borderRadius: '14px', padding: '12px 20px', fontWeight: 600, fontSize: '13px', background: darkMode ? '#222' : '#fff', color: darkMode ? '#eee' : '#1a1a1a' } }} />
       <Navigation onOpenCart={() => setCartOpen(true)} />
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} onReceipt={setReceipt} />
       {receipt && <ReceiptPreview sale={receipt} onClose={() => setReceipt(null)} />}
-      <main className="pt-16 md:pt-[72px] pb-24 md:pb-10 min-h-screen">
+
+      {/* Sale Notification Popup */}
+      {salePopup && (
+        <div className="fixed top-20 md:top-5 left-1/2 -translate-x-1/2 z-[300] animate-fade">
+          <div className="bg-gray-900 text-white rounded-2xl px-6 py-4 shadow-2xl flex items-center gap-4 min-w-[280px]">
+            <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">💰</div>
+            <div>
+              <div className="text-xs text-gray-400">New Sale!</div>
+              <div className="text-lg font-extrabold">GHS {Number(salePopup.total || 0).toFixed(2)}</div>
+              <div className="text-xs text-gray-400">{salePopup.cashier} • {salePopup.payment}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <main className="pt-14 md:pt-16 pb-24 md:pb-10 min-h-screen">
         <div className="px-4 md:px-8 lg:px-10 py-5 md:py-6">
           {pages[page] || <POS />}
         </div>

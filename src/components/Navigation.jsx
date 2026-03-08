@@ -32,7 +32,7 @@ const AP = ['dash','products','bundles','staff','expenses','reports','customers'
 
 export default function Navigation({ onOpenCart }) {
   const [open, setOpen] = useState(false)
-  const { page, setPage, user, isAdmin, logout, waOrders, cart } = useStore()
+  const { page, setPage, user, isAdmin, logout, waOrders, cart, darkMode, toggleDark } = useStore()
   const wa = waOrders.filter(o => o.status === 'Pending').length
   const cc = cart.reduce((a, c) => a + c.qty, 0)
   const go = (p) => { if (!isAdmin && AP.includes(p)) return; setPage(p); setOpen(false) }
@@ -46,6 +46,7 @@ export default function Navigation({ onOpenCart }) {
           {n.label}{n.wa&&wa>0&&<span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center">{wa}</span>}
         </button>))}</div>
       <div className="ml-auto flex items-center gap-3">
+        <button onClick={toggleDark} className="w-8 h-8 rounded-full bg-stone-100 dark:bg-gray-800 flex items-center justify-center text-sm transition hover:scale-110" title="Toggle dark mode">{darkMode ? '☀️' : '🌙'}</button>
         <div className="flex items-center gap-2 py-1.5 px-3 pl-1.5 bg-white rounded-full"><div className="w-8 h-8 bg-gray-900 rounded-full flex items-center justify-center text-white text-xs font-bold">{user?.name?.charAt(0)}</div><span className="text-xs font-semibold text-stone-600">{user?.name}</span></div>
         <button onClick={logout} className="text-xs font-semibold text-stone-400 hover:text-red-500 transition">Sign Out</button>
       </div>
@@ -77,7 +78,10 @@ export default function Navigation({ onOpenCart }) {
             <span className="text-base w-6">{n.icon}</span>{n.label}
           </button>))}</div>
       </div>
-      <div className="p-3 safe-bottom"><button onClick={()=>{logout();setOpen(false)}} className="w-full py-3 bg-red-50 rounded-xl text-sm font-semibold text-red-500">Sign Out</button></div>
+      <div className="p-3 safe-bottom border-t border-stone-200/30 space-y-2">
+        <button onClick={toggleDark} className="w-full py-3 bg-stone-100 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">{darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}</button>
+        <button onClick={()=>{logout();setOpen(false)}} className="w-full py-3 bg-red-50 rounded-xl text-sm font-semibold text-red-500">Sign Out</button>
+      </div>
     </div>
   </>)
 }

@@ -35,6 +35,8 @@ export const useStore = create((set, get) => ({
   user: null, isAdmin: false,
   page: 'pos', cart: [], mode: 'retail', selectedCat: 'all', waFilter: 'Pending', perfPeriod: 'today',
   _secondaryLoaded: false,
+  darkMode: localStorage.getItem('pos-dark') === 'true',
+  toggleDark: () => set(s => { const d = !s.darkMode; localStorage.setItem('pos-dark', d); return { darkMode: d } }),
 
   setPage: page => {
     set({ page })
