@@ -50,7 +50,7 @@ export default function PromosPage() {
         <div><h1 className="text-3xl font-extrabold">🏷️ Promotions</h1><p className="text-gray-500">Temporary pricing without changing base prices</p></div>
         <button onClick={openNew} className="h-12 px-5 bg-brand-500 text-white rounded-xl text-sm font-semibold">➕ New Promo</button>
       </div>
-      <div className="bg-orange-500 rounded-3xl p-7 text-white mb-6"><small className="text-sm opacity-80">Active Promos</small><strong className="block text-4xl font-extrabold mt-2">{activeCount}</strong></div>
+      <div className="bg-orange-500 rounded-3xl p-7 text-white mb-6 relative overflow-hidden"><div className="absolute -right-5 -top-5 w-24 h-24 rounded-full border-[3px] border-white/10" /><div className="absolute -right-2 -top-2 w-14 h-14 rounded-full border-[3px] border-white/10" /><div className="absolute right-10 -bottom-8 w-20 h-20 rounded-full bg-white/5" /><div className="relative z-10"><small className="text-sm opacity-80">Active Promos</small><strong className="block text-4xl font-extrabold mt-2">{activeCount}</strong></div></div>
 
       <div className="space-y-4">
         {promos.length === 0 && <div className="text-center py-12 text-gray-400"><span className="text-5xl block mb-3 opacity-30">🏷️</span>No promotions</div>}

@@ -10,10 +10,15 @@ const ProductCard = memo(({ item, price, hasPromo, onAdd }) => {
     <button onClick={onAdd} disabled={qty === 0}
       className={`bg-white rounded-3xl overflow-hidden text-left transition-transform active:scale-[.97] ${hasPromo ? 'ring-2 ring-amber-300' : ''} ${qty === 0 ? 'opacity-30 pointer-events-none' : ''}`}>
       {hasPromo && <div className="bg-amber-400 text-black text-[10px] font-bold text-center py-1 tracking-wider uppercase">Promo</div>}
-      <div className="w-full aspect-[4/3] bg-stone-100 flex items-center justify-center overflow-hidden">
-        {item.image ? <img src={thumb(item.image)} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" /> : <span className="text-3xl opacity-10">📦</span>}
+      <div className="w-full aspect-[4/3] bg-stone-100 flex items-center justify-center overflow-hidden relative">
+        {/* Decorative circles */}
+        <div className="absolute -right-3 -top-3 w-16 h-16 rounded-full border-[2px] border-amber-400/10" />
+        <div className="absolute -right-1 -top-1 w-9 h-9 rounded-full border-[2px] border-amber-400/10" />
+        <div className="absolute -left-4 -bottom-4 w-14 h-14 rounded-full bg-amber-400/5" />
+        {item.image ? <img src={thumb(item.image)} alt="" className="w-full h-full object-cover relative z-10" loading="lazy" decoding="async" /> : <span className="text-3xl opacity-10 relative z-10">📦</span>}
       </div>
-      <div className="p-3 md:p-3.5">
+      <div className="p-3 md:p-3.5 relative overflow-hidden">
+        <div className="absolute -right-2 -bottom-2 w-10 h-10 rounded-full bg-amber-400/[0.04]" />
         <div className="text-[13px] md:text-sm font-semibold text-gray-900 leading-snug truncate">{item.name}</div>
         <div className="flex items-end justify-between mt-2">
           <div>
