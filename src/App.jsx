@@ -146,7 +146,7 @@ export default function App() {
         </div>
       )}
 
-      <main className="pt-14 md:pt-16 pb-24 md:pb-10 min-h-screen">
+      <main className="pt-14 md:pt-0 md:ml-16 pb-24 md:pb-10 min-h-screen">
         <div className="px-4 md:px-8 lg:px-10 py-5 md:py-6">
           {pages[page] || <POS />}
         </div>

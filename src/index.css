@@ -36,6 +36,16 @@ body.dark .shadow-lg, body.dark .shadow-md, body.dark .shadow-sm { box-shadow: 0
 body.dark .ring-2 { --tw-ring-color: rgba(61,139,106,.3) !important; }
 body.dark ::-webkit-scrollbar-thumb { background: #2d4a3c; }
 body.dark ::selection { background: #3d8b6a; color: #fff; }
+body.dark .dark-sidebar { background: #0f1a15 !important; border-color: #1a2e27 !important; }
+body.dark .dark-sidebar + * .bg-stone-100 { background: #1a2e27 !important; }
+body.dark aside .bg-white { background: #0f1a15 !important; }
+body.dark aside .bg-stone-100 { background: #1a2e27 !important; }
+body.dark aside .text-stone-500 { color: #4a6a58 !important; }
+body.dark aside .text-stone-400 { color: #3d5a4c !important; }
+body.dark aside .hover\:bg-stone-100:hover { background: #1a2e27 !important; }
+body.dark aside .bg-stone-200\/60 { background: #1a2e27 !important; }
+body.dark aside .hover\:text-stone-800:hover { color: #e8ece6 !important; }
+body.dark aside .bg-gray-900 { background: #e8ece6 !important; color: #0f1a15 !important; }
 
 /* ===== LIGHT MODE ===== */
 ::selection { background: #d4dbd0; color: #1a3d30; }
