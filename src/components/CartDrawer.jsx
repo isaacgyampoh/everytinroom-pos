@@ -148,12 +148,12 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
   return (
     <>
       {open && <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[300]" onClick={onClose} />}
-      <div className={`fixed bottom-0 left-0 right-0 md:left-auto md:top-0 md:w-[400px] bg-white md:border-l border-gray-200 max-h-[92vh] md:max-h-full z-[301] flex flex-col transition-transform duration-300 ${open ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:translate-y-0 md:translate-x-full'} md:rounded-none rounded-t-2xl shadow-2xl`}>
+      <div className={`cart-drawer fixed bottom-0 left-0 right-0 md:left-auto md:top-0 md:w-[400px] bg-white md:border-l border-gray-200 max-h-[92vh] md:max-h-full z-[301] flex flex-col transition-transform duration-300 ${open ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:translate-y-0 md:translate-x-full'} md:rounded-none rounded-t-2xl shadow-2xl`}>
 
         <div className="md:hidden w-10 h-1 bg-gray-200 rounded-full mx-auto mt-2.5" />
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2.5">
-            <h3 className="text-lg font-bold text-gray-800">Cart</h3>
+            <h3 className="text-lg font-bold text-gray-900">Cart</h3>
             {cnt > 0 && <span className="bg-brand-500 text-white h-6 min-w-[24px] px-1.5 rounded-full text-xs font-bold flex items-center justify-center">{cnt}</span>}
           </div>
           <div className="flex gap-1.5">
@@ -176,9 +176,9 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
           ) : (
             <div className="space-y-2">
               {cart.map((c, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50/80 border border-gray-100 hover:bg-gray-50 transition">
+                <div key={i} className="cart-item flex items-center gap-3 p-3 rounded-xl bg-gray-50/80 border border-gray-100 hover:bg-gray-50 transition">
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-gray-800 leading-tight">{c.name}</div>
+                    <div className="text-sm font-semibold text-gray-900 leading-tight">{c.name}</div>
                     <div className="text-xs text-gray-400 mt-0.5">
                       {money(c.price)} each
                       {c.isPromo && <span className="ml-1 text-orange-500 font-bold">• Promo 🏷️</span>}
@@ -190,7 +190,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                     <span className="text-sm font-bold w-7 text-center">{c.qty}</span>
                     <button onClick={() => { if (!updateCartQty(i, 1)) toast.error('Not enough stock') }} className="w-8 h-8 rounded-lg bg-white border border-gray-200 text-gray-500 text-sm font-bold flex items-center justify-center hover:bg-gray-50 active:scale-90 transition">+</button>
                   </div>
-                  <span className="text-sm font-bold text-gray-800 min-w-[70px] text-right">{money(c.lineTotal)}</span>
+                  <span className="text-sm font-bold text-gray-900 min-w-[70px] text-right">{money(c.lineTotal)}</span>
                   <button onClick={() => removeFromCart(i)} className="w-8 h-8 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-500 text-sm flex items-center justify-center transition">✕</button>
                 </div>
               ))}
@@ -201,13 +201,13 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
         {/* Footer */}
         <div className="px-5 py-4 border-t border-gray-100 bg-white safe-bottom">
           <div className="space-y-2 mb-3">
-            <div className="flex justify-between text-sm"><span className="text-gray-400">Subtotal</span><span className="font-semibold text-gray-700">{money(sub)}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-gray-400">Subtotal</span><span className="font-semibold text-gray-900">{money(sub)}</span></div>
             <div className="flex justify-between items-center text-sm">
               <span className="text-gray-400">Discount</span>
               <input type="number" className="w-20 h-8 px-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-right focus:outline-none focus:border-brand-400" value={discount} min={0} onChange={e => setDiscount(e.target.value)} />
             </div>
             <div className="flex justify-between items-baseline pt-2 border-t border-dashed border-gray-200">
-              <span className="text-base font-bold text-gray-800">Total</span>
+              <span className="text-base font-bold text-gray-900">Total</span>
               <span className="text-xl font-extrabold text-brand-600">{money(total)}</span>
             </div>
           </div>
@@ -332,7 +332,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
               <div className="p-3.5">
                 <div className="flex justify-between items-center mb-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-gray-700">{h.items.length} items</span>
+                    <span className="text-sm font-bold text-gray-900">{h.items.length} items</span>
                     <span className="text-xs text-gray-400">{h.time}</span>
                     {h.phone && <span className="text-xs text-gray-400">📱 {h.phone}</span>}
                   </div>

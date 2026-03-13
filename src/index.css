@@ -47,6 +47,12 @@ body.dark aside .bg-stone-200\/60 { background: #1a2e27 !important; }
 body.dark aside .hover\:text-stone-800:hover { color: #e8ece6 !important; }
 body.dark aside .bg-gray-900 { background: #e8ece6 !important; color: #0f1a15 !important; }
 
+/* Cart drawer dark mode */
+body.dark .cart-drawer { background: #0f1a15 !important; }
+body.dark .cart-item { background: #1a2e27 !important; border-color: #264035 !important; }
+body.dark .cart-item * { color: #e8ece6; }
+body.dark .cart-item .text-gray-400, body.dark .cart-item .text-stone-400 { color: #6b8a7a !important; }
+
 /* ===== LIGHT MODE ===== */
 ::selection { background: #d4dbd0; color: #1a3d30; }
 ::-webkit-scrollbar { width: 4px; }
