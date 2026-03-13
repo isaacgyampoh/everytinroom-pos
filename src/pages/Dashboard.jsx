@@ -75,10 +75,10 @@ export default function Dashboard() {
       {/* Revenue Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         {[
-          { label: "Today", value: money(todayRev), sub: todaySales.length + ' sales', color: 'bg-gray-900' },
-          { label: "This Week", value: money(weekRev), sub: weekSales.length + ' sales', color: 'bg-amber-500' },
-          { label: "This Month", value: money(monthRev), sub: monthSales.length + ' sales', color: 'bg-green-600' },
-          { label: "All Time", value: money(allRev), sub: allSales.length + ' total', color: 'bg-gray-800' },
+          { label: "Today", value: money(todayRev), sub: todaySales.length + ' sales', color: 'bg-brand-700' },
+          { label: "This Week", value: money(weekRev), sub: weekSales.length + ' sales', color: 'bg-brand-500' },
+          { label: "This Month", value: money(monthRev), sub: monthSales.length + ' sales', color: 'bg-brand-600' },
+          { label: "All Time", value: money(allRev), sub: allSales.length + ' total', color: 'bg-brand-800' },
         ].map((c, i) => (
           <div key={i} className={`${c.color} rounded-2xl p-4 md:p-5 text-white relative overflow-hidden`}>
             {/* Decorative circles */}
