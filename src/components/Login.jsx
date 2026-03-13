@@ -34,21 +34,59 @@ export default function Login() {
   }
 
   return (
-    <div className="fixed inset-0 bg-brand-900 flex items-center justify-center p-6 z-[1000]">
-      {/* Decorative circles */}
-      <div className="absolute -left-20 -top-20 w-64 h-64 rounded-full border-[2px] border-brand-700/30" />
-      <div className="absolute -left-10 -top-10 w-44 h-44 rounded-full border-[2px] border-brand-700/30" />
-      <div className="absolute -right-16 -bottom-16 w-56 h-56 rounded-full border-[2px] border-brand-700/20" />
-      <div className="absolute -right-8 -bottom-8 w-36 h-36 rounded-full border-[2px] border-brand-700/20" />
+    <div className="fixed inset-0 bg-brand-900 flex items-center justify-center p-6 z-[1000] overflow-hidden">
+      {/* Rich decorative circles pattern */}
+      {/* Top left cluster */}
+      <div className="absolute -left-16 -top-16 w-72 h-72 rounded-full border border-brand-700/20" />
+      <div className="absolute -left-8 -top-8 w-52 h-52 rounded-full border border-brand-700/25" />
+      <div className="absolute left-12 top-12 w-32 h-32 rounded-full border border-brand-700/15" />
+      <div className="absolute left-4 top-40 w-20 h-20 rounded-full bg-brand-700/10" />
 
+      {/* Top right */}
+      <div className="absolute -right-24 top-10 w-56 h-56 rounded-full border border-brand-600/10" />
+      <div className="absolute right-8 -top-12 w-40 h-40 rounded-full border border-brand-600/15" />
+      <div className="absolute right-20 top-32 w-16 h-16 rounded-full bg-brand-600/8" />
+
+      {/* Middle left */}
+      <div className="absolute -left-20 top-1/2 -translate-y-1/2 w-44 h-44 rounded-full border border-brand-700/15" />
+      <div className="absolute left-16 top-[45%] w-24 h-24 rounded-full border border-brand-700/10" />
+
+      {/* Middle right */}
+      <div className="absolute -right-10 top-[40%] w-36 h-36 rounded-full bg-brand-700/8" />
+      <div className="absolute right-24 top-[55%] w-14 h-14 rounded-full border-2 border-brand-500/10" />
+
+      {/* Bottom left */}
+      <div className="absolute -left-10 -bottom-10 w-48 h-48 rounded-full border border-brand-700/20" />
+      <div className="absolute left-20 -bottom-4 w-28 h-28 rounded-full border border-brand-700/15" />
+      <div className="absolute left-8 bottom-20 w-12 h-12 rounded-full bg-brand-600/10" />
+
+      {/* Bottom right cluster */}
+      <div className="absolute -right-20 -bottom-20 w-64 h-64 rounded-full border border-brand-700/20" />
+      <div className="absolute -right-8 -bottom-8 w-44 h-44 rounded-full border border-brand-700/25" />
+      <div className="absolute right-16 bottom-16 w-28 h-28 rounded-full border border-brand-700/15" />
+      <div className="absolute right-6 bottom-40 w-10 h-10 rounded-full bg-brand-500/8" />
+
+      {/* Center scattered */}
+      <div className="absolute left-[30%] top-[15%] w-8 h-8 rounded-full border border-brand-600/12" />
+      <div className="absolute right-[35%] top-[20%] w-6 h-6 rounded-full bg-brand-500/6" />
+      <div className="absolute left-[25%] bottom-[20%] w-10 h-10 rounded-full border border-brand-600/10" />
+      <div className="absolute right-[30%] bottom-[15%] w-7 h-7 rounded-full bg-brand-600/8" />
+      <div className="absolute left-[50%] top-[10%] w-5 h-5 rounded-full bg-brand-500/10" />
+      <div className="absolute left-[45%] bottom-[10%] w-6 h-6 rounded-full border border-brand-500/10" />
+
+      {/* Dotted ring accent */}
+      <div className="absolute left-[10%] top-[60%] w-20 h-20 rounded-full border-2 border-dashed border-brand-600/10" />
+      <div className="absolute right-[15%] top-[30%] w-16 h-16 rounded-full border-2 border-dashed border-brand-600/8" />
+
+      {/* Content */}
       <div className="text-center w-full max-w-[360px] relative z-10">
         <div className="mb-10">
-          <img src="/logo.png" alt="" className="w-24 h-24 rounded-3xl mx-auto mb-5 object-contain" />
+          <img src="/logo.png" alt="" className="w-24 h-24 rounded-3xl mx-auto mb-5 object-contain shadow-lg shadow-black/20" />
           <h1 className="text-white font-heading text-3xl font-extrabold tracking-tight">Everytin Room</h1>
           <p className="text-brand-400 text-sm mt-1">Point of Sale System</p>
         </div>
 
-        <div className="bg-brand-800/50 rounded-3xl p-8 border border-brand-700/30 backdrop-blur-sm">
+        <div className="bg-brand-800/40 rounded-3xl p-8 border border-brand-700/30 backdrop-blur-sm">
           <h2 className="text-white text-xl font-bold mb-1">Welcome Back</h2>
           <p className="text-brand-400/60 text-sm mb-7">Enter your 4-digit PIN</p>
 

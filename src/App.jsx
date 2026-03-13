@@ -121,7 +121,6 @@ export default function App() {
     promos: <PromosPage />,
     invoices: <InvoicesPage />,
     stocktakes: <StockTakesPage />,
-    stockadjustments: <StockAdjustmentsPage />,
     restock: <RestockPage />,
   }
 
