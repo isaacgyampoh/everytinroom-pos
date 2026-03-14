@@ -157,7 +157,7 @@ export default function StockAdjustmentsPage() {
 
       {/* New Adjustment Modal */}
       <Modal open={modal} onClose={() => setModal(false)} title="Record Stock Adjustment"
-        footer={<><button onClick={() => setModal(false)} className="h-11 px-5 bg-gray-100 rounded-xl text-sm font-semibold">Cancel</button><button onClick={save} className="flex-1 h-11 bg-red-500 text-white rounded-xl text-sm font-bold">Remove from Stock</button></>}>
+        footer={<><button onClick={() => setModal(false)} className="h-11 px-5 border border-stone-300 rounded-xl text-sm font-semibold text-stone-600">Cancel</button><button onClick={save} className="flex-1 h-11 bg-red-500 text-white rounded-xl text-sm font-bold">Remove from Stock</button></>}>
         <div className="space-y-4">
           <div className="bg-red-50 rounded-xl p-3.5 text-sm text-red-700">
             This will deduct items from stock. Use for damaged, broken, missing, or stolen goods.

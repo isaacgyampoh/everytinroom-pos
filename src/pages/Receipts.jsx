@@ -36,7 +36,7 @@ export default function Receipts({ onPrintReceipt }) {
                   </td>
                   <td className="p-3 text-sm"><span className="px-2.5 py-1 bg-gray-100 rounded-lg text-[11px] font-bold text-gray-600">{s.cashier || 'Unknown'}</span></td>
                   <td className="p-3 text-sm font-bold">{money(s.total)}</td>
-                  <td className="p-3"><button onClick={() => onPrintReceipt(s)} className="h-9 px-3 bg-indigo-500 text-white rounded-lg text-xs font-semibold"></button></td>
+                  <td className="p-3"><button onClick={() => onPrintReceipt(s)} className="h-9 px-3 bg-brand-600 text-white rounded-lg text-xs font-semibold hover:bg-brand-700 transition">View</button></td>
                 </tr>
               ))}
             </tbody>

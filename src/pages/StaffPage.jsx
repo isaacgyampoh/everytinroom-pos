@@ -40,13 +40,13 @@ export default function StaffPage() {
             <tr key={s.id} className="border-b border-gray-50">
               <td className="p-3 text-sm font-semibold">{s.name}</td>
               <td className="p-3"><span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${s.role === 'Admin' ? 'bg-gray-100 text-gray-600' : 'bg-green-50 text-green-500'}`}>{s.role}</span></td>
-              <td className="p-3"><div className="flex gap-2 justify-center"><button onClick={() => openEdit(s)} className="h-9 px-3 bg-gray-100 rounded-lg text-xs"></button><button onClick={() => del(s.id)} className="h-9 px-3 bg-red-50 text-red-500 rounded-lg text-xs"></button></div></td>
+              <td className="p-3"><div className="flex gap-2 justify-center"><button onClick={() => openEdit(s)} className="h-9 px-3 border border-stone-300 rounded-lg text-xs font-medium text-stone-600 hover:bg-stone-100 transition">Edit</button><button onClick={() => del(s.id)} className="h-9 px-3 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 transition">Delete</button></div></td>
             </tr>
           ))}</tbody>
         </table>
       </div>
       <Modal open={modal} onClose={() => setModal(false)} title={form.id ? 'Edit Staff' : 'Add Staff'}
-        footer={<><button onClick={() => setModal(false)} className="h-12 px-5 bg-gray-100 rounded-xl text-sm font-semibold">Cancel</button><button onClick={save} className="flex-1 h-12 bg-brand-500 text-white rounded-xl text-sm font-bold">Save</button></>}>
+        footer={<><button onClick={() => setModal(false)} className="h-12 px-5 border border-stone-300 rounded-xl text-sm font-semibold text-stone-600">Cancel</button><button onClick={save} className="flex-1 h-12 bg-brand-500 text-white rounded-xl text-sm font-bold">Save</button></>}>
         <div className="space-y-4">
           <div><label className="block text-xs font-semibold text-gray-500 mb-2">Name</label><input className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base" value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
           <div><label className="block text-xs font-semibold text-gray-500 mb-2">Role</label><select className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base" value={form.role} onChange={e => setForm({...form, role: e.target.value})}><option>Cashier</option><option>Admin</option></select></div>

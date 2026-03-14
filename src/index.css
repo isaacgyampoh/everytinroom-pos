@@ -61,6 +61,11 @@ body.dark .border-stone-100 { border-color: #1a2e27 !important; }
 body.dark .border-brand-200 { border-color: #265a44 !important; }
 body.dark .border-red-200 { border-color: #5c2020 !important; }
 
+/* Action buttons dark mode */
+body.dark .border-stone-300 { border-color: #3d5a4c !important; }
+body.dark .text-stone-600 { color: #adbba5 !important; }
+body.dark .hover\:bg-stone-100:hover { background: #1a2e27 !important; }
+
 /* ===== LIGHT MODE ===== */
 ::selection { background: #d4dbd0; color: #1a3d30; }
 ::-webkit-scrollbar { width: 4px; }

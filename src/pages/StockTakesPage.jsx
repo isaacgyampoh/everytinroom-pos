@@ -181,7 +181,7 @@ export default function StockTakesPage() {
 
       {/* New Stock Take Modal */}
       <Modal open={modal} onClose={() => setModal(false)} title="New Stock Take"
-        footer={<><button onClick={() => setModal(false)} className="h-11 px-5 bg-gray-100 rounded-xl text-sm font-semibold">Cancel</button><button onClick={saveTake} className="flex-1 h-11 bg-brand-500 text-white rounded-xl text-sm font-bold">Save</button></>}>
+        footer={<><button onClick={() => setModal(false)} className="h-11 px-5 border border-stone-300 rounded-xl text-sm font-semibold text-stone-600">Cancel</button><button onClick={saveTake} className="flex-1 h-11 bg-brand-500 text-white rounded-xl text-sm font-bold">Save</button></>}>
         <div className="space-y-4">
           <div className="bg-brand-50 rounded-xl p-3 text-sm text-brand-700">Enter physical count. Leave blank to skip. Variances auto-calculated.</div>
           <input className="w-full h-11 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" placeholder="Notes..." value={notes} onChange={e => setNotes(e.target.value)} />
@@ -201,7 +201,7 @@ export default function StockTakesPage() {
 
       {/* New Adjustment Modal */}
       <Modal open={adjModal} onClose={() => setAdjModal(false)} title="New Adjustment"
-        footer={<><button onClick={() => setAdjModal(false)} className="h-11 px-5 bg-gray-100 rounded-xl text-sm font-semibold">Cancel</button><button onClick={saveAdj} className="flex-1 h-11 bg-brand-500 text-white rounded-xl text-sm font-bold">Save</button></>}>
+        footer={<><button onClick={() => setAdjModal(false)} className="h-11 px-5 border border-stone-300 rounded-xl text-sm font-semibold text-stone-600">Cancel</button><button onClick={saveAdj} className="flex-1 h-11 bg-brand-500 text-white rounded-xl text-sm font-bold">Save</button></>}>
         <div className="space-y-4">
           <div><label className="block text-xs font-semibold text-gray-500 mb-2">Product</label>
             <select className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" value={adjProduct} onChange={e => setAdjProduct(e.target.value)}>
