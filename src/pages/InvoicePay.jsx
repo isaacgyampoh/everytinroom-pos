@@ -11,7 +11,6 @@ export default function InvoicePay() {
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
 
-  // Delivery form
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
@@ -21,7 +20,7 @@ export default function InvoicePay() {
   const orderId = window.location.hash.split('/pay/')[1]
 
   useEffect(() => {
-    if (!orderId) { setError('Invalid invoice link'); setLoading(false); return }
+    if (!orderId) { setError('Invalid link'); setLoading(false); return }
     loadOrder()
   }, [orderId])
 
@@ -31,7 +30,6 @@ export default function InvoicePay() {
     if (err || !data) { setError('Invoice not found'); setLoading(false); return }
     const items = typeof data.items === 'string' ? JSON.parse(data.items) : (data.items || [])
     setOrder({ ...data, items })
-    // Pre-fill from existing data
     setName(data.customer_name || '')
     setPhone(data.customer_phone || '')
     setAddress(data.address || '')
@@ -53,10 +51,16 @@ export default function InvoicePay() {
   }
 
   const handlePay = async () => {
+    // Security: re-check order status before payment
+    const sb = getSupabase()
+    const { data: fresh } = await sb.from('whatsapp_orders').select('status').eq('id', orderId).single()
+    if (fresh?.status === 'Cancelled') { setError('This order has been cancelled. Please contact the shop.'); return }
+    if (fresh?.status === 'Paid' || fresh?.status === 'Completed') { setError('This order has already been paid.'); await loadOrder(); return }
+
     if (!name.trim()) { setError('Please enter your name'); return }
+    if (!phone.trim() || phone.trim().length < 9) { setError('Please enter a valid phone number'); return }
     if (!address.trim()) { setError('Please enter your delivery address'); return }
 
-    // Save delivery details first
     await saveDelivery()
 
     if (!order) return
@@ -74,20 +78,19 @@ export default function InvoicePay() {
       })
       const data = await res.json()
       if (data.success && data.authorizationUrl) {
-        const sb = getSupabase()
         await sb.from('whatsapp_orders').update({ paystack_ref: data.reference }).eq('id', order.id)
         window.location.href = data.authorizationUrl
       } else {
         setPaying(false)
-        setError(data.error || 'Payment failed to initialize')
+        setError(data.error || 'Payment could not be processed. Please try again.')
       }
     } catch (e) {
       setPaying(false)
-      setError('Network error. Please try again.')
+      setError('Connection error. Please check your internet and try again.')
     }
   }
 
-  // Check if payment callback
+  // Payment callback
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const ref = params.get('reference') || params.get('trxref')
@@ -102,20 +105,56 @@ export default function InvoicePay() {
   }, [])
 
   const isPaid = order?.status === 'Paid' || order?.status === 'Completed' || order?.paid_at
+  const isCancelled = order?.status === 'Cancelled'
   const hasDelivery = order?.address && order.address.length > 3
 
+  // Loading
   if (loading) return (
     <div className="min-h-screen bg-[#f6f4ef] flex items-center justify-center">
       <div className="w-8 h-8 border-3 border-[#d4dbd0] border-t-[#3d8b6a] rounded-full animate-spin" />
     </div>
   )
 
+  // Not found
   if (error && !order) return (
     <div className="min-h-screen bg-[#f6f4ef] flex items-center justify-center p-6">
-      <div className="text-center">
-        <div className="text-5xl mb-4">❌</div>
+      <div className="text-center max-w-sm">
         <h1 className="text-xl font-bold text-gray-800 mb-2">Invoice Not Found</h1>
         <p className="text-gray-500 text-sm">{error}</p>
+        <p className="text-gray-400 text-xs mt-4">If you believe this is an error, please contact the shop on {SHOP.phone}</p>
+      </div>
+    </div>
+  )
+
+  // Cancelled
+  if (isCancelled) return (
+    <div className="min-h-screen bg-[#f6f4ef]">
+      <div className="bg-[#1a3d30] text-white relative overflow-hidden">
+        <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full border border-white/5" />
+        <div className="max-w-lg mx-auto px-6 py-8 relative z-10">
+          <div className="flex items-center gap-3 mb-6">
+            <img src="/logo.png" alt="" className="w-12 h-12 rounded-xl object-contain" />
+            <div>
+              <h1 className="font-bold text-lg tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>{SHOP.name}</h1>
+              <p className="text-white/50 text-xs">{SHOP.tagline}</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white/50 text-xs uppercase tracking-wider">Invoice</p>
+              <p className="text-xl font-extrabold mt-0.5">{order?.order_no}</p>
+            </div>
+            <div className="bg-red-500 text-white px-4 py-2 rounded-full text-sm font-bold">Cancelled</div>
+          </div>
+        </div>
+      </div>
+      <div className="max-w-lg mx-auto px-6 py-8">
+        <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-6 text-center">
+          <h3 className="text-lg font-bold text-red-700 mb-2">Order Cancelled</h3>
+          <p className="text-sm text-red-600">This order has been cancelled and payment is no longer accepted.</p>
+          <p className="text-sm text-gray-500 mt-3">If you would like to place a new order, please contact us:</p>
+          <p className="text-sm font-semibold text-gray-700 mt-1">{SHOP.phone}</p>
+        </div>
       </div>
     </div>
   )
@@ -127,8 +166,6 @@ export default function InvoicePay() {
         <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full border border-white/5" />
         <div className="absolute -right-3 -top-3 w-20 h-20 rounded-full border border-white/5" />
         <div className="absolute -left-6 -bottom-6 w-24 h-24 rounded-full border border-white/5" />
-        <div className="absolute left-1/3 -top-4 w-16 h-16 rounded-full bg-white/3" />
-        <div className="absolute right-1/4 bottom-2 w-10 h-10 rounded-full border border-white/5" />
 
         <div className="max-w-lg mx-auto px-6 py-8 relative z-10">
           <div className="flex items-center gap-3 mb-6">
@@ -144,9 +181,9 @@ export default function InvoicePay() {
               <p className="text-xl font-extrabold mt-0.5">{order?.order_no}</p>
             </div>
             {isPaid ? (
-              <div className="bg-emerald-500 text-white px-4 py-2 rounded-full text-sm font-bold flex items-center gap-1.5">✓ Paid</div>
+              <div className="bg-emerald-500 text-white px-4 py-2 rounded-full text-sm font-bold">Paid</div>
             ) : (
-              <div className="bg-amber-500 text-white px-4 py-2 rounded-full text-sm font-bold">Pending</div>
+              <div className="bg-amber-500 text-white px-4 py-2 rounded-full text-sm font-bold">Awaiting Payment</div>
             )}
           </div>
         </div>
@@ -156,7 +193,7 @@ export default function InvoicePay() {
         {/* Items */}
         <div className="bg-white rounded-2xl overflow-hidden mb-4">
           <div className="px-4 py-3 border-b border-gray-100">
-            <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Order Items</p>
+            <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Order Summary</p>
           </div>
           {order?.items?.map((it, i) => (
             <div key={i} className="flex justify-between items-center px-4 py-3 border-b border-gray-50 last:border-0">
@@ -167,74 +204,63 @@ export default function InvoicePay() {
               <p className="text-sm font-bold text-gray-900">{money(it.lineTotal || it.price * it.qty)}</p>
             </div>
           ))}
-          {/* Total */}
           <div className="flex justify-between items-center px-4 py-4 bg-gray-50">
             <span className="text-base font-bold text-gray-900">Total</span>
             <span className="text-xl font-extrabold text-[#1a3d30]">{money(order?.total)}</span>
           </div>
         </div>
 
-        {/* Delivery Details Form — only show if not paid */}
+        {/* Delivery form — only when not paid */}
         {!isPaid && (
           <div className="bg-white rounded-2xl p-5 mb-4">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-lg"></span>
-              <h3 className="text-sm font-bold text-gray-900">Delivery Details</h3>
-            </div>
-
+            <h3 className="text-sm font-bold text-gray-900 mb-4">Delivery Details</h3>
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Full Name *</label>
                 <input type="text" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#3d8b6a]"
                   placeholder="Your full name" value={name} onChange={e => setName(e.target.value)} />
               </div>
-
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Phone Number *</label>
                 <input type="tel" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#3d8b6a]"
-                  placeholder="0XX XXX XXXX" value={phone} onChange={e => setPhone(e.target.value)} />
+                  placeholder="e.g. 024 XXX XXXX" value={phone} onChange={e => setPhone(e.target.value)} />
               </div>
-
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Delivery Address *</label>
                 <input type="text" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#3d8b6a]"
-                  placeholder="e.g. Adenta, Frafraha Estate" value={address} onChange={e => setAddress(e.target.value)} />
+                  placeholder="Area, street name or description" value={address} onChange={e => setAddress(e.target.value)} />
               </div>
-
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Nearest Landmark</label>
                 <input type="text" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#3d8b6a]"
-                  placeholder="e.g. Near Shell filling station" value={landmark} onChange={e => setLandmark(e.target.value)} />
+                  placeholder="e.g. Near the Shell station" value={landmark} onChange={e => setLandmark(e.target.value)} />
               </div>
-
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Special Instructions</label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Delivery Notes</label>
                 <textarea className="w-full h-20 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#3d8b6a] resize-none"
-                  placeholder="e.g. Call before delivery, gate is blue..." value={notes} onChange={e => setNotes(e.target.value)} />
+                  placeholder="Any additional information for delivery" value={notes} onChange={e => setNotes(e.target.value)} />
               </div>
             </div>
-
-            {saved && <div className="mt-3 text-xs text-emerald-600 font-semibold flex items-center gap-1">✓ Details saved</div>}
+            {saved && <div className="mt-3 text-xs text-emerald-600 font-semibold">Details saved</div>}
           </div>
         )}
 
-        {/* Show delivery details if paid */}
+        {/* Delivery summary after payment */}
         {isPaid && hasDelivery && (
           <div className="bg-white rounded-2xl p-4 mb-4">
             <p className="text-xs text-gray-400 uppercase tracking-wider mb-2 font-semibold">Delivery Details</p>
             <p className="font-bold text-gray-900">{order.customer_name}</p>
             <p className="text-sm text-gray-500">{order.customer_phone}</p>
-            <p className="text-sm text-gray-500 mt-1">📍 {order.address}</p>
-            {order.notes && order.notes !== 'Invoice from POS' && <p className="text-sm text-gray-400 mt-1 italic">"{order.notes}"</p>}
+            <p className="text-sm text-gray-500 mt-1">{order.address}</p>
+            {order.notes && order.notes !== 'Invoice from POS' && <p className="text-sm text-gray-400 mt-1">Note: {order.notes}</p>}
           </div>
         )}
 
-        {/* Payment */}
+        {/* Payment section */}
         {isPaid ? (
           <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-6 text-center">
-            <div className="text-4xl mb-3">✅</div>
-            <h3 className="text-lg font-bold text-emerald-700">Payment Received!</h3>
-            <p className="text-sm text-emerald-600 mt-1">Thank you for your purchase. Your order is being processed.</p>
+            <h3 className="text-lg font-bold text-emerald-700">Payment Received</h3>
+            <p className="text-sm text-emerald-600 mt-1">Thank you. Your order is being prepared.</p>
             {order?.paid_at && <p className="text-xs text-emerald-500 mt-2">Paid on {new Date(order.paid_at).toLocaleString('en-GB')}</p>}
           </div>
         ) : (
@@ -250,11 +276,7 @@ export default function InvoicePay() {
               )}
             </button>
 
-            <p className="text-center text-xs text-gray-400 mt-3">Secured by Paystack • Card & Mobile Money accepted</p>
-
-            <div className="bg-[#f0ece4] rounded-xl p-3 mt-4">
-              <p className="text-xs text-gray-500 text-center">Fill in your delivery details above before paying. Your info will be saved automatically when you pay.</p>
-            </div>
+            <p className="text-center text-xs text-gray-400 mt-3">Secured by Paystack · Card and Mobile Money accepted</p>
           </div>
         )}
 
@@ -262,7 +284,6 @@ export default function InvoicePay() {
         <div className="text-center mt-8 pb-8">
           <p className="text-xs text-gray-400">{SHOP.phone}</p>
           <p className="text-xs text-gray-400">{SHOP.address}</p>
-          <p className="text-xs text-gray-300 mt-2">Powered by {SHOP.name}</p>
         </div>
       </div>
     </div>
