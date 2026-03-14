@@ -53,7 +53,7 @@ export default function Navigation({ onOpenCart }) {
 
       {/* Logo */}
       <div className="relative z-10 flex items-center gap-3 px-4 h-16 flex-shrink-0">
-        <img src="/logo.png" alt="" className="w-8 h-8 rounded-xl object-contain flex-shrink-0" />
+        <div className="w-8 h-8 bg-brand-600 rounded-xl flex items-center justify-center text-white text-xs font-extrabold flex-shrink-0">ER</div>
         <div className={`overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'}`}>
           <div className="font-heading text-sm font-extrabold tracking-tight whitespace-nowrap">Everytin Room</div>
           <div className="text-[10px] text-stone-400 whitespace-nowrap">POS System</div>
@@ -124,7 +124,7 @@ export default function Navigation({ onOpenCart }) {
     {/* ===== MOBILE HEADER ===== */}
     <header className="flex md:hidden fixed top-0 left-0 right-0 h-14 safe-top glass px-4 items-center gap-2 z-[100] border-b border-stone-200/30">
       <div className="flex items-center gap-2 font-heading text-base font-extrabold tracking-tight flex-1">
-        <img src="/logo.png" alt="" className="w-8 h-8 rounded-lg object-contain" />Everytin Room
+        <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white text-xs font-extrabold flex-shrink-0">ER</div>Everytin Room
       </div>
       <button onClick={() => setMobileOpen(true)} className="w-9 h-9 rounded-xl bg-brand-700 flex items-center justify-center text-white text-sm">☰</button>
     </header>

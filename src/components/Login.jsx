@@ -73,7 +73,7 @@ export default function Login() {
       {/* Content */}
       <div className="text-center w-full max-w-[360px] relative z-10">
         <div className="mb-8">
-          <img src="/logo.png" alt="" className="w-20 h-20 rounded-2xl mx-auto mb-5 object-contain shadow-2xl shadow-black/30" />
+          
           <h1 className="text-white text-4xl font-extrabold tracking-tight italic" style={{ fontFamily: 'Outfit, sans-serif' }}>Welcome Back</h1>
           <p className="text-white/40 text-sm mt-2">EVERYTINROOM & BEDTIME</p>
         </div>
