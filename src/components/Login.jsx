@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useStore } from '../hooks/useStore'
 import { getSupabase } from '../lib/supabase'
-import { ADMIN_PIN } from '../lib/utils'
 
 export default function Login() {
   const [pins, setPins] = useState(['', '', '', ''])
@@ -23,11 +22,6 @@ export default function Login() {
   }
 
   const tryLogin = async (pin) => {
-    if (pin === ADMIN_PIN) {
-      login({ name: 'Admin', role: 'Admin' }, true)
-      setPage('dash')
-      return
-    }
     try {
       const sb = getSupabase()
       const { data } = await sb.rpc('verify_pin', { p_pin: pin })

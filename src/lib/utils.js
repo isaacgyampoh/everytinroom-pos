@@ -19,7 +19,7 @@ export const SHOP = {
   promoMsg: '',
 }
 
-export const ADMIN_PIN = '1024'
+export const ADMIN_PIN = null // Admin PIN verified server-side via verify_pin()
 
 // Generate thumbnail URL for Supabase images
 export const thumb = (url, w = 200) => {
