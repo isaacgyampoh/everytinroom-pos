@@ -48,7 +48,7 @@ export default function ReportsPage() {
   const netCashFlow = totalRev - totalExp - totalRefAmt
 
   const cashSales = fSales.filter(s => s.payment === 'Cash')
-  const momoSales = fSales.filter(s => s.payment === 'Momo')
+  const momoSales = fSales.filter(s => s.payment === 'Momo' || s.payment === 'Paystack')
   const splitSales = fSales.filter(s => s.payment === 'Split')
   const cashTotal = cashSales.reduce((a, s) => a + s.total, 0) + splitSales.reduce((a, s) => a + (s.splitCash || 0), 0)
   const momoTotal = momoSales.reduce((a, s) => a + s.total, 0) + splitSales.reduce((a, s) => a + (s.splitMomo || 0), 0)
@@ -77,7 +77,7 @@ export default function ReportsPage() {
     dayMap[d].revenue += s.total
     dayMap[d].profit += s.profit
     if (s.payment === 'Cash') dayMap[d].cash += s.total
-    else if (s.payment === 'Momo') dayMap[d].momo += s.total
+    else if (s.payment === 'Momo' || s.payment === 'Paystack') dayMap[d].momo += s.total
     else if (s.payment === 'Split') { dayMap[d].cash += (s.splitCash || 0); dayMap[d].momo += (s.splitMomo || 0) }
   })
   const days = Object.values(dayMap).sort((a, b) => b.date.localeCompare(a.date))

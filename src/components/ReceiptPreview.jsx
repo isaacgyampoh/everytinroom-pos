@@ -67,7 +67,7 @@ export default function ReceiptPreview({ sale, onClose }) {
             <div className="meta-row flex justify-between text-sm"><span className="font-bold text-gray-600">Date:</span><span className="font-extrabold">{fmtDateTime(sale.date)}</span></div>
             <div className="meta-row flex justify-between text-sm"><span className="font-bold text-gray-600">Customer:</span><span className="font-extrabold">{sale.customer}</span></div>
             <div className="meta-row flex justify-between text-sm"><span className="font-bold text-gray-600">Cashier:</span><span className="font-extrabold">{sale.cashier}</span></div>
-            <div className="meta-row flex justify-between text-sm"><span className="font-bold text-gray-600">Payment:</span><span className="font-extrabold">{sale.payment}</span></div>
+            <div className="meta-row flex justify-between text-sm"><span className="font-bold text-gray-600">Payment:</span><span className="font-extrabold">{sale.payment === 'Paystack' ? 'Momo' : sale.payment}</span></div>
             <div className="meta-row flex justify-between text-sm"><span className="font-bold text-gray-600">Type:</span><span className="font-extrabold">{sale.type || 'Retail'}</span></div>
           </div>
 
@@ -91,7 +91,7 @@ export default function ReceiptPreview({ sale, onClose }) {
           <div className="totals space-y-1.5">
             <div className="total-row flex justify-between text-sm"><span className="font-bold text-gray-600">Subtotal</span><span className="font-extrabold">{money((sale.total || 0) + (sale.discount || 0))}</span></div>
             {(sale.discount || 0) > 0 && <div className="total-row flex justify-between text-sm"><span className="font-bold text-gray-600">Discount</span><span className="font-extrabold text-red-600">-{money(sale.discount)}</span></div>}
-            {sale.payment === 'Split' && sale.splitCash > 0 && <div className="total-row flex justify-between text-sm"><span className="font-bold text-gray-600">💵 Cash</span><span className="font-extrabold">{money(sale.splitCash)}</span></div>}
+            {sale.payment === 'Split' && sale.splitCash > 0 && <div className="total-row flex justify-between text-sm"><span className="font-bold text-gray-600">Cash</span><span className="font-extrabold">{money(sale.splitCash)}</span></div>}
             {sale.payment === 'Split' && sale.splitMomo > 0 && <div className="total-row flex justify-between text-sm"><span className="font-bold text-gray-600">Momo</span><span className="font-extrabold">{money(sale.splitMomo)}</span></div>}
             <div className="grand-total flex justify-between text-xl border-t-2 border-dashed border-gray-800 pt-3 mt-3">
               <span className="font-black">TOTAL</span>

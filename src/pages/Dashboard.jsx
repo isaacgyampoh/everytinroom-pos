@@ -42,7 +42,7 @@ export default function Dashboard() {
 
   // Payment split this month
   const monthCash = monthSales.filter(s => s.payment === 'Cash').reduce((a, s) => a + s.total, 0)
-  const monthMomo = monthSales.filter(s => s.payment === 'Momo').reduce((a, s) => a + s.total, 0)
+  const monthMomo = monthSales.filter(s => s.payment === 'Momo' || s.payment === 'Paystack').reduce((a, s) => a + s.total, 0)
   const monthSplit = monthSales.filter(s => s.payment === 'Split').reduce((a, s) => a + s.total, 0)
 
   // Profit margin
@@ -214,7 +214,7 @@ export default function Dashboard() {
             {recentSales.length === 0 && <div className="p-8 text-center text-gray-300 text-sm">No sales yet</div>}
             {recentSales.map(s => (
               <div key={s.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/50 transition">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${s.payment === 'Cash' ? 'bg-green-500' : s.payment === 'Momo' ? 'bg-amber-500' : 'bg-violet-500'}`}>
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${s.payment === 'Cash' ? 'bg-green-500' : (s.payment === 'Momo' || s.payment === 'Paystack') ? 'bg-amber-500' : 'bg-violet-500'}`}>
                   {s.payment === 'Cash' ? '💵' : ''}
                 </div>
                 <div className="flex-1 min-w-0">

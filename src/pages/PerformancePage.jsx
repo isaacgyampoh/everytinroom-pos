@@ -30,7 +30,7 @@ export default function PerformancePage() {
 
   const staffData = [...names].map(name => {
     const ss = sales.filter(s => !s.voided && isoDate(s.date) >= range.from && isoDate(s.date) <= range.to && s.cashier === name)
-    return { name, sales: ss, count: ss.length, revenue: ss.reduce((a, s) => a + s.total, 0), profit: ss.reduce((a, s) => a + s.profit, 0), cash: ss.filter(s => s.payment === 'Cash').reduce((a, s) => a + s.total, 0), momo: ss.filter(s => s.payment === 'Momo').reduce((a, s) => a + s.total, 0) }
+    return { name, sales: ss, count: ss.length, revenue: ss.reduce((a, s) => a + s.total, 0), profit: ss.reduce((a, s) => a + s.profit, 0), cash: ss.filter(s => s.payment === 'Cash').reduce((a, s) => a + s.total, 0), momo: ss.filter(s => s.payment === 'Momo' || s.payment === 'Paystack').reduce((a, s) => a + s.total, 0) }
   }).filter(s => s.count > 0 || staff.find(st => st.name === s.name)).sort((a, b) => b.revenue - a.revenue)
 
   const totalRevAll = staffData.reduce((a, s) => a + s.revenue, 0)
@@ -99,7 +99,7 @@ export default function PerformancePage() {
                   {[
                     { label: 'Revenue', value: money(s.revenue), color: 'text-brand-500' },
                     { label: 'Profit', value: money(s.profit), color: 'text-green-600' },
-                    { label: '💵 Cash', value: money(s.cash), color: 'text-gray-700' },
+                    { label: 'Cash', value: money(s.cash), color: 'text-gray-700' },
                     { label: 'Momo', value: money(s.momo), color: 'text-amber-600' },
                   ].map((stat, i) => (
                     <div key={i} className="bg-gray-50 rounded-xl p-2.5 md:p-3 text-center">
