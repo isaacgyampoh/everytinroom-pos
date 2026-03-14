@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { useStore } from '../hooks/useStore'
+import { getSupabase } from '../lib/supabase'
 import { ADMIN_PIN } from '../lib/utils'
 
 export default function Login() {
   const [pins, setPins] = useState(['', '', '', ''])
   const [error, setError] = useState(false)
   const refs = [useRef(), useRef(), useRef(), useRef()]
-  const { staff, login, setPage } = useStore()
+  const { login, setPage } = useStore()
 
   useEffect(() => { refs[0].current?.focus() }, [])
 
@@ -21,16 +22,27 @@ export default function Login() {
     if (e.key === 'Backspace' && !pins[i] && i > 0) refs[i - 1].current?.focus()
   }
 
-  const tryLogin = (pin) => {
-    let u = staff.find(s => String(s.pin) === pin && s.active)
-    if (!u && pin === ADMIN_PIN) u = { name: 'Admin', role: 'Admin' }
-    if (u) {
-      login(u, u.role === 'Admin')
-      setPage(u.role === 'Admin' ? 'dash' : 'pos')
-    } else {
-      setError(true); setPins(['', '', '', '']); refs[0].current?.focus()
-      setTimeout(() => setError(false), 2000)
+  const tryLogin = async (pin) => {
+    // Admin PIN check (hardcoded for system access)
+    if (pin === ADMIN_PIN) {
+      login({ name: 'Admin', role: 'Admin' }, true)
+      setPage('dash')
+      return
     }
+    // Server-side PIN verification — PIN never stored in browser
+    try {
+      const sb = getSupabase()
+      const { data, error } = await sb.rpc('verify_pin', { p_pin: pin })
+      if (data?.success) {
+        const isAdmin = data.role === 'Admin'
+        login({ id: data.id, name: data.name, role: data.role }, isAdmin)
+        setPage(isAdmin ? 'dash' : 'pos')
+        return
+      }
+    } catch {}
+    // Failed
+    setError(true); setPins(['', '', '', '']); refs[0].current?.focus()
+    setTimeout(() => setError(false), 2000)
   }
 
   return (

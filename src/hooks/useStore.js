@@ -5,7 +5,7 @@ import { num } from '../lib/utils'
 const mapProduct = p => ({ id: p.id, name: p.name, category: p.category || '', costPrice: num(p.cost_price), price: num(p.price), wholesalePrice: num(p.wholesale_price), wholesaleMinQty: num(p.wholesale_min_qty) || 0, quantity: num(p.quantity), image: p.image || '' })
 const mapBundle = b => ({ id: b.id, name: b.name, products: typeof b.products === 'string' ? JSON.parse(b.products) : (b.products || []), bundlePrice: num(b.bundle_price), active: b.active })
 const mapSale = s => ({ id: s.id, receiptNo: s.receipt_no, date: s.date, items: typeof s.items === 'string' ? JSON.parse(s.items) : (s.items || []), subtotal: num(s.subtotal), discount: num(s.discount), total: num(s.total), profit: num(s.profit), payment: s.payment, splitCash: num(s.split_cash), splitMomo: num(s.split_momo), customer: s.customer || 'Walk-in', type: s.type || 'Retail', cashier: s.cashier || '', voided: s.voided })
-const mapStaff = s => ({ id: s.id, name: s.name, role: s.role, pin: s.pin, active: s.active })
+const mapStaff = s => ({ id: s.id, name: s.name, role: s.role, active: s.active })
 const mapExpense = e => ({ id: e.id, date: e.date, category: e.category, description: e.description, amount: num(e.amount) })
 const mapCustomer = c => ({ id: c.id, phone: c.phone, visitCount: num(c.visit_count), totalSpent: num(c.total_spent), lastVisit: c.last_visit })
 const mapWAOrder = o => ({ id: o.id, orderNo: o.order_no, date: o.date, customerName: o.customer_name, customerPhone: o.customer_phone, items: typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || []), subtotal: num(o.subtotal), deliveryFee: num(o.delivery_fee), total: num(o.total), address: o.address, notes: o.notes, status: o.status, paystackRef: o.paystack_ref, paidAt: o.paid_at, processedBy: o.processed_by, processedAt: o.processed_at })
@@ -101,7 +101,7 @@ export const useStore = create((set, get) => ({
       // PHASE 1: Only what POS needs immediately
       const [prodData, staffData, bunData, promoData] = await Promise.all([
         q(sb, 'products', { select: 'id,name,category,cost_price,price,wholesale_price,wholesale_min_qty,quantity,image', order: 'name', asc: true }),
-        q(sb, 'staff', { select: 'id,name,role,pin,active' }),
+        q(sb, 'staff', { select: 'id,name,role,active' }),
         q(sb, 'bundles', { select: 'id,name,products,bundle_price,active' }),
         q(sb, 'promos', { select: 'id,name,start_date,end_date,items,active', limit: 50 }),
       ])
