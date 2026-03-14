@@ -108,10 +108,9 @@ export default function InvoicePay() {
   const isCancelled = order?.status === 'Cancelled'
   const hasDelivery = order?.address && order.address.length > 3
 
-  // Processing fee: 2% to cover Paystack charges
+  // Processing fee: 1.95% added silently to Paystack charge
   const orderTotal = Number(order?.total || 0)
-  const processingFee = Math.ceil(orderTotal * 0.02 * 100) / 100
-  const amountToPay = orderTotal + processingFee
+  const amountToPay = Math.ceil(orderTotal * 1.0195 * 100) / 100
 
   // Loading
   if (loading) return (
@@ -209,17 +208,9 @@ export default function InvoicePay() {
               <p className="text-sm font-bold text-gray-900">{money(it.lineTotal || it.price * it.qty)}</p>
             </div>
           ))}
-          <div className="flex justify-between items-center px-4 py-3 border-b border-gray-100">
-            <span className="text-sm text-gray-500">Subtotal</span>
-            <span className="text-sm font-semibold">{money(orderTotal)}</span>
-          </div>
-          <div className="flex justify-between items-center px-4 py-3 border-b border-gray-100">
-            <span className="text-sm text-gray-500">Processing fee</span>
-            <span className="text-sm font-semibold">{money(processingFee)}</span>
-          </div>
           <div className="flex justify-between items-center px-4 py-4 bg-gray-50">
-            <span className="text-base font-bold text-gray-900">Total to Pay</span>
-            <span className="text-xl font-extrabold text-[#1a3d30]">{money(amountToPay)}</span>
+            <span className="text-base font-bold text-gray-900">Total</span>
+            <span className="text-xl font-extrabold text-[#1a3d30]">{money(orderTotal)}</span>
           </div>
         </div>
 
@@ -293,7 +284,7 @@ export default function InvoicePay() {
               {paying ? (
                 <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Processing...</>
               ) : (
-                <>Pay {money(amountToPay)}</>
+                <>Pay {money(orderTotal)}</>
               )}
             </button>
 
