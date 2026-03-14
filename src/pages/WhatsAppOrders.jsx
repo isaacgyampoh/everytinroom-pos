@@ -124,17 +124,20 @@ export default function WhatsAppOrders() {
           </div>
         )}
         {sorted.map(order => (
-          <div key={order.id} onClick={() => setSelected(order)} className="bg-white rounded-2xl p-4 cursor-pointer hover:bg-gray-50/50 transition">
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <div className="text-sm font-bold">{order.customerName || order.customerPhone || 'Customer'}</div>
-                <div className="text-xs text-gray-400">{order.orderNo} · {fmtDateTime(order.date)}</div>
+          <div key={order.id} onClick={() => setSelected(order)} className="bg-white rounded-2xl overflow-hidden cursor-pointer hover:bg-stone-50/50 transition border border-transparent hover:border-stone-200">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-2.5">
+                <div>
+                  <div className="text-sm font-bold">{order.customerName || 'Customer'}</div>
+                  <div className="text-xs text-stone-400 mt-0.5">{order.orderNo} · {fmtDateTime(order.date)}</div>
+                </div>
+                <span className={`px-3 py-1.5 rounded-lg text-[11px] font-bold ${statusColor(order.status)}`}>{order.status}</span>
               </div>
-              <span className={`px-3 py-1 rounded-full text-[11px] font-bold ${statusColor(order.status)}`}>{order.status}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="text-xs text-gray-400">{order.items.length} item{order.items.length !== 1 ? 's' : ''}{order.address ? ' · Delivery details filled' : ''}</div>
-              <div className="text-base font-extrabold">{money(order.total)}</div>
+              <div className="text-xs text-stone-400 mb-2">{order.items.length} item{order.items.length !== 1 ? 's' : ''}{order.address ? ' · Delivery filled' : ' · No delivery details'}</div>
+              <div className="flex items-center justify-between pt-2.5 border-t border-stone-100">
+                <div className="text-lg font-extrabold">{money(order.total)}</div>
+                <span className="text-xs font-medium text-brand-600">View details →</span>
+              </div>
             </div>
           </div>
         ))}
@@ -212,27 +215,31 @@ export default function WhatsAppOrders() {
             )}
 
             {/* Actions */}
-            <div className="flex gap-2 pt-2">
-              {o.status === 'Pending' && (
-                <>
-                  <button onClick={() => resendInvoice(o)} className="flex-1 h-11 bg-[#25d366] text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Resend Invoice</button>
-                  <button onClick={() => copyLink(o)} className="h-11 px-4 bg-gray-100 rounded-xl text-sm font-semibold text-gray-600">Copy Link</button>
-                  <button onClick={() => cancel(o.id)} className="h-11 px-4 bg-red-50 text-red-500 rounded-xl text-sm font-semibold">Cancel</button>
-                </>
-              )}
-              {o.status === 'Paid' && (
-                <>
-                  <button onClick={() => complete(o.id)} className="flex-1 h-11 bg-brand-600 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Process Order</button>
-                  <button onClick={() => copyLink(o)} className="h-11 px-4 bg-gray-100 rounded-xl text-sm font-semibold text-gray-600">Copy Link</button>
-                </>
-              )}
-              {o.status === 'Completed' && (
-                <div className="flex-1 h-11 bg-brand-50 text-brand-700 rounded-xl text-sm font-semibold flex items-center justify-center">Order completed</div>
-              )}
-              {o.status === 'Cancelled' && (
-                <div className="flex-1 h-11 bg-red-50 text-red-500 rounded-xl text-sm font-semibold flex items-center justify-center">Order cancelled</div>
-              )}
-            </div>
+            {o.status === 'Pending' && (
+              <div className="space-y-2 pt-2">
+                <button onClick={() => resendInvoice(o)} className="w-full h-12 bg-[#25d366] text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Resend Invoice</button>
+                <div className="flex gap-2">
+                  <button onClick={() => copyLink(o)} className="flex-1 h-11 bg-stone-200 text-stone-700 rounded-xl text-sm font-semibold active:scale-[.98] transition">Copy Link</button>
+                  <button onClick={() => cancel(o.id)} className="flex-1 h-11 bg-red-500 text-white rounded-xl text-sm font-semibold active:scale-[.98] transition">Cancel Order</button>
+                </div>
+              </div>
+            )}
+            {o.status === 'Paid' && (
+              <div className="space-y-2 pt-2">
+                <button onClick={() => complete(o.id)} className="w-full h-12 bg-brand-600 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Process Order</button>
+                <button onClick={() => copyLink(o)} className="w-full h-11 bg-stone-200 text-stone-700 rounded-xl text-sm font-semibold active:scale-[.98] transition">Copy Link</button>
+              </div>
+            )}
+            {o.status === 'Completed' && (
+              <div className="pt-2">
+                <div className="w-full h-11 bg-brand-50 text-brand-700 rounded-xl text-sm font-semibold flex items-center justify-center border border-brand-200">Order completed</div>
+              </div>
+            )}
+            {o.status === 'Cancelled' && (
+              <div className="pt-2">
+                <div className="w-full h-11 bg-red-50 text-red-600 rounded-xl text-sm font-semibold flex items-center justify-center border border-red-200">Order cancelled</div>
+              </div>
+            )}
           </div>
         )}
       </Modal>

@@ -53,6 +53,14 @@ body.dark .cart-item { background: #1a2e27 !important; border-color: #264035 !im
 body.dark .cart-item * { color: #e8ece6; }
 body.dark .cart-item .text-gray-400, body.dark .cart-item .text-stone-400 { color: #6b8a7a !important; }
 
+/* Modal dark mode */
+body.dark .bg-stone-200 { background: #1a2e27 !important; color: #e8ece6 !important; }
+body.dark .text-stone-700 { color: #e8ece6 !important; }
+body.dark .border-stone-200 { border-color: #264035 !important; }
+body.dark .border-stone-100 { border-color: #1a2e27 !important; }
+body.dark .border-brand-200 { border-color: #265a44 !important; }
+body.dark .border-red-200 { border-color: #5c2020 !important; }
+
 /* ===== LIGHT MODE ===== */
 ::selection { background: #d4dbd0; color: #1a3d30; }
 ::-webkit-scrollbar { width: 4px; }

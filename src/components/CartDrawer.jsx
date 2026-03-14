@@ -237,7 +237,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
               const { data, error } = await sb.from('whatsapp_orders').insert({
                 order_no: orderNo,
                 date: new Date().toISOString(),
-                customer_name: phone.trim(),
+                customer_name: '',
                 customer_phone: phone.trim(),
                 items: orderItems,
                 subtotal: sub,
