@@ -40,7 +40,7 @@ export default function WhatsAppOrders() {
       <div className="bg-wa rounded-3xl p-7 text-white mb-6"><small className="text-sm opacity-80">Pending Orders</small><strong className="block text-4xl font-extrabold mt-2">{pending}</strong></div>
 
       <div className="flex gap-2.5 mb-6 overflow-x-auto">
-        {['Pending', 'Completed', 'all'].map(f => (
+        {['Pending', 'Paid', 'Completed', 'all'].map(f => (
           <button key={f} onClick={() => setWAFilter(f)}
             className={`h-11 px-5 rounded-xl text-sm font-semibold whitespace-nowrap border-2 transition ${waFilter === f ? (f === 'Pending' ? 'bg-wa text-white border-transparent' : 'bg-brand-500 text-white border-transparent') : 'bg-white border-gray-200 text-gray-500'}`}>
             {f === 'Pending' ? '🟢 Pending' : f === 'Completed' ? '✅ Completed' : '📋 All'}
@@ -76,6 +76,13 @@ export default function WhatsAppOrders() {
                 <div className="text-xl font-extrabold text-brand-500">{money(o.total)}</div>
                 {o.status === 'Pending' && (
                   <div className="flex gap-2">
+                    <button onClick={() => {
+                      const link = window.location.origin + '/#/pay/' + o.id
+                      const msg = `Hi ${o.customerName || 'there'}! 🛍️\n\nYour invoice from *EVERYTINROOM&BEDTIME* is ready:\n\n${o.items.map(it => `• ${it.qty}x ${it.name} — ${money(it.lineTotal || it.price * it.qty)}`).join('\n')}\n\n*Total: ${money(o.total)}*\n\nPay securely here:\n${link}\n\nThank you for shopping with us! 🙏`
+                      const waLink = `https://wa.me/${o.customerPhone?.replace(/^0/, '233')}?text=${encodeURIComponent(msg)}`
+                      window.open(waLink, '_blank')
+                      toast.success('Invoice link opened in WhatsApp!')
+                    }} className="h-10 px-4 bg-wa text-white rounded-lg text-[13px] font-semibold active:scale-95 transition">📩 Send Invoice</button>
                     <button onClick={() => complete(o.id)} className="h-10 px-4 bg-green-500 text-white rounded-lg text-[13px] font-semibold active:scale-95 transition">✅ Complete</button>
                     <button onClick={() => cancel(o.id)} className="h-10 px-4 bg-red-500 text-white rounded-lg text-[13px] font-semibold active:scale-95 transition">❌</button>
                   </div>

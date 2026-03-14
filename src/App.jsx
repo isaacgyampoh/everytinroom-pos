@@ -24,6 +24,7 @@ import InvoicesPage from './pages/InvoicesPage'
 import StockTakesPage from './pages/StockTakesPage'
 import StockAdjustmentsPage from './pages/StockAdjustmentsPage'
 import RestockPage from './pages/RestockPage'
+import InvoicePay from './pages/InvoicePay'
 import toast from 'react-hot-toast'
 
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000 // 30 minutes
@@ -100,6 +101,11 @@ export default function App() {
         }
       })
       .subscribe()
+  }
+
+  // Public invoice page - no login required
+  if (window.location.hash.includes('/pay/')) {
+    return <InvoicePay />
   }
 
   if (loading) return <><Loader /><Toaster /></>
