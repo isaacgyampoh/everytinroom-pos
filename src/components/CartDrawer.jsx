@@ -250,12 +250,24 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
 
               const link = window.location.origin + '/#/pay/' + data.id
               const msg = `Hi! 🛍️\n\nYour invoice from *EVERYTINROOM&BEDTIME* is ready:\n\n${orderItems.map(it => `• ${it.qty}x ${it.name} — GHS ${Number(it.lineTotal).toFixed(2)}`).join('\n')}\n\n*Total: GHS ${Number(total).toFixed(2)}*\n\n💳 Pay securely here:\n${link}\n\nThank you for shopping with us! 🙏`
+
+              // Copy message to clipboard first
+              try { await navigator.clipboard.writeText(msg) } catch {}
+
+              // Try to open WhatsApp
               const waPhone = phone.trim().replace(/^0/, '233')
-              const waLink = `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`
-              window.open(waLink, '_blank')
-              toast.success('Invoice created! Sending via WhatsApp...')
+              const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent)
+
+              if (isMobile) {
+                // Mobile: use WhatsApp deep link
+                window.location.href = `whatsapp://send?phone=${waPhone}&text=${encodeURIComponent(msg)}`
+              } else {
+                // Desktop: open WhatsApp Web
+                window.open(`https://web.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(msg)}`, '_blank')
+              }
+
+              toast.success('✅ Invoice created! Message copied to clipboard.\nPaste in WhatsApp if it didn\'t open automatically.', { duration: 5000 })
               clearCart(); setPhone(''); setDiscount(''); onClose()
-              // Refresh WA orders
               const store = useStore.getState()
               store.refreshWAOrders()
             } catch (e) { toast.error('Error creating invoice') }
