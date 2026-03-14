@@ -224,6 +224,46 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             className="w-full h-12 bg-brand-700 hover:bg-brand-600 rounded-xl text-white text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm shadow-brand-700/20">
             Complete Sale — {money(total)}
           </button>
+
+          {/* WhatsApp Invoice Button */}
+          <button onClick={async () => {
+            if (!phoneValid) { toast.error('Enter phone number first!'); return }
+            if (cnt === 0) return
+            setProcessing(true)
+            try {
+              const sb = getSupabase()
+              const orderNo = 'WA-' + Date.now().toString(36).toUpperCase()
+              const orderItems = cart.map(c => ({ name: c.name, qty: c.qty, price: c.price, lineTotal: c.lineTotal }))
+              const { data, error } = await sb.from('whatsapp_orders').insert({
+                order_no: orderNo,
+                date: new Date().toISOString(),
+                customer_name: phone.trim(),
+                customer_phone: phone.trim(),
+                items: orderItems,
+                subtotal: sub,
+                delivery_fee: 0,
+                total: total,
+                status: 'Pending',
+                notes: 'Invoice from POS'
+              }).select('id').single()
+              if (error) { toast.error('Failed to create invoice'); setProcessing(false); return }
+
+              const link = window.location.origin + '/#/pay/' + data.id
+              const msg = `Hi! 🛍️\n\nYour invoice from *EVERYTINROOM&BEDTIME* is ready:\n\n${orderItems.map(it => `• ${it.qty}x ${it.name} — GHS ${Number(it.lineTotal).toFixed(2)}`).join('\n')}\n\n*Total: GHS ${Number(total).toFixed(2)}*\n\n💳 Pay securely here:\n${link}\n\nThank you for shopping with us! 🙏`
+              const waPhone = phone.trim().replace(/^0/, '233')
+              const waLink = `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`
+              window.open(waLink, '_blank')
+              toast.success('Invoice created! Sending via WhatsApp...')
+              clearCart(); setPhone(''); setDiscount(''); onClose()
+              // Refresh WA orders
+              const store = useStore.getState()
+              store.refreshWAOrders()
+            } catch (e) { toast.error('Error creating invoice') }
+            setProcessing(false)
+          }} disabled={cnt === 0 || !phoneValid || processing}
+            className="w-full h-12 bg-[#25d366] hover:bg-[#1ebe5d] rounded-xl text-white text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm mt-2 flex items-center justify-center gap-2">
+            📩 Send Invoice via WhatsApp — {money(total)}
+          </button>
         </div>
       </div>
 
