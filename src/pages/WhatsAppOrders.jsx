@@ -36,12 +36,12 @@ export default function WhatsAppOrders() {
     setLoading(true, 'Cancelling...')
     const sb = getSupabase()
     await sb.from('whatsapp_orders').update({ status: 'Cancelled', processed_by: user?.name || '', processed_at: new Date().toISOString(), notes: reason }).eq('id', id)
-    setLoading(false); toast('Cancelled', { icon: '⚠️' }); refreshWAOrders()
+    setLoading(false); toast('Cancelled', { icon: '' }); refreshWAOrders()
   }
 
   const resendInvoice = (o) => {
     const link = window.location.origin + '/#/pay/' + o.id
-    const msg = `Hi ${o.customerName || 'there'}! 🛍️\n\nReminder: Your invoice from *EVERYTINROOM&BEDTIME*:\n\n${o.items.map(it => `• ${it.qty}x ${it.name} — ${money(it.lineTotal || it.price * it.qty)}`).join('\n')}\n\n*Total: ${money(o.total)}*\n\n💳 Pay here:\n${link}\n\nThank you! 🙏`
+    const msg = `Hi ${o.customerName || 'there'}! \n\nReminder: Your invoice from *EVERYTINROOM&BEDTIME*:\n\n${o.items.map(it => `• ${it.qty}x ${it.name} — ${money(it.lineTotal || it.price * it.qty)}`).join('\n')}\n\n*Total: ${money(o.total)}*\n\nPay here:\n${link}\n\nThank you! `
     const waPhone = (o.customerPhone || '').replace(/^0/, '233')
     window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`, '_blank')
     toast.success('Resending invoice...')
@@ -65,10 +65,10 @@ export default function WhatsAppOrders() {
     <div className="animate-fade">
       <div className="flex justify-between items-start flex-wrap gap-4 mb-5">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">📱 WhatsApp Invoices</h1>
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">WhatsApp Invoices</h1>
           <p className="text-gray-400 text-sm mt-0.5">Send invoices, track payments</p>
         </div>
-        <button onClick={refreshWAOrders} className="h-10 px-4 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">🔄 Refresh</button>
+        <button onClick={refreshWAOrders} className="h-10 px-4 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">Refresh</button>
       </div>
 
       {/* Stats */}
@@ -92,8 +92,8 @@ export default function WhatsAppOrders() {
 
       {/* How it works */}
       <div className="bg-brand-50 rounded-2xl p-4 mb-5 border border-brand-100">
-        <p className="text-sm font-semibold text-brand-700 mb-2">💡 How to send a WhatsApp Invoice:</p>
-        <p className="text-xs text-brand-600 leading-relaxed">Go to <b>POS</b> → Add products to cart → Enter phone number → Click <b>"📩 Send Invoice via WhatsApp"</b> → Invoice is created and sent automatically!</p>
+        <p className="text-sm font-semibold text-brand-700 mb-2">How to send a WhatsApp Invoice:</p>
+        <p className="text-xs text-brand-600 leading-relaxed">Go to <b>POS</b> → Add products to cart → Enter phone number → Click <b>"Send Invoice via WhatsApp"</b> → Invoice is created and sent automatically!</p>
       </div>
 
       {/* Search + Filters */}
@@ -114,7 +114,7 @@ export default function WhatsAppOrders() {
       <div className="space-y-3">
         {sorted.length === 0 && (
           <div className="text-center py-16">
-            <div className="text-4xl mb-3 opacity-20">📱</div>
+            <div className="text-4xl mb-3 opacity-20"></div>
             <p className="text-stone-400 text-sm">No invoices found</p>
             <p className="text-stone-300 text-xs mt-1">Go to POS to create and send one</p>
           </div>
@@ -124,7 +124,7 @@ export default function WhatsAppOrders() {
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-50">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center text-lg">📱</div>
+                <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center text-lg"></div>
                 <div>
                   <div className="text-sm font-bold">{o.customerName || o.customerPhone || 'Customer'}</div>
                   <div className="text-xs text-gray-400">{o.orderNo} • {fmtDateTime(o.date)}</div>
@@ -150,16 +150,16 @@ export default function WhatsAppOrders() {
               <div className="flex gap-1.5">
                 {o.status === 'Pending' && (
                   <>
-                    <button onClick={() => resendInvoice(o)} className="h-8 px-3 bg-[#25d366] text-white rounded-lg text-xs font-bold active:scale-95 transition" title="Resend invoice via WhatsApp">📩 Resend</button>
-                    <button onClick={() => copyLink(o)} className="h-8 px-3 bg-gray-100 rounded-lg text-xs font-semibold text-gray-600 active:scale-95 transition" title="Copy invoice link">🔗</button>
+                    <button onClick={() => resendInvoice(o)} className="h-8 px-3 bg-[#25d366] text-white rounded-lg text-xs font-bold active:scale-95 transition" title="Resend invoice via WhatsApp">Resend</button>
+                    <button onClick={() => copyLink(o)} className="h-8 px-3 bg-gray-100 rounded-lg text-xs font-semibold text-gray-600 active:scale-95 transition" title="Copy invoice link"></button>
                     <button onClick={() => complete(o.id)} className="h-8 px-3 bg-brand-500 text-white rounded-lg text-xs font-bold active:scale-95 transition">✅</button>
-                    <button onClick={() => cancel(o.id)} className="h-8 px-3 bg-red-50 text-red-500 rounded-lg text-xs font-bold active:scale-95 transition">❌</button>
+                    <button onClick={() => cancel(o.id)} className="h-8 px-3 bg-red-50 text-red-500 rounded-lg text-xs font-bold active:scale-95 transition"></button>
                   </>
                 )}
                 {o.status === 'Paid' && (
                   <>
-                    <button onClick={() => complete(o.id)} className="h-8 px-3 bg-brand-500 text-white rounded-lg text-xs font-bold active:scale-95 transition">✅ Process Order</button>
-                    <button onClick={() => copyLink(o)} className="h-8 px-3 bg-gray-100 rounded-lg text-xs font-semibold text-gray-600" title="Copy link">🔗</button>
+                    <button onClick={() => complete(o.id)} className="h-8 px-3 bg-brand-500 text-white rounded-lg text-xs font-bold active:scale-95 transition">Process Order</button>
+                    <button onClick={() => copyLink(o)} className="h-8 px-3 bg-gray-100 rounded-lg text-xs font-semibold text-gray-600" title="Copy link"></button>
                   </>
                 )}
                 {o.status === 'Completed' && o.paystackRef && (

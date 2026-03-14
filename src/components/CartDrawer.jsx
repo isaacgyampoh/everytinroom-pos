@@ -127,7 +127,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
 
   const handleCompleteSale = () => {
     // PHONE IS REQUIRED
-    if (!phoneValid) { toast.error('⚠️ Customer phone number is required!'); return }
+    if (!phoneValid) { toast.error('Phone number is required'); return }
 
     if (splitMode) {
       if (num(splitCash) < 0 || num(splitCash) > total) { toast.error('Invalid cash amount'); return }
@@ -140,7 +140,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
 
   // Block "Complete Sale" if no phone
   const handleOpenPayment = () => {
-    if (!phoneValid) { toast.error('⚠️ Enter customer phone number first!'); return }
+    if (!phoneValid) { toast.error('Enter phone number first'); return }
     if (cnt === 0) return
     setPayOpen(true)
   }
@@ -158,9 +158,9 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
           </div>
           <div className="flex gap-1.5">
             <button onClick={() => setShowHeld(true)} className="h-9 px-3 rounded-lg text-xs font-semibold bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100 transition relative">
-              ⏸ Held{heldCarts.length > 0 && <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-brand-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{heldCarts.length}</span>}
+              Held{heldCarts.length > 0 && <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-brand-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{heldCarts.length}</span>}
             </button>
-            <button onClick={holdCart} disabled={!cart.length} className="h-9 px-3 rounded-lg text-xs font-semibold bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100 transition disabled:opacity-30">⏸ Hold</button>
+            <button onClick={holdCart} disabled={!cart.length} className="h-9 px-3 rounded-lg text-xs font-semibold bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100 transition disabled:opacity-30">Hold</button>
             <button onClick={() => { if (cart.length && confirm('Clear cart?')) clearCart() }} className="h-9 px-3 rounded-lg text-xs font-semibold bg-red-50 text-red-500 border border-red-100 hover:bg-red-100 transition">Clear</button>
           </div>
         </div>
@@ -169,7 +169,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
         <div className="flex-1 overflow-y-auto px-5 py-3">
           {cnt === 0 ? (
             <div className="text-center py-14">
-              <div className="text-5xl mb-3 opacity-20">🛒</div>
+              <div className="text-xl opacity-15">Empty cart</div>
               <p className="text-gray-400 text-sm font-medium">Your cart is empty</p>
               <p className="text-gray-300 text-xs mt-1">Add products from the POS page</p>
             </div>
@@ -181,7 +181,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                     <div className="text-sm font-semibold text-gray-900 leading-tight">{c.name}</div>
                     <div className="text-xs text-gray-400 mt-0.5">
                       {money(c.price)} each
-                      {c.isPromo && <span className="ml-1 text-orange-500 font-bold">• Promo 🏷️</span>}
+                      {c.isPromo && <span className="ml-1 text-orange-500 font-bold">• Promo </span>}
                       {!c.isPromo && c.originalPrice && c.price < c.originalPrice && <span className="ml-1 text-green-600 font-bold">• Wholesale ✓</span>}
                     </div>
                   </div>
@@ -215,7 +215,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
           {/* Phone - REQUIRED */}
           <div className="relative mb-3">
             <input type="tel" className={`w-full h-11 px-4 bg-gray-50 border rounded-xl text-sm font-medium focus:outline-none placeholder:text-gray-300 ${phoneValid ? 'border-green-300 bg-green-50/30' : 'border-red-300 bg-red-50/30'}`}
-              placeholder="📱 Customer phone number (REQUIRED)" value={phone} onChange={e => setPhone(e.target.value)} />
+              placeholder="Customer phone number (required)" value={phone} onChange={e => setPhone(e.target.value)} />
             {phoneValid && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 text-sm">✓</span>}
           </div>
           {!phoneValid && phone.length > 0 && <p className="text-red-500 text-xs font-medium mb-2 -mt-1">Enter at least 9 digits</p>}
@@ -249,7 +249,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
               if (error) { toast.error('Failed to create invoice'); setProcessing(false); return }
 
               const link = window.location.origin + '/#/pay/' + data.id
-              const msg = `Hi! 🛍️\n\nYour invoice from *EVERYTINROOM&BEDTIME* is ready:\n\n${orderItems.map(it => `• ${it.qty}x ${it.name} — GHS ${Number(it.lineTotal).toFixed(2)}`).join('\n')}\n\n*Total: GHS ${Number(total).toFixed(2)}*\n\n💳 Pay securely here:\n${link}\n\nThank you for shopping with us! 🙏`
+              const msg = `Hi! \n\nYour invoice from *EVERYTINROOM&BEDTIME* is ready:\n\n${orderItems.map(it => `• ${it.qty}x ${it.name} — GHS ${Number(it.lineTotal).toFixed(2)}`).join('\n')}\n\n*Total: GHS ${Number(total).toFixed(2)}*\n\nPay securely here:\n${link}\n\nThank you for shopping with us! `
 
               // Copy message to clipboard first
               try { await navigator.clipboard.writeText(msg) } catch {}
@@ -266,7 +266,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                 window.open(`https://web.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(msg)}`, '_blank')
               }
 
-              toast.success('✅ Invoice created! Message copied to clipboard.\nPaste in WhatsApp if it didn\'t open automatically.', { duration: 5000 })
+              toast.success('Invoice created! Message copied to clipboard.\nPaste in WhatsApp if it didn\'t open automatically.', { duration: 5000 })
               clearCart(); setPhone(''); setDiscount(''); onClose()
               const store = useStore.getState()
               store.refreshWAOrders()
@@ -274,7 +274,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             setProcessing(false)
           }} disabled={cnt === 0 || !phoneValid || processing}
             className="w-full h-12 bg-[#25d366] hover:bg-[#1ebe5d] rounded-xl text-white text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm mt-2 flex items-center justify-center gap-2">
-            📩 Send Invoice via WhatsApp — {money(total)}
+            Send Invoice via WhatsApp — {money(total)}
           </button>
         </div>
       </div>
@@ -286,7 +286,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             <div className="bg-gray-50 rounded-xl p-5 text-center border border-gray-100">
               <div className="text-xs text-gray-400 font-medium">Amount Due</div>
               <div className="text-3xl font-extrabold text-gray-900 mt-1">{money(total)}</div>
-              <div className="text-xs text-gray-400 mt-1">📱 {phone}</div>
+              <div className="text-xs text-gray-400 mt-1">{phone}</div>
             </div>
 
             {/* 4 Payment Methods */}
@@ -295,8 +295,8 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
               <div className="grid grid-cols-2 gap-2.5">
                 {[
                   { id: 'Cash', icon: '💵', label: 'Cash', sub: 'Manual', color: 'bg-green-500', border: 'border-green-500' },
-                  { id: 'Momo', icon: '📱', label: 'Momo', sub: 'Manual', color: 'bg-brand-500', border: 'border-amber-500' },
-                  { id: 'Paystack', icon: '💳', label: 'Paystack', sub: 'Online', color: 'bg-blue-500', border: 'border-blue-500' },
+                  { id: 'Momo', icon: '', label: 'Momo', sub: 'Manual', color: 'bg-brand-500', border: 'border-amber-500' },
+                  { id: 'Paystack', icon: '', label: 'Paystack', sub: 'Online', color: 'bg-blue-500', border: 'border-blue-500' },
                   { id: 'Split', icon: '✂️', label: 'Split', sub: 'Cash + Paystack', color: 'bg-violet-500', border: 'border-violet-500' },
                 ].map(m => {
                   const active = m.id === 'Split' ? splitMode : (!splitMode && payMethod === m.id)
@@ -315,7 +315,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             {/* Momo Manual Info */}
             {!splitMode && payMethod === 'Momo' && (
               <div className="bg-brand-50 rounded-xl p-3.5 border border-amber-100">
-                <div className="text-sm font-bold text-amber-700 mb-1">📱 Manual Momo</div>
+                <div className="text-sm font-bold text-amber-700 mb-1">Manual Momo</div>
                 <div className="text-xs text-brand-600">Confirm you've received {money(total)} via Mobile Money from {phone}, then click to complete.</div>
               </div>
             )}
@@ -323,7 +323,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             {/* Paystack Info */}
             {!splitMode && payMethod === 'Paystack' && (
               <div className="bg-blue-50 rounded-xl p-3.5 border border-blue-100">
-                <div className="text-sm font-bold text-blue-700 mb-1">💳 Paystack Online</div>
+                <div className="text-sm font-bold text-blue-700 mb-1">Paystack Online</div>
                 <div className="text-xs text-blue-600">A Paystack checkout window will open. Customer pays via Momo online. Payment auto-confirmed.</div>
               </div>
             )}
@@ -337,30 +337,30 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                   <input type="number" className="w-full h-11 px-4 bg-white border border-violet-200 rounded-xl text-sm font-bold focus:outline-none focus:border-violet-400" placeholder="0.00" value={splitCash} min={0} max={total} onChange={e => setSplitCash(e.target.value)} />
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-violet-200">
-                  <span className="text-sm font-semibold text-blue-600">💳 Paystack Portion</span>
+                  <span className="text-sm font-semibold text-blue-600">Paystack Portion</span>
                   <span className="text-lg font-extrabold text-blue-600">{money(Math.max(0, splitRemainder))}</span>
                 </div>
                 <div className="text-xs text-violet-500">Cash collected manually. Paystack handles the rest online.</div>
               </div>
             )}
 
-            {momoStep === 'failed' && <div className="bg-red-50 rounded-xl p-3.5 text-red-600 text-sm font-medium border border-red-100">❌ {momoMessage}</div>}
+            {momoStep === 'failed' && <div className="bg-red-50 rounded-xl p-3.5 text-red-600 text-sm font-medium border border-red-100"> {momoMessage}</div>}
 
             <button onClick={handleCompleteSale} disabled={processing}
               className="w-full h-12 bg-brand-700 hover:bg-brand-600 text-white rounded-xl text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm">
-              {processing ? 'Processing...' : splitMode ? '✂️ Confirm Split' : payMethod === 'Cash' ? '💵 Confirm Cash' : payMethod === 'Momo' ? '📱 Confirm Momo Received' : '💳 Open Paystack'}
+              {processing ? 'Processing...' : splitMode ? '✂️ Confirm Split' : payMethod === 'Cash' ? '💵 Confirm Cash' : payMethod === 'Momo' ? 'Confirm Momo Received' : 'Open Paystack'}
             </button>
           </>)}
 
           {momoStep === 'charging' && <div className="text-center py-10"><div className="w-14 h-14 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" /><h3 className="text-lg font-bold mb-1">Opening Paystack...</h3><p className="text-gray-400 text-sm">{momoMessage}</p></div>}
           {momoStep === 'waiting' && (
             <div className="text-center py-6">
-              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 animate-pulse">💳</div>
+              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 animate-pulse"></div>
               <h3 className="text-lg font-bold mb-1">Waiting for Paystack</h3>
               <p className="text-gray-400 text-sm mb-4">Customer is completing payment</p>
               <div className="bg-blue-50 rounded-xl p-4 mb-4 border border-blue-100">
                 <div className="text-lg font-extrabold text-blue-700">{money(splitMode ? splitRemainder : total)}</div>
-                <div className="text-sm text-blue-600 mt-0.5">📱 {phone}</div>
+                <div className="text-sm text-blue-600 mt-0.5">{phone}</div>
               </div>
               <div className="flex items-center justify-center gap-1.5 text-blue-500 mb-4">
                 <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
@@ -378,7 +378,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
       {/* Held Carts */}
       <Modal open={showHeld} onClose={() => setShowHeld(false)} title={'Held Carts (' + heldCarts.length + ')'}>
         <div className="space-y-2.5">
-          {heldCarts.length === 0 && <div className="text-center py-10 text-gray-300"><div className="text-4xl mb-2 opacity-30">⏸</div><p className="text-sm">No held carts</p></div>}
+          {heldCarts.length === 0 && <div className="text-center py-10 text-gray-300"><div className="text-4xl mb-2 opacity-30"></div><p className="text-sm">No held carts</p></div>}
           {heldCarts.map(h => (
             <div key={h.id} className="rounded-xl border border-gray-100 bg-gray-50/50 overflow-hidden">
               <div className="p-3.5">
@@ -386,7 +386,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-gray-900">{h.items.length} items</span>
                     <span className="text-xs text-gray-400">{h.time}</span>
-                    {h.phone && <span className="text-xs text-gray-400">📱 {h.phone}</span>}
+                    {h.phone && <span className="text-xs text-gray-400">{h.phone}</span>}
                   </div>
                   <span className="text-base font-extrabold text-brand-600">{money(h.items.reduce((a, c) => a + c.lineTotal, 0))}</span>
                 </div>

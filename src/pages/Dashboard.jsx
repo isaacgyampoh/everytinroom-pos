@@ -59,7 +59,7 @@ export default function Dashboard() {
     <div className="animate-fade">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">{greet}, {user?.name || 'Boss'} 👋</h1>
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">{greet}, {user?.name || 'Boss'} </h1>
           <p className="text-gray-400 text-sm mt-0.5">{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
         </div>
       </div>
@@ -67,7 +67,7 @@ export default function Dashboard() {
       {/* Alerts */}
       {outOfStock.length > 0 && (
         <div onClick={() => setPage('stocktakes')} className="bg-red-50 border border-red-200 rounded-xl p-3.5 mb-4 flex items-center gap-3 cursor-pointer hover:bg-red-100 transition">
-          <span className="text-xl">🚨</span>
+          <span className="text-sm opacity-30">□</span>
           <div className="flex-1"><span className="text-sm font-bold text-red-600">{outOfStock.length} products out of stock!</span> <span className="text-xs text-red-400">Tap to view</span></div>
         </div>
       )}
@@ -118,7 +118,7 @@ export default function Dashboard() {
         <div className="bg-white rounded-2xl p-5 border border-gray-100 relative overflow-hidden">
           <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full border-[2px] border-amber-400/[0.06]" />
           <div className="absolute -right-3 -top-3 w-14 h-14 rounded-full border-[2px] border-amber-400/[0.06]" />
-          <h3 className="text-sm font-bold text-gray-800 mb-4 relative z-10">📈 Last 7 Days Revenue</h3>
+          <h3 className="text-sm font-bold text-gray-800 mb-4 relative z-10">Last 7 Days Revenue</h3>
           <div className="flex items-end gap-2 h-32">
             {last7.map((d, i) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-1">
@@ -134,7 +134,7 @@ export default function Dashboard() {
 
         {/* Payment Split */}
         <div className="bg-white rounded-2xl p-5 border border-gray-100">
-          <h3 className="text-sm font-bold text-gray-800 mb-4">💳 Payment Split (This Month)</h3>
+          <h3 className="text-sm font-bold text-gray-800 mb-4">Payment Split (This Month)</h3>
           <div className="space-y-3">
             {[
               { label: 'Cash', amount: monthCash, color: 'bg-green-500', pct: monthRev ? (monthCash / monthRev * 100) : 0 },
@@ -187,12 +187,12 @@ export default function Dashboard() {
           <h3 className="text-sm font-bold text-gray-800 mb-3">⚡ Quick Actions</h3>
           <div className="grid grid-cols-3 gap-2">
             {[
-              { icon: '🛍️', label: 'New Sale', page: 'pos' },
-              { icon: '📦', label: 'Products', page: 'products' },
-              { icon: '📈', label: 'Reports', page: 'reports' },
-              { icon: '💸', label: 'Expenses', page: 'expenses' },
-              { icon: '📋', label: 'Stock Take', page: 'stocktakes' },
-              { icon: '🧾', label: 'Receipts', page: 'receipts' },
+              { icon: '', label: 'New Sale', page: 'pos' },
+              { icon: '', label: 'Products', page: 'products' },
+              { icon: '', label: 'Reports', page: 'reports' },
+              { icon: '', label: 'Expenses', page: 'expenses' },
+              { icon: '', label: 'Stock Take', page: 'stocktakes' },
+              { icon: '', label: 'Receipts', page: 'receipts' },
             ].map((a, i) => (
               <button key={i} onClick={() => setPage(a.page)} className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100 hover:shadow-md hover:border-brand-200 active:scale-95 transition-all">
                 <span className="text-xl block mb-0.5">{a.icon}</span>
@@ -215,7 +215,7 @@ export default function Dashboard() {
             {recentSales.map(s => (
               <div key={s.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/50 transition">
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${s.payment === 'Cash' ? 'bg-green-500' : s.payment === 'Momo' ? 'bg-amber-500' : 'bg-violet-500'}`}>
-                  {s.payment === 'Cash' ? '💵' : '📱'}
+                  {s.payment === 'Cash' ? '💵' : ''}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-gray-800">{s.receiptNo}</div>
@@ -230,15 +230,15 @@ export default function Dashboard() {
         {/* Low Stock */}
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <div className="flex justify-between items-center p-4 border-b border-gray-50">
-            <h3 className="text-sm font-bold text-gray-800">⚠️ Low Stock</h3>
+            <h3 className="text-sm font-bold text-gray-800">Low Stock</h3>
             <span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-bold">{lowStock.length}</span>
           </div>
           <div className="divide-y divide-gray-50">
-            {lowStock.length === 0 && <div className="p-8 text-center text-gray-300 text-sm">All stocked up! 🎉</div>}
+            {lowStock.length === 0 && <div className="p-8 text-center text-gray-300 text-sm">All stocked up! </div>}
             {lowStock.slice(0, 6).map(p => (
               <div key={p.id} className="flex items-center gap-3 px-4 py-3">
                 <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
-                  {p.image ? <img src={p.image} alt="" className="w-full h-full object-cover" /> : <span className="text-sm">📦</span>}
+                  {p.image ? <img src={p.image} alt="" className="w-full h-full object-cover" /> : <span className="text-xs opacity-30">□</span>}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-gray-800">{p.name}</div>

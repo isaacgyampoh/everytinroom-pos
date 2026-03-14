@@ -20,7 +20,7 @@ export default function RestockPage() {
   const addToRestock = (product) => {
     const existing = cart.find(c => c.productId === product.id)
     if (existing) {
-      toast('Already in restock list', { icon: '⚠️' })
+      toast('Already in restock list', { icon: '' })
       return
     }
     setCart([...cart, {
@@ -107,7 +107,7 @@ export default function RestockPage() {
     <div className="max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-xl font-black text-gray-800">📦 Restock</h1>
+          <h1 className="text-xl font-black text-gray-800">Restock</h1>
           <p className="text-sm text-gray-400 mt-0.5">Add stock to existing products</p>
         </div>
       </div>
@@ -121,7 +121,7 @@ export default function RestockPage() {
           value={query}
           onChange={e => setQuery(e.target.value)}
         />
-        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl">🔍</span>
+        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl"></span>
 
         {/* Search Results Dropdown */}
         {filtered.length > 0 && (
@@ -135,7 +135,7 @@ export default function RestockPage() {
                 {p.image ? (
                   <img src={p.image} alt="" className="w-11 h-11 rounded-xl object-cover bg-gray-100" />
                 ) : (
-                  <div className="w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center text-lg">📦</div>
+                  <div className="w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center text-lg">□</div>
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-bold text-gray-800 truncate">{p.name}</div>
@@ -167,7 +167,7 @@ export default function RestockPage() {
                 {item.image ? (
                   <img src={item.image} alt="" className="w-12 h-12 rounded-xl object-cover bg-gray-100" />
                 ) : (
-                  <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center text-xl">📦</div>
+                  <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center text-xl">□</div>
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-bold text-gray-800 truncate">{item.name}</div>
@@ -214,7 +214,7 @@ export default function RestockPage() {
               {saving ? (
                 <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Updating...</>
               ) : (
-                <>📦 Restock {totalItems} Units</>
+                <>Restock {totalItems} Units</>
               )}
             </button>
           </div>
@@ -224,7 +224,7 @@ export default function RestockPage() {
       {/* Empty State */}
       {cart.length === 0 && (
         <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-10 text-center">
-          <div className="text-5xl mb-3">📦</div>
+          <div className="text-5xl mb-3">□</div>
           <h3 className="text-base font-bold text-gray-600 mb-1">Search and add products above</h3>
           <p className="text-sm text-gray-400">Enter quantities bought, then hit Restock.<br />Stock will be added to current quantities automatically.</p>
         </div>

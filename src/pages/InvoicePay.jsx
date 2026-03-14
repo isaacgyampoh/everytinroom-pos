@@ -178,7 +178,7 @@ export default function InvoicePay() {
         {!isPaid && (
           <div className="bg-white rounded-2xl p-5 mb-4">
             <div className="flex items-center gap-2 mb-4">
-              <span className="text-lg">🚚</span>
+              <span className="text-lg"></span>
               <h3 className="text-sm font-bold text-gray-900">Delivery Details</h3>
             </div>
 
@@ -246,14 +246,14 @@ export default function InvoicePay() {
               {paying ? (
                 <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Processing...</>
               ) : (
-                <>💳 Pay {money(order?.total)}</>
+                <>Pay {money(order?.total)}</>
               )}
             </button>
 
             <p className="text-center text-xs text-gray-400 mt-3">Secured by Paystack • Card & Mobile Money accepted</p>
 
             <div className="bg-[#f0ece4] rounded-xl p-3 mt-4">
-              <p className="text-xs text-gray-500 text-center">💡 Fill in your delivery details above before paying. Your info will be saved automatically when you pay.</p>
+              <p className="text-xs text-gray-500 text-center">Fill in your delivery details above before paying. Your info will be saved automatically when you pay.</p>
             </div>
           </div>
         )}

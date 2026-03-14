@@ -37,12 +37,12 @@ export default function PerformancePage() {
 
   return (
     <div className="animate-fade">
-      <h1 className="text-2xl md:text-3xl font-extrabold mb-1 tracking-tight">👥 Staff Sales</h1>
+      <h1 className="text-2xl md:text-3xl font-extrabold mb-1 tracking-tight">Staff Sales</h1>
       <p className="text-gray-400 text-sm mb-5">Performance & sales breakdown per staff member</p>
 
       {/* Period Tabs */}
       <div className="flex gap-2 overflow-x-auto mb-6 pb-1 scrollbar-hide">
-        {[['today', '📅 Today'], ['week', '📆 This Week'], ['month', '🗓️ This Month'], ['overall', '📊 Overall']].map(([p, l]) => (
+        {[['today', '📅 Today'], ['week', '📆 This Week'], ['month', '🗓️ This Month'], ['overall', 'Overall']].map(([p, l]) => (
           <button key={p} onClick={() => setPerfPeriod(p)}
             className={`h-10 md:h-11 px-4 md:px-5 rounded-xl text-[13px] md:text-sm font-semibold whitespace-nowrap transition-all ${perfPeriod === p ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20' : 'bg-white border border-gray-200 text-gray-500 hover:border-brand-200'}`}>
             {l}
@@ -67,7 +67,7 @@ export default function PerformancePage() {
       </div>
 
       {/* Staff Cards */}
-      {staffData.length === 0 && <div className="text-center py-16 text-gray-300"><span className="text-5xl block mb-3">👥</span>No sales data for this period</div>}
+      {staffData.length === 0 && <div className="text-center py-16 text-gray-300"><span className="text-xl opacity-15">—</span>No sales data for this period</div>}
 
       <div className="space-y-4">
         {staffData.map((s, idx) => {
@@ -100,7 +100,7 @@ export default function PerformancePage() {
                     { label: 'Revenue', value: money(s.revenue), color: 'text-brand-500' },
                     { label: 'Profit', value: money(s.profit), color: 'text-green-600' },
                     { label: '💵 Cash', value: money(s.cash), color: 'text-gray-700' },
-                    { label: '📱 Momo', value: money(s.momo), color: 'text-amber-600' },
+                    { label: 'Momo', value: money(s.momo), color: 'text-amber-600' },
                   ].map((stat, i) => (
                     <div key={i} className="bg-gray-50 rounded-xl p-2.5 md:p-3 text-center">
                       <div className="text-[10px] md:text-xs text-gray-400 font-medium">{stat.label}</div>

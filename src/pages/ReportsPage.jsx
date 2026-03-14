@@ -106,14 +106,14 @@ export default function ReportsPage() {
     { id: 'today', label: '📅 Today' },
     { id: 'week', label: '📆 This Week' },
     { id: 'month', label: '🗓️ This Month' },
-    { id: 'overall', label: '📊 Overall' },
+    { id: 'overall', label: 'Overall' },
   ]
 
   return (
     <div className="animate-fade">
       <div className="flex justify-between items-start flex-wrap gap-3 mb-5">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">📈 Reports</h1>
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Reports</h1>
           <p className="text-gray-400 text-sm mt-0.5">Business analytics & insights</p>
         </div>
         <button onClick={() => {
@@ -125,7 +125,7 @@ export default function ReportsPage() {
           const url = URL.createObjectURL(blob)
           const a = document.createElement('a'); a.href = url; a.download = `everytin-room-report-${tab}-${today()}.csv`; a.click()
         }} className="h-10 px-4 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 active:scale-[.97] transition">
-          📥 Export CSV
+          Export CSV
         </button>
       </div>
 
@@ -156,7 +156,7 @@ export default function ReportsPage() {
 
       <div className="grid md:grid-cols-2 gap-5 mb-5">
         {/* Payment Breakdown */}
-        <Section title="Payment Breakdown" icon="💳">
+        <Section title="Payment Breakdown" icon="">
           <div className="space-y-3">
             {[
               { label: 'Cash', count: cashSales.length, amount: cashTotal, color: 'bg-green-500', pct: totalRev ? (cashTotal / totalRev * 100) : 0 },
@@ -177,7 +177,7 @@ export default function ReportsPage() {
         </Section>
 
         {/* Sales Type Breakdown */}
-        <Section title="Sales Type" icon="🏷️">
+        <Section title="Sales Type" icon="">
           <div className="space-y-3">
             {[
               { label: 'Retail', count: retailSales.length, amount: retailSales.reduce((a, s) => a + s.total, 0), color: 'bg-brand-500' },
@@ -201,7 +201,7 @@ export default function ReportsPage() {
 
       <div className="grid md:grid-cols-2 gap-5 mb-5">
         {/* Top Selling Products */}
-        <Section title="Top Selling Products" icon="🔥">
+        <Section title="Top Selling Products" icon="">
           {topProducts.length === 0 ? <p className="text-gray-400 text-sm text-center py-4">No sales data</p> : (
             <div className="space-y-2.5">
               {topProducts.map((p, i) => (
@@ -223,7 +223,7 @@ export default function ReportsPage() {
         </Section>
 
         {/* Expense Breakdown */}
-        <Section title="Expense Categories" icon="💸">
+        <Section title="Expense Categories" icon="">
           {expCats.length === 0 ? <p className="text-gray-400 text-sm text-center py-4">No expenses</p> : (
             <div className="space-y-2.5">
               {expCats.map((c, i) => (
@@ -246,7 +246,7 @@ export default function ReportsPage() {
 
       <div className="grid md:grid-cols-2 gap-5 mb-5">
         {/* Staff Performance */}
-        <Section title="Staff Performance" icon="👥">
+        <Section title="Staff Performance" icon="">
           {staffPerf.length === 0 ? <p className="text-gray-400 text-sm text-center py-4">No data</p> : (
             <div className="space-y-2.5">
               {staffPerf.map((s, i) => (

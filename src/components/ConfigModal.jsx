@@ -30,7 +30,7 @@ export default function ConfigModal({ onConnect }) {
           </div>
         </div>
         <div className="p-6 border-t border-gray-100">
-          <button onClick={handleSave} className="w-full h-14 bg-brand-500 text-white rounded-xl text-base font-bold hover:bg-brand-600 active:scale-[.97] transition">💾 Connect</button>
+          <button onClick={handleSave} className="w-full h-14 bg-brand-500 text-white rounded-xl text-base font-bold hover:bg-brand-600 active:scale-[.97] transition">Connect</button>
         </div>
       </div>
     </div>

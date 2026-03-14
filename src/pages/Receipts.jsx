@@ -11,7 +11,7 @@ export default function Receipts({ onPrintReceipt }) {
     <div className="animate-fade">
       <h1 className="text-3xl font-extrabold mb-6">Receipts</h1>
       <div className="bg-white rounded-3xl p-6 shadow-md">
-        <input className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base mb-5" placeholder="🔍 Search receipt, customer, staff..." value={query} onChange={e => setQuery(e.target.value)} />
+        <input className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base mb-5" placeholder="Search receipt, customer, staff..." value={query} onChange={e => setQuery(e.target.value)} />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[650px]">
             <thead><tr className="text-left">
@@ -32,11 +32,11 @@ export default function Receipts({ onPrintReceipt }) {
                   <td className="p-3 text-sm">{s.customer}</td>
                   <td className="p-3 text-sm">
                     <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${s.type === 'WhatsApp' ? 'bg-wa/10 text-wa' : s.type === 'Wholesale' ? 'bg-amber-50 text-amber-500' : 'bg-green-50 text-green-500'}`}>{s.type}</span>
-                    {' '}<span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${s.payment === 'Cash' ? 'bg-green-50 text-green-500' : s.payment === 'Momo' ? 'bg-amber-50 text-amber-500' : 'bg-cyan-50 text-cyan-500'}`}>{s.payment}</span>
+                    {''}<span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${s.payment === 'Cash' ? 'bg-green-50 text-green-500' : s.payment === 'Momo' ? 'bg-amber-50 text-amber-500' : 'bg-cyan-50 text-cyan-500'}`}>{s.payment}</span>
                   </td>
-                  <td className="p-3 text-sm"><span className="px-2.5 py-1 bg-gray-100 rounded-lg text-[11px] font-bold text-gray-600">👤 {s.cashier || 'Unknown'}</span></td>
+                  <td className="p-3 text-sm"><span className="px-2.5 py-1 bg-gray-100 rounded-lg text-[11px] font-bold text-gray-600">{s.cashier || 'Unknown'}</span></td>
                   <td className="p-3 text-sm font-bold">{money(s.total)}</td>
-                  <td className="p-3"><button onClick={() => onPrintReceipt(s)} className="h-9 px-3 bg-indigo-500 text-white rounded-lg text-xs font-semibold">🖨️</button></td>
+                  <td className="p-3"><button onClick={() => onPrintReceipt(s)} className="h-9 px-3 bg-indigo-500 text-white rounded-lg text-xs font-semibold"></button></td>
                 </tr>
               ))}
             </tbody>

@@ -9,10 +9,10 @@ export default function CustomersPage() {
 
   return (
     <div className="animate-fade">
-      <h1 className="text-3xl font-extrabold mb-6">👥 Customers</h1>
+      <h1 className="text-3xl font-extrabold mb-6">Customers</h1>
       <div className="bg-green-500 rounded-3xl p-7 text-white mb-6"><small className="text-sm opacity-80">Total Customers</small><strong className="block text-4xl font-extrabold mt-2">{customers.length}</strong></div>
       <div className="bg-white rounded-3xl p-6 shadow-md">
-        <input className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base mb-5" placeholder="🔍 Search..." value={query} onChange={e => setQuery(e.target.value)} />
+        <input className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base mb-5" placeholder="Search..." value={query} onChange={e => setQuery(e.target.value)} />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[400px]">
             <thead><tr><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Phone</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Visits</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Total Spent</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Last Visit</th></tr></thead>

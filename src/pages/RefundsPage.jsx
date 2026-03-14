@@ -48,7 +48,7 @@ export default function RefundsPage() {
     <div className="animate-fade">
       <div className="flex justify-between items-start flex-wrap gap-4 mb-6">
         <h1 className="text-3xl font-extrabold">↩️ Refunds</h1>
-        <button onClick={() => { setReceiptNo(''); setSale(null); setSaleItems([]); setReason(''); setModal(true) }} className="h-12 px-5 bg-violet-500 text-white rounded-xl text-sm font-semibold">➕ New Refund</button>
+        <button onClick={() => { setReceiptNo(''); setSale(null); setSaleItems([]); setReason(''); setModal(true) }} className="h-12 px-5 bg-violet-500 text-white rounded-xl text-sm font-semibold">New Refund</button>
       </div>
       <div className="bg-violet-500 rounded-3xl p-7 text-white mb-6"><small className="text-sm opacity-80">Total Refunds Today</small><strong className="block text-4xl font-extrabold mt-2">{money(todayTotal)}</strong></div>
       <div className="bg-white rounded-3xl p-6 shadow-md overflow-x-auto">
@@ -64,7 +64,7 @@ export default function RefundsPage() {
         footer={sale ? <button onClick={processRefund} className="flex-1 h-12 bg-violet-500 text-white rounded-xl text-sm font-bold">↩️ Refund</button> : null}>
         <div className="space-y-4">
           <div><label className="block text-xs font-semibold text-gray-500 mb-2">Receipt Number</label>
-            <div className="flex gap-2.5"><input className="flex-1 h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base" placeholder="RCP20250215-001" value={receiptNo} onChange={e => setReceiptNo(e.target.value)} /><button onClick={lookup} className="h-13 px-4 bg-brand-500 text-white rounded-xl text-sm font-semibold">🔍 Find</button></div>
+            <div className="flex gap-2.5"><input className="flex-1 h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base" placeholder="RCP20250215-001" value={receiptNo} onChange={e => setReceiptNo(e.target.value)} /><button onClick={lookup} className="h-13 px-4 bg-brand-500 text-white rounded-xl text-sm font-semibold">Find</button></div>
           </div>
           {sale && (<>
             <div className="bg-green-50 border-2 border-green-200 rounded-2xl p-5">

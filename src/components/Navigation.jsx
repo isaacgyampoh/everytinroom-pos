@@ -2,30 +2,30 @@ import { useState } from 'react'
 import { useStore } from '../hooks/useStore'
 
 const NAV = [
-  { id: 'dash', icon: '📊', label: 'Dashboard', admin: true },
-  { id: 'pos', icon: '🛒', label: 'POS' },
-  { id: 'whatsapp', icon: '📱', label: 'WhatsApp', wa: true },
-  { id: 'receipts', icon: '🧾', label: 'Receipts' },
-  { id: 'refunds', icon: '↩️', label: 'Refunds' },
+  { id: 'dash', icon: '◎', label: 'Dashboard', admin: true },
+  { id: 'pos', icon: '◉', label: 'POS' },
+  { id: 'whatsapp', icon: '◈', label: 'WhatsApp', wa: true },
+  { id: 'receipts', icon: '◇', label: 'Receipts' },
+  { id: 'refunds', icon: '←', label: 'Refunds' },
   { id: 'sep1', sep: true },
-  { id: 'performance', icon: '👥', label: 'Staff Sales', admin: true },
-  { id: 'products', icon: '📦', label: 'Products', admin: true },
-  { id: 'promos', icon: '🏷️', label: 'Promos & Bundles', admin: true },
-  { id: 'restock', icon: '🚚', label: 'Restock', admin: true },
-  { id: 'stocktakes', icon: '📋', label: 'Stock & Adjust', admin: true },
+  { id: 'performance', icon: '◎', label: 'Staff Sales', admin: true },
+  { id: 'products', icon: '▣', label: 'Products', admin: true },
+  { id: 'promos', icon: '◆', label: 'Promos & Bundles', admin: true },
+  { id: 'restock', icon: '▤', label: 'Restock', admin: true },
+  { id: 'stocktakes', icon: '▥', label: 'Stock & Adjust', admin: true },
   { id: 'sep2', sep: true },
-  { id: 'invoices', icon: '🧾', label: 'Invoices', admin: true },
-  { id: 'customers', icon: '👤', label: 'Customers', admin: true },
-  { id: 'expenses', icon: '💸', label: 'Expenses', admin: true },
-  { id: 'reports', icon: '📈', label: 'Reports', admin: true },
-  { id: 'staff', icon: '🔑', label: 'Staff', admin: true },
+  { id: 'invoices', icon: '◇', label: 'Invoices', admin: true },
+  { id: 'customers', icon: '○', label: 'Customers', admin: true },
+  { id: 'expenses', icon: '¢', label: 'Expenses', admin: true },
+  { id: 'reports', icon: '↗', label: 'Reports', admin: true },
+  { id: 'staff', icon: '⊕', label: 'Staff', admin: true },
 ]
 const MOB = [
-  { id: 'pos', icon: '🛒', label: 'Sale' },
-  { id: 'whatsapp', icon: '📱', label: 'WA', wa: true },
-  { id: 'receipts', icon: '🧾', label: 'Receipts' },
-  { id: 'refunds', icon: '↩️', label: 'Refund' },
-  { id: 'dash', icon: '📊', label: 'More', admin: true },
+  { id: 'pos', icon: '◉', label: 'Sale' },
+  { id: 'whatsapp', icon: '◈', label: 'WA', wa: true },
+  { id: 'receipts', icon: '◇', label: 'Receipts' },
+  { id: 'refunds', icon: '←', label: 'Refund' },
+  { id: 'dash', icon: '◎', label: 'More', admin: true },
 ]
 
 const AP = ['dash','products','bundles','staff','expenses','reports','customers','performance','promos','invoices','stocktakes','restock','stockadjustments']
@@ -93,7 +93,7 @@ export default function Navigation({ onOpenCart }) {
         {/* Dark mode toggle */}
         <button onClick={toggleDark}
           className="w-full flex items-center gap-3 h-10 px-3 rounded-xl text-stone-500 hover:bg-stone-100 hover:text-stone-800 transition">
-          <span className="text-base flex-shrink-0 w-5 text-center">{darkMode ? '☀️' : '🌙'}</span>
+          <span className="text-base flex-shrink-0 w-5 text-center">{darkMode ? '○' : '●'}</span>
           <span className={`text-[13px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'}`}>
             {darkMode ? 'Light mode' : 'Dark mode'}
           </span>
@@ -110,7 +110,7 @@ export default function Navigation({ onOpenCart }) {
         {/* Logout */}
         <button onClick={logout}
           className="w-full flex items-center gap-3 h-10 px-3 rounded-xl text-stone-400 hover:bg-red-50 hover:text-red-500 transition">
-          <span className="text-base flex-shrink-0 w-5 text-center">🚪</span>
+          <span className="text-base flex-shrink-0 w-5 text-center"></span>
           <span className={`text-[13px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'}`}>
             Sign out
           </span>
@@ -119,7 +119,7 @@ export default function Navigation({ onOpenCart }) {
     </aside>
 
     {/* ===== CART FAB — only on POS ===== */}
-    {page === 'pos' && <button onClick={onOpenCart} className="fixed bottom-[calc(90px+env(safe-area-inset-bottom))] md:bottom-6 right-4 md:right-6 w-14 h-14 bg-brand-700 rounded-2xl flex items-center justify-center text-2xl text-white z-[99] shadow-lg active:scale-90 transition">🛒{cc>0&&<span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 bg-brand-400 rounded-full text-[10px] font-bold text-white flex items-center justify-center">{cc}</span>}</button>}
+    {page === 'pos' && <button onClick={onOpenCart} className="fixed bottom-[calc(90px+env(safe-area-inset-bottom))] md:bottom-6 right-4 md:right-6 w-14 h-14 bg-brand-700 rounded-2xl flex items-center justify-center text-2xl text-white z-[99] shadow-lg active:scale-90 transition">{cc>0&&<span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 bg-brand-400 rounded-full text-[10px] font-bold text-white flex items-center justify-center">{cc}</span>}</button>}
 
     {/* ===== MOBILE HEADER ===== */}
     <header className="flex md:hidden fixed top-0 left-0 right-0 h-14 safe-top glass px-4 items-center gap-2 z-[100] border-b border-stone-200/30">
@@ -165,7 +165,7 @@ export default function Navigation({ onOpenCart }) {
         </div>
       </div>
       <div className="p-3 safe-bottom space-y-2 border-t border-stone-100">
-        <button onClick={toggleDark} className="w-full py-3 bg-stone-100 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">{darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}</button>
+        <button onClick={toggleDark} className="w-full py-3 bg-stone-100 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">{darkMode ? 'Light Mode' : 'Dark Mode'}</button>
         <button onClick={() => { logout(); setMobileOpen(false) }} className="w-full py-3 bg-red-50 rounded-xl text-sm font-semibold text-red-500">Sign Out</button>
       </div>
     </div>

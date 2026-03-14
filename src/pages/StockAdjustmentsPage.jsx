@@ -74,12 +74,12 @@ export default function StockAdjustmentsPage() {
     <div className="animate-fade">
       <div className="flex justify-between items-start flex-wrap gap-4 mb-5">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">🔧 Stock Adjustments</h1>
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Stock Adjustments</h1>
           <p className="text-gray-400 text-sm mt-0.5">Record damaged, broken, or missing items</p>
         </div>
         <button onClick={() => { setForm({ productId: '', qty: '', reason: 'Damaged', notes: '' }); setSearch(''); setModal(true) }}
           className="h-11 px-5 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600 active:scale-[.97] transition">
-          ⚠️ Record Adjustment
+          Record Adjustment
         </button>
       </div>
 
@@ -116,7 +116,7 @@ export default function StockAdjustmentsPage() {
       {/* Adjustments List */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {filteredAdj.length === 0 ? (
-          <div className="text-center py-16 text-gray-300"><span className="text-5xl block mb-3">🔧</span>No adjustments recorded</div>
+          <div className="text-center py-16 text-gray-300"><span className="text-xl opacity-15">—</span>No adjustments recorded</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -156,8 +156,8 @@ export default function StockAdjustmentsPage() {
       </div>
 
       {/* New Adjustment Modal */}
-      <Modal open={modal} onClose={() => setModal(false)} title="⚠️ Record Stock Adjustment"
-        footer={<><button onClick={() => setModal(false)} className="h-11 px-5 bg-gray-100 rounded-xl text-sm font-semibold">Cancel</button><button onClick={save} className="flex-1 h-11 bg-red-500 text-white rounded-xl text-sm font-bold">⚠️ Remove from Stock</button></>}>
+      <Modal open={modal} onClose={() => setModal(false)} title="Record Stock Adjustment"
+        footer={<><button onClick={() => setModal(false)} className="h-11 px-5 bg-gray-100 rounded-xl text-sm font-semibold">Cancel</button><button onClick={save} className="flex-1 h-11 bg-red-500 text-white rounded-xl text-sm font-bold">Remove from Stock</button></>}>
         <div className="space-y-4">
           <div className="bg-red-50 rounded-xl p-3.5 text-sm text-red-700">
             This will deduct items from stock. Use for damaged, broken, missing, or stolen goods.
@@ -167,7 +167,7 @@ export default function StockAdjustmentsPage() {
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-2">Select Product</label>
             <input className="w-full h-11 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm mb-2"
-              placeholder="🔍 Search product..." value={search} onChange={e => setSearch(e.target.value)} />
+              placeholder="Search product..." value={search} onChange={e => setSearch(e.target.value)} />
 
             {!form.productId && (
               <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-50">

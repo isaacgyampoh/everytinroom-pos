@@ -16,7 +16,7 @@ export const SHOP = {
   address: 'Adenta Aviation Road',
   website: 'www.Erbliving.shop',
   // Seasonal message on receipts (set to '' to remove)
-  promoMsg: '🇬🇭 Happy Ghana Month! EVERYTINROOM&BEDTIME wishes you a blessed celebration! 🇬🇭',
+  promoMsg: 'Happy Ghana Month from EVERYTINROOM&BEDTIME!',
 }
 
 export const ADMIN_PIN = '1024'

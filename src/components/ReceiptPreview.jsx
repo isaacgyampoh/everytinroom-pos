@@ -92,7 +92,7 @@ export default function ReceiptPreview({ sale, onClose }) {
             <div className="total-row flex justify-between text-sm"><span className="font-bold text-gray-600">Subtotal</span><span className="font-extrabold">{money((sale.total || 0) + (sale.discount || 0))}</span></div>
             {(sale.discount || 0) > 0 && <div className="total-row flex justify-between text-sm"><span className="font-bold text-gray-600">Discount</span><span className="font-extrabold text-red-600">-{money(sale.discount)}</span></div>}
             {sale.payment === 'Split' && sale.splitCash > 0 && <div className="total-row flex justify-between text-sm"><span className="font-bold text-gray-600">💵 Cash</span><span className="font-extrabold">{money(sale.splitCash)}</span></div>}
-            {sale.payment === 'Split' && sale.splitMomo > 0 && <div className="total-row flex justify-between text-sm"><span className="font-bold text-gray-600">📱 Momo</span><span className="font-extrabold">{money(sale.splitMomo)}</span></div>}
+            {sale.payment === 'Split' && sale.splitMomo > 0 && <div className="total-row flex justify-between text-sm"><span className="font-bold text-gray-600">Momo</span><span className="font-extrabold">{money(sale.splitMomo)}</span></div>}
             <div className="grand-total flex justify-between text-xl border-t-2 border-dashed border-gray-800 pt-3 mt-3">
               <span className="font-black">TOTAL</span>
               <span className="font-black">{money(sale.total)}</span>
@@ -103,14 +103,14 @@ export default function ReceiptPreview({ sale, onClose }) {
           <div className="footer text-center border-t-2 border-dashed border-gray-800 pt-3 mt-4">
             <p className="text-sm font-bold">Thank you for shopping with us!</p>
             <p className="text-xs font-bold text-gray-500 mt-1">{SHOP.website}</p>
-            {SHOP.promoMsg && <p className="text-xs font-bold text-gray-600 mt-2">🇬🇭 Happy Ghana Month! 🇬🇭</p>}
+            {SHOP.promoMsg && <p className="text-xs font-bold text-gray-600 mt-2">Happy Ghana Month!</p>}
             <p className="text-xs text-gray-400 mt-1">Goods sold are not returnable</p>
           </div>
         </div>
 
         {/* Actions */}
         <div className="flex gap-2 px-5 pb-5">
-          <button onClick={doPrint} className="flex-1 h-12 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-bold active:scale-95 transition">🖨️ Print Receipt</button>
+          <button onClick={doPrint} className="flex-1 h-12 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-bold active:scale-95 transition">Print Receipt</button>
           <button onClick={onClose} className="h-12 px-5 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-semibold text-gray-600 transition">Close</button>
         </div>
       </div>

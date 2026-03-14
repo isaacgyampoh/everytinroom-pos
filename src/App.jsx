@@ -54,7 +54,7 @@ export default function App() {
     const timer = setInterval(() => {
       if (Date.now() - lastActivity > INACTIVITY_TIMEOUT) {
         logout()
-        toast('Session expired — please log in again', { icon: '🔒' })
+        toast('Session expired — please log in again', { icon: '' })
       }
     }, 60000) // Check every minute
     return () => {
@@ -141,7 +141,7 @@ export default function App() {
       {salePopup && (
         <div className="fixed top-20 md:top-5 left-1/2 -translate-x-1/2 z-[300] animate-fade">
           <div className="bg-brand-800 text-white rounded-2xl px-6 py-4 shadow-2xl flex items-center gap-4 min-w-[280px]">
-            <div className="w-12 h-12 bg-brand-500 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">💰</div>
+            <div className="w-12 h-12 bg-brand-500 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"></div>
             <div>
               <div className="text-xs text-gray-400">New Sale!</div>
               <div className="text-lg font-extrabold">GHS {Number(salePopup.total || 0).toFixed(2)}</div>

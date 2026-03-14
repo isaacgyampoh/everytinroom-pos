@@ -74,12 +74,12 @@ export default function StockTakesPage() {
     <div className="animate-fade">
       <div className="flex justify-between items-start flex-wrap gap-4 mb-5">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">📋 Stock & Adjustments</h1>
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Stock Stock & Adjustments Adjustments</h1>
           <p className="text-gray-400 text-sm mt-0.5">Count inventory, track variances & adjustments</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setAdjModal(true)} className="h-11 px-4 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition">🔧 Adjust</button>
-          <button onClick={startStockTake} className="h-11 px-5 bg-brand-500 text-white rounded-xl text-sm font-semibold hover:bg-brand-600 transition">📋 New Stock Take</button>
+          <button onClick={() => setAdjModal(true)} className="h-11 px-4 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition">Adjust</button>
+          <button onClick={startStockTake} className="h-11 px-5 bg-brand-500 text-white rounded-xl text-sm font-semibold hover:bg-brand-600 transition">New Stock Take</button>
         </div>
       </div>
 
@@ -96,7 +96,7 @@ export default function StockTakesPage() {
           <div className="text-xl font-extrabold text-brand-600 mt-1">{money(totalStockValue)}</div>
         </div>
         <button onClick={() => setLowStockOpen(true)} className="bg-amber-50 rounded-2xl p-4 border-2 border-amber-200 text-center hover:bg-amber-100 transition">
-          <div className="text-xs text-amber-600 font-medium">⚠️ Low Stock</div>
+          <div className="text-xs text-amber-600 font-medium">Low Stock</div>
           <div className="text-2xl font-extrabold text-amber-500 mt-1">{lowStockProducts.length}</div>
         </button>
         <div className="bg-red-50 rounded-2xl p-4 border border-red-100 text-center">
@@ -107,15 +107,15 @@ export default function StockTakesPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-white rounded-2xl p-1 mb-5 border border-gray-100 w-fit">
-        <button onClick={() => setTab('takes')} className={`h-9 px-5 rounded-xl text-sm font-semibold transition ${tab === 'takes' ? 'bg-brand-600 text-white' : 'text-stone-500 hover:text-stone-700'}`}>📋 Stock Takes</button>
-        <button onClick={() => setTab('adjustments')} className={`h-9 px-5 rounded-xl text-sm font-semibold transition ${tab === 'adjustments' ? 'bg-brand-600 text-white' : 'text-stone-500 hover:text-stone-700'}`}>🔧 Adjustments</button>
+        <button onClick={() => setTab('takes')} className={`h-9 px-5 rounded-xl text-sm font-semibold transition ${tab === 'takes' ? 'bg-brand-600 text-white' : 'text-stone-500 hover:text-stone-700'}`}>Stock Takes</button>
+        <button onClick={() => setTab('adjustments')} className={`h-9 px-5 rounded-xl text-sm font-semibold transition ${tab === 'adjustments' ? 'bg-brand-600 text-white' : 'text-stone-500 hover:text-stone-700'}`}>Adjustments</button>
       </div>
 
       {/* Stock Takes Tab */}
       {tab === 'takes' && (
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <div className="p-4 border-b border-gray-100"><h3 className="font-bold text-gray-800">Stock Take History ({stockTakes.length})</h3></div>
-          {stockTakes.length === 0 ? <div className="text-center py-16 text-gray-300"><span className="text-4xl block mb-2">📋</span>No stock takes yet</div> : (
+          {stockTakes.length === 0 ? <div className="text-center py-16 text-gray-300"><span className="text-xl opacity-15">—</span>No stock takes yet</div> : (
             <div className="divide-y divide-gray-50">
               {stockTakes.map(st => {
                 const variances = st.items.filter(i => (i.variance || 0) !== 0).length
@@ -128,7 +128,7 @@ export default function StockTakesPage() {
                         {st.notes && <div className="text-xs text-gray-400 mt-1 italic">"{st.notes}"</div>}
                       </div>
                       <div className="flex gap-2">
-                        {variances > 0 && <span className="px-2.5 py-1 bg-red-50 text-red-500 rounded-lg text-xs font-bold">⚠️ {variances}</span>}
+                        {variances > 0 && <span className="px-2.5 py-1 bg-red-50 text-red-500 rounded-lg text-xs font-bold">{variances}</span>}
                         <span className="text-gray-300">→</span>
                       </div>
                     </div>
@@ -147,7 +147,7 @@ export default function StockTakesPage() {
             <h3 className="font-bold text-gray-800">Adjustments ({stockAdjustments.length})</h3>
             <button onClick={() => setAdjModal(true)} className="h-8 px-3 bg-brand-50 text-brand-600 rounded-lg text-xs font-bold hover:bg-brand-100 transition">+ New</button>
           </div>
-          {stockAdjustments.length === 0 ? <div className="text-center py-16 text-gray-300"><span className="text-4xl block mb-2">🔧</span>No adjustments yet</div> : (
+          {stockAdjustments.length === 0 ? <div className="text-center py-16 text-gray-300"><span className="text-xl opacity-15">—</span>No adjustments yet</div> : (
             <div className="divide-y divide-gray-50">
               {stockAdjustments.slice(0, 50).map(a => (
                 <div key={a.id} className="p-4 flex items-center gap-3">
@@ -167,9 +167,9 @@ export default function StockTakesPage() {
       )}
 
       {/* Low Stock Modal */}
-      <Modal open={lowStockOpen} onClose={() => setLowStockOpen(false)} title={'⚠️ Low Stock (' + lowStockProducts.length + ')'}>
+      <Modal open={lowStockOpen} onClose={() => setLowStockOpen(false)} title={'Low Stock (' + lowStockProducts.length + ')'}>
         <div className="space-y-2">
-          {lowStockProducts.length === 0 && <div className="text-center py-8 text-gray-400">All stocked! 🎉</div>}
+          {lowStockProducts.length === 0 && <div className="text-center py-8 text-gray-400">All stocked! </div>}
           {lowStockProducts.map(p => (
             <div key={p.id} className={`flex items-center gap-3 p-3 rounded-xl ${p.quantity === 0 ? 'bg-red-50 border border-red-200' : 'bg-amber-50 border border-amber-200'}`}>
               <div className="flex-1"><div className="text-sm font-bold">{p.name}</div><div className="text-xs text-gray-400">{p.category || '-'}</div></div>
@@ -180,12 +180,12 @@ export default function StockTakesPage() {
       </Modal>
 
       {/* New Stock Take Modal */}
-      <Modal open={modal} onClose={() => setModal(false)} title="📋 New Stock Take"
-        footer={<><button onClick={() => setModal(false)} className="h-11 px-5 bg-gray-100 rounded-xl text-sm font-semibold">Cancel</button><button onClick={saveTake} className="flex-1 h-11 bg-brand-500 text-white rounded-xl text-sm font-bold">💾 Save</button></>}>
+      <Modal open={modal} onClose={() => setModal(false)} title="New Stock Take"
+        footer={<><button onClick={() => setModal(false)} className="h-11 px-5 bg-gray-100 rounded-xl text-sm font-semibold">Cancel</button><button onClick={saveTake} className="flex-1 h-11 bg-brand-500 text-white rounded-xl text-sm font-bold">Save</button></>}>
         <div className="space-y-4">
           <div className="bg-brand-50 rounded-xl p-3 text-sm text-brand-700">Enter physical count. Leave blank to skip. Variances auto-calculated.</div>
           <input className="w-full h-11 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" placeholder="Notes..." value={notes} onChange={e => setNotes(e.target.value)} />
-          <input className="w-full h-11 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" placeholder="🔍 Search..." value={search} onChange={e => setSearch(e.target.value)} />
+          <input className="w-full h-11 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} />
           {filteredCounts.map((c, i) => {
             const ri = counts.indexOf(c); const v = c.countedQty !== '' ? c.variance : null
             return (
@@ -200,8 +200,8 @@ export default function StockTakesPage() {
       </Modal>
 
       {/* New Adjustment Modal */}
-      <Modal open={adjModal} onClose={() => setAdjModal(false)} title="🔧 New Adjustment"
-        footer={<><button onClick={() => setAdjModal(false)} className="h-11 px-5 bg-gray-100 rounded-xl text-sm font-semibold">Cancel</button><button onClick={saveAdj} className="flex-1 h-11 bg-brand-500 text-white rounded-xl text-sm font-bold">💾 Save</button></>}>
+      <Modal open={adjModal} onClose={() => setAdjModal(false)} title="New Adjustment"
+        footer={<><button onClick={() => setAdjModal(false)} className="h-11 px-5 bg-gray-100 rounded-xl text-sm font-semibold">Cancel</button><button onClick={saveAdj} className="flex-1 h-11 bg-brand-500 text-white rounded-xl text-sm font-bold">Save</button></>}>
         <div className="space-y-4">
           <div><label className="block text-xs font-semibold text-gray-500 mb-2">Product</label>
             <select className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" value={adjProduct} onChange={e => setAdjProduct(e.target.value)}>
@@ -223,7 +223,7 @@ export default function StockTakesPage() {
       </Modal>
 
       {/* View Stock Take Detail */}
-      <Modal open={!!viewModal} onClose={() => setViewModal(null)} title="📋 Stock Take Details">
+      <Modal open={!!viewModal} onClose={() => setViewModal(null)} title="Stock Take Details">
         {viewModal && (<div className="space-y-3">
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="bg-gray-50 rounded-xl p-3"><div className="text-xs text-gray-400">Date</div><div className="text-sm font-bold mt-0.5">{fmtDateTime(viewModal.date)}</div></div>

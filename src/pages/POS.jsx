@@ -13,7 +13,7 @@ const ProductCard = memo(({ item, price, hasPromo, onAdd }) => {
         <div className="absolute -right-3 -top-3 w-16 h-16 rounded-full border-[2px] border-brand-400/10" />
         <div className="absolute -right-1 -top-1 w-9 h-9 rounded-full border-[2px] border-brand-400/10" />
         <div className="absolute -left-4 -bottom-4 w-14 h-14 rounded-full bg-brand-400/5" />
-        {item.image ? <img src={thumb(item.image)} alt="" className="w-full h-full object-cover relative z-10" loading="lazy" decoding="async" /> : <span className="text-3xl opacity-10 relative z-10">📦</span>}
+        {item.image ? <img src={thumb(item.image)} alt="" className="w-full h-full object-cover relative z-10" loading="lazy" decoding="async" /> : <span className="text-3xl opacity-10 relative z-10"></span>}
       </div>
       <div className="p-3 md:p-3.5 relative overflow-hidden">
         <div className="absolute -right-2 -bottom-2 w-10 h-10 rounded-full bg-brand-400/[0.04]" />
@@ -58,11 +58,11 @@ export default function POS() {
   const doAdd = (item) => {
     if (mode === 'bundle') {
       let cost = 0; for (const bi of item.products) { const p = products.find(x => x.id === bi.productId); if (p) cost += p.costPrice * num(bi.qty) }
-      if (addToCart({ bundleId: item.id, name: item.name, price: item.bundlePrice, costPrice: cost, isBundle: true, bundleItems: item.products })) toast.success('Added!')
+      if (addToCart({ bundleId: item.id, name: item.name, price: item.bundlePrice, costPrice: cost, isBundle: true, bundleItems: item.products })) toast.success('Added')
     } else {
       if (item.quantity === 0) return
       const price = getPrice(item)
-      if (addToCart({ productId: item.id, name: item.name, price, costPrice: item.costPrice, image: item.image, originalPrice: item.price, isPromo: !!promoPriceMap[item.id] })) toast.success('Added!')
+      if (addToCart({ productId: item.id, name: item.name, price, costPrice: item.costPrice, image: item.image, originalPrice: item.price, isPromo: !!promoPriceMap[item.id] })) toast.success('Added')
       else toast.error('Out of stock')
     }
   }
@@ -79,7 +79,7 @@ export default function POS() {
         <div className="bg-brand-600 rounded-2xl px-5 py-3 mt-4 flex items-center gap-3 text-white relative overflow-hidden">
           <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full border-[2px] border-white/10" />
           <div className="absolute -right-1 -top-1 w-10 h-10 rounded-full border-[2px] border-white/10" />
-          <span className="text-xl relative z-10">🏷️</span>
+          <span className="text-xl relative z-10"></span>
           <span className="text-sm font-bold relative z-10">{promoCount} product{promoCount > 1 ? 's' : ''} on promo!</span>
         </div>
       )}
@@ -120,7 +120,7 @@ export default function POS() {
         {filtered.map(item => {
           if (mode === 'bundle') return (
             <button key={item.id} onClick={() => doAdd(item)} className="bg-white rounded-3xl p-4 text-left active:scale-[.97] transition-transform">
-              <div className="w-full aspect-[4/3] bg-sage-50 rounded-2xl mb-3 flex items-center justify-center text-3xl opacity-20">🎁</div>
+              <div className="w-full aspect-[4/3] bg-sage-50 rounded-2xl mb-3 flex items-center justify-center text-3xl opacity-20"></div>
               <div className="text-sm font-semibold">{item.name}</div>
               <div className="text-lg font-extrabold mt-1">{money(item.bundlePrice)}</div>
             </button>

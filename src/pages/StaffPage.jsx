@@ -31,7 +31,7 @@ export default function StaffPage() {
     <div className="animate-fade">
       <div className="flex justify-between items-start flex-wrap gap-4 mb-6">
         <h1 className="text-3xl font-extrabold">Staff</h1>
-        <button onClick={openNew} className="h-12 px-5 bg-brand-500 text-white rounded-xl text-sm font-semibold">➕ Add</button>
+        <button onClick={openNew} className="h-12 px-5 bg-brand-500 text-white rounded-xl text-sm font-semibold">Add</button>
       </div>
       <div className="bg-white rounded-3xl p-6 shadow-md overflow-x-auto">
         <table className="w-full min-w-[300px]">
@@ -40,7 +40,7 @@ export default function StaffPage() {
             <tr key={s.id} className="border-b border-gray-50">
               <td className="p-3 text-sm font-semibold">{s.name}</td>
               <td className="p-3"><span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${s.role === 'Admin' ? 'bg-gray-100 text-gray-600' : 'bg-green-50 text-green-500'}`}>{s.role}</span></td>
-              <td className="p-3"><div className="flex gap-2 justify-center"><button onClick={() => openEdit(s)} className="h-9 px-3 bg-gray-100 rounded-lg text-xs">✏️</button><button onClick={() => del(s.id)} className="h-9 px-3 bg-red-50 text-red-500 rounded-lg text-xs">🗑️</button></div></td>
+              <td className="p-3"><div className="flex gap-2 justify-center"><button onClick={() => openEdit(s)} className="h-9 px-3 bg-gray-100 rounded-lg text-xs"></button><button onClick={() => del(s.id)} className="h-9 px-3 bg-red-50 text-red-500 rounded-lg text-xs"></button></div></td>
             </tr>
           ))}</tbody>
         </table>
