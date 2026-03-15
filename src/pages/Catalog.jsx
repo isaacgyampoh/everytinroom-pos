@@ -24,7 +24,7 @@ export default function Catalog() {
 
   const loadProducts = async () => {
     const sb = getSupabase()
-    const { data } = await sb.from('products').select('id,name,category,price,quantity,image').order('name', { ascending: true })
+    const { data } = await sb.from('products').select('id,name,category,price,wholesale_price,wholesale_min_qty,quantity,image').order('name', { ascending: true })
     setProducts((data || []).filter(p => p.quantity > 0))
     setLoading(false)
   }
@@ -39,13 +39,26 @@ export default function Catalog() {
   const addToCart = (product) => {
     setCart(prev => {
       const existing = prev.find(c => c.id === product.id)
-      if (existing) return prev.map(c => c.id === product.id ? { ...c, qty: c.qty + 1 } : c)
-      return [...prev, { id: product.id, name: product.name, price: Number(product.price), qty: 1, image: product.image }]
+      if (existing) {
+        const newQty = existing.qty + 1
+        const wp = Number(product.wholesale_price || 0)
+        const wm = Number(product.wholesale_min_qty || 0)
+        const price = (wp > 0 && wm > 0 && newQty >= wm) ? wp : Number(product.price)
+        return prev.map(c => c.id === product.id ? { ...c, qty: newQty, price, isWholesale: wp > 0 && wm > 0 && newQty >= wm } : c)
+      }
+      return [...prev, { id: product.id, name: product.name, price: Number(product.price), retailPrice: Number(product.price), wholesalePrice: Number(product.wholesale_price || 0), wholesaleMinQty: Number(product.wholesale_min_qty || 0), qty: 1, image: product.image, isWholesale: false }]
     })
   }
 
   const updateQty = (id, delta) => {
-    setCart(prev => prev.map(c => c.id === id ? { ...c, qty: Math.max(0, c.qty + delta) } : c).filter(c => c.qty > 0))
+    setCart(prev => prev.map(c => {
+      if (c.id !== id) return c
+      const newQty = Math.max(0, c.qty + delta)
+      if (newQty === 0) return { ...c, qty: 0 }
+      const isWholesale = c.wholesalePrice > 0 && c.wholesaleMinQty > 0 && newQty >= c.wholesaleMinQty
+      const price = isWholesale ? c.wholesalePrice : c.retailPrice
+      return { ...c, qty: newQty, price, isWholesale }
+    }).filter(c => c.qty > 0))
   }
 
   const cartCount = cart.reduce((a, c) => a + c.qty, 0)
@@ -53,7 +66,7 @@ export default function Catalog() {
 
   const orderViaWhatsApp = () => {
     if (cart.length === 0) return
-    const items = cart.map(c => `${c.qty}x ${c.name} - ${money(c.price * c.qty)}`).join('\n')
+    const items = cart.map(c => `${c.qty}x ${c.name} - ${money(c.price * c.qty)}${c.isWholesale ? ' (wholesale)' : ''}`).join('\n')
     const msg = `Hi, I'd like to order from EVERYTINROOM&BEDTIME:\n\n${items}\n\nTotal: ${money(cartTotal)}\n\nPlease send me an invoice. Thank you.`
     const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent)
     if (isMobile) window.location.href = `whatsapp://send?phone=${SHOP_WHATSAPP}&text=${encodeURIComponent(msg)}`
@@ -112,7 +125,9 @@ export default function Catalog() {
 
         {/* Products Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
-          {filtered.map(p => (
+          {filtered.map(p => {
+            const hasWholesale = Number(p.wholesale_price || 0) > 0 && Number(p.wholesale_min_qty || 0) > 0
+            return (
             <div key={p.id} className="bg-white rounded-2xl overflow-hidden group">
               <div onClick={() => setViewProduct(p)} className="cursor-pointer">
                 <div className="w-full aspect-[4/3] bg-stone-100 overflow-hidden">
@@ -122,6 +137,7 @@ export default function Catalog() {
                   <div className="text-[13px] font-semibold text-stone-800 leading-snug">{p.name}</div>
                   {p.category && <div className="text-[11px] text-stone-400 mt-0.5">{p.category}</div>}
                   <div className="text-base font-extrabold text-[#1a3d30] mt-1.5">{money(p.price)}</div>
+                  {hasWholesale && <div className="text-[10px] text-emerald-600 font-semibold mt-0.5">Buy {p.wholesale_min_qty}+ for {money(p.wholesale_price)} each</div>}
                 </div>
               </div>
               <div className="px-3 pb-3">
@@ -130,7 +146,8 @@ export default function Catalog() {
                 </button>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
 
         {filtered.length === 0 && (
@@ -142,7 +159,7 @@ export default function Catalog() {
 
       {/* Floating Cart Button */}
       {cartCount > 0 && (
-        <button onClick={() => setShowCart(true)} className="fixed bottom-5 right-5 h-14 px-6 bg-[#f97316] text-white rounded-2xl shadow-lg shadow-orange-500/30 flex items-center gap-3 font-bold text-sm active:scale-95 transition z-50">
+        <button onClick={() => setShowCart(true)} className="fixed bottom-5 right-5 h-16 px-7 bg-[#f97316] text-white rounded-2xl shadow-lg shadow-orange-500/30 flex items-center gap-3 font-extrabold text-base active:scale-95 transition z-50">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
           {cartCount} item{cartCount !== 1 ? 's' : ''} · {money(cartTotal)}
         </button>
@@ -171,6 +188,8 @@ export default function Catalog() {
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold truncate">{c.name}</div>
                     <div className="text-xs text-stone-400">{money(c.price)} each</div>
+                    {c.isWholesale && <div className="text-[10px] font-bold text-emerald-600 mt-0.5">Wholesale price applied</div>}
+                    {!c.isWholesale && c.wholesaleMinQty > 0 && c.qty < c.wholesaleMinQty && <div className="text-[10px] text-stone-400 mt-0.5">Buy {c.wholesaleMinQty}+ for {money(c.wholesalePrice)} each</div>}
                   </div>
                   <div className="flex items-center gap-2">
                     <button onClick={() => updateQty(c.id, -1)} className="w-8 h-8 border border-stone-300 rounded-lg text-sm font-bold flex items-center justify-center text-stone-600 hover:bg-stone-100 transition">−</button>
@@ -185,16 +204,16 @@ export default function Catalog() {
 
         {cart.length > 0 && (
           <div className="p-5 border-t border-stone-100 safe-bottom">
-            <div className="flex justify-between mb-4">
-              <span className="text-sm text-stone-500">Total</span>
-              <span className="text-xl font-extrabold">{money(cartTotal)}</span>
+            <div className="flex justify-between items-center mb-5">
+              <span className="text-sm text-stone-500">Total ({cartCount} item{cartCount !== 1 ? 's' : ''})</span>
+              <span className="text-2xl font-extrabold">{money(cartTotal)}</span>
             </div>
             <button onClick={() => { orderViaWhatsApp(); setShowCart(false) }}
-              className="w-full h-13 bg-[#25d366] text-white rounded-2xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[.98] transition">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492l4.612-1.21A11.95 11.95 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75c-2.115 0-4.142-.588-5.904-1.699l-.424-.252-2.732.717.73-2.667-.276-.44A9.72 9.72 0 012.25 12C2.25 6.624 6.624 2.25 12 2.25S21.75 6.624 21.75 12 17.376 21.75 12 21.75z"/></svg>
+              className="w-full h-16 bg-[#25d366] text-white rounded-2xl text-lg font-extrabold flex items-center justify-center gap-3 active:scale-[.98] transition shadow-lg shadow-green-500/20">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492l4.612-1.21A11.95 11.95 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75c-2.115 0-4.142-.588-5.904-1.699l-.424-.252-2.732.717.73-2.667-.276-.44A9.72 9.72 0 012.25 12C2.25 6.624 6.624 2.25 12 2.25S21.75 6.624 21.75 12 17.376 21.75 12 21.75z"/></svg>
               Order on WhatsApp
             </button>
-            <button onClick={() => setCart([])} className="w-full h-10 text-stone-400 text-xs font-medium mt-2 hover:text-stone-600 transition">Clear order</button>
+            <button onClick={() => setCart([])} className="w-full h-9 text-stone-400 text-xs font-medium mt-3 hover:text-stone-600 transition">Clear order</button>
           </div>
         )}
       </div>
@@ -214,7 +233,13 @@ export default function Catalog() {
               {viewProduct.category && <div className="text-xs text-stone-400 font-medium mb-1">{viewProduct.category}</div>}
               <h2 className="text-xl font-extrabold text-stone-900">{viewProduct.name}</h2>
               <div className="text-2xl font-extrabold text-[#1a3d30] mt-2">{money(viewProduct.price)}</div>
-              <div className="text-xs text-stone-400 mt-1">{viewProduct.quantity > 0 ? 'In stock' : 'Out of stock'}</div>
+              {Number(viewProduct.wholesale_price || 0) > 0 && Number(viewProduct.wholesale_min_qty || 0) > 0 && (
+                <div className="mt-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                  <div className="text-sm font-semibold text-emerald-700">Wholesale: {money(viewProduct.wholesale_price)} each</div>
+                  <div className="text-xs text-emerald-600">When you buy {viewProduct.wholesale_min_qty} or more pieces</div>
+                </div>
+              )}
+              <div className="text-xs text-stone-400 mt-2">{viewProduct.quantity > 0 ? 'In stock' : 'Out of stock'}</div>
             </div>
             <div className="p-5 pt-0">
               <button onClick={() => { addToCart(viewProduct); setViewProduct(null) }}
