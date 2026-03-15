@@ -22,6 +22,38 @@ export default function Catalog() {
 
   useEffect(() => { loadProducts() }, [])
 
+  // Deep link: /#/catalog/PRODUCT_ID opens that product
+  useEffect(() => {
+    if (!products.length) return
+    const hash = window.location.hash
+    const match = hash.match(/\/catalog\/(.+)$/)
+    if (match) {
+      const p = products.find(pr => pr.id === match[1])
+      if (p) setViewProduct(p)
+    }
+  }, [products])
+
+  const openProduct = (p) => {
+    setViewProduct(p)
+    window.location.hash = `/catalog/${p.id}`
+  }
+
+  const closeProduct = () => {
+    setViewProduct(null)
+    window.location.hash = '/catalog'
+  }
+
+  const shareProduct = (p) => {
+    const link = `${window.location.origin}/#/catalog/${p.id}`
+    const text = `Check out ${p.name} from EVERYTINROOM - ${money(p.price)}\n${link}`
+    if (navigator.share) {
+      navigator.share({ title: p.name, text: `${p.name} - ${money(p.price)}`, url: link }).catch(() => {})
+    } else {
+      navigator.clipboard?.writeText(text)
+      alert('Link copied!')
+    }
+  }
+
   const loadProducts = async () => {
     const sb = getSupabase()
     const { data } = await sb.from('products').select('id,name,category,price,wholesale_price,wholesale_min_qty,quantity,image').order('name', { ascending: true })
@@ -135,7 +167,7 @@ export default function Catalog() {
             const hasWholesale = Number(p.wholesale_price || 0) > 0 && Number(p.wholesale_min_qty || 0) > 0
             return (
             <div key={p.id} className="bg-white rounded-2xl overflow-hidden group">
-              <div onClick={() => setViewProduct(p)} className="cursor-pointer">
+              <div onClick={() => openProduct(p)} className="cursor-pointer">
                 <div className="w-full aspect-[4/3] bg-stone-100 overflow-hidden">
                   {p.image ? <img src={thumb(p.image)} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" /> : <div className="w-full h-full flex items-center justify-center text-stone-200 text-2xl">□</div>}
                 </div>
@@ -225,37 +257,68 @@ export default function Catalog() {
       </div>
 
       {/* Product Detail Modal */}
-      {viewProduct && (
+      {viewProduct && (() => {
+        const related = products.filter(p => p.id !== viewProduct.id && p.category === viewProduct.category && p.image).slice(0, 4)
+        return (
         <>
-          <div className="fixed inset-0 bg-black/50 z-[300]" onClick={() => setViewProduct(null)} />
+          <div className="fixed inset-0 bg-black/50 z-[300]" onClick={() => closeProduct()} />
           <div className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[480px] md:max-h-[85vh] bg-white rounded-3xl z-[301] overflow-hidden flex flex-col">
-            <div className="w-full aspect-[4/3] bg-stone-100 overflow-hidden relative">
-              {viewProduct.image ? <img src={thumb(viewProduct.image, 500)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-stone-200 text-4xl">□</div>}
-              <button onClick={() => setViewProduct(null)} className="absolute top-4 right-4 w-9 h-9 bg-white/90 backdrop-blur rounded-xl flex items-center justify-center shadow-md">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-              </button>
+            <div className="flex-1 overflow-y-auto">
+              <div className="w-full aspect-[4/3] bg-stone-100 overflow-hidden relative">
+                {viewProduct.image ? <img src={thumb(viewProduct.image, 500)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-stone-200 text-4xl">□</div>}
+                <button onClick={() => closeProduct()} className="absolute top-4 right-4 w-9 h-9 bg-white/90 backdrop-blur rounded-xl flex items-center justify-center shadow-md">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+                <button onClick={() => shareProduct(viewProduct)} className="absolute top-4 left-4 w-9 h-9 bg-white/90 backdrop-blur rounded-xl flex items-center justify-center shadow-md">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
+                </button>
+              </div>
+              <div className="p-5">
+                {viewProduct.category && <div className="text-xs text-stone-400 font-medium mb-1">{viewProduct.category}</div>}
+                <h2 className="text-xl font-extrabold text-stone-900">{viewProduct.name}</h2>
+                <div className="text-2xl font-extrabold text-[#1a3d30] mt-2">{money(viewProduct.price)}</div>
+                {Number(viewProduct.wholesale_price || 0) > 0 && Number(viewProduct.wholesale_min_qty || 0) > 0 && (
+                  <div className="mt-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                    <div className="text-sm font-semibold text-emerald-700">Wholesale: {money(viewProduct.wholesale_price)} each</div>
+                    <div className="text-xs text-emerald-600">When you buy {viewProduct.wholesale_min_qty} or more pieces</div>
+                  </div>
+                )}
+
+                {/* Share link */}
+                <button onClick={() => shareProduct(viewProduct)} className="flex items-center gap-2 mt-3 text-sm text-brand-600 font-medium">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
+                  Share this product
+                </button>
+
+                {/* You may also like */}
+                {related.length > 0 && (
+                  <div className="mt-5 pt-4 border-t border-stone-100">
+                    <h4 className="text-sm font-bold text-stone-700 mb-3">You may also like</h4>
+                    <div className="flex gap-2.5 overflow-x-auto scrollbar-hide">
+                      {related.map(r => (
+                        <div key={r.id} onClick={() => openProduct(r)} className="flex-shrink-0 w-28 cursor-pointer">
+                          <div className="w-28 h-20 bg-stone-100 rounded-xl overflow-hidden">
+                            <img src={thumb(r.image, 150)} alt="" className="w-full h-full object-cover" loading="lazy" />
+                          </div>
+                          <div className="text-[11px] font-semibold text-stone-700 mt-1.5 leading-tight line-clamp-2">{r.name}</div>
+                          <div className="text-[11px] font-extrabold text-[#1a3d30]">{money(r.price)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="p-5 flex-1">
-              {viewProduct.category && <div className="text-xs text-stone-400 font-medium mb-1">{viewProduct.category}</div>}
-              <h2 className="text-xl font-extrabold text-stone-900">{viewProduct.name}</h2>
-              <div className="text-2xl font-extrabold text-[#1a3d30] mt-2">{money(viewProduct.price)}</div>
-              {Number(viewProduct.wholesale_price || 0) > 0 && Number(viewProduct.wholesale_min_qty || 0) > 0 && (
-                <div className="mt-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
-                  <div className="text-sm font-semibold text-emerald-700">Wholesale: {money(viewProduct.wholesale_price)} each</div>
-                  <div className="text-xs text-emerald-600">When you buy {viewProduct.wholesale_min_qty} or more pieces</div>
-                </div>
-              )}
-              <div className="text-xs text-stone-400 mt-2">{viewProduct.quantity > 0 ? 'In stock' : 'Out of stock'}</div>
-            </div>
-            <div className="p-5 pt-0">
-              <button onClick={() => { addToCart(viewProduct); setViewProduct(null) }}
+            <div className="p-5 pt-0 border-t border-stone-100">
+              <button onClick={() => { addToCart(viewProduct); closeProduct() }}
                 className="w-full h-12 bg-[#1a3d30] text-white rounded-2xl text-sm font-bold hover:bg-[#265a44] active:scale-[.98] transition">
                 Add to Order
               </button>
             </div>
           </div>
         </>
-      )}
+        )
+      })()}
 
       {/* Footer */}
       <div className="bg-[#1a3d30] text-white mt-10">
