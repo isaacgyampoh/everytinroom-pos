@@ -7,21 +7,17 @@ const ProductCard = memo(({ item, price, hasPromo, onAdd }) => {
   const qty = item.quantity
   return (
     <button onClick={onAdd} disabled={qty === 0}
-      className={`bg-white rounded-3xl overflow-hidden text-left transition-transform active:scale-[.97] ${hasPromo ? 'ring-2 ring-brand-300' : ''} ${qty === 0 ? 'opacity-30 pointer-events-none' : ''}`}>
+      className={`bg-white rounded-2xl overflow-hidden text-left transition-transform active:scale-[.97] ${hasPromo ? 'ring-2 ring-brand-300' : ''} ${qty === 0 ? 'opacity-30 pointer-events-none' : ''}`}>
       {hasPromo && <div className="bg-brand-600 text-white text-[10px] font-bold text-center py-1 tracking-wider uppercase">Promo</div>}
-      <div className="w-full aspect-[4/3] bg-sage-50 flex items-center justify-center overflow-hidden relative">
-        <div className="absolute -right-3 -top-3 w-16 h-16 rounded-full border-[2px] border-brand-400/10" />
-        <div className="absolute -right-1 -top-1 w-9 h-9 rounded-full border-[2px] border-brand-400/10" />
-        <div className="absolute -left-4 -bottom-4 w-14 h-14 rounded-full bg-brand-400/5" />
-        {item.image ? <img src={thumb(item.image)} alt="" className="w-full h-full object-cover relative z-10" loading="lazy" decoding="async" /> : <span className="text-3xl opacity-10 relative z-10"></span>}
+      <div className="w-full aspect-[4/3] bg-stone-100 overflow-hidden">
+        {item.image ? <img src={thumb(item.image, 150)} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" fetchPriority="low" /> : <div className="w-full h-full flex items-center justify-center text-stone-200 text-xl">□</div>}
       </div>
-      <div className="p-3 md:p-3.5 relative overflow-hidden">
-        <div className="absolute -right-2 -bottom-2 w-10 h-10 rounded-full bg-brand-400/[0.04]" />
-        <div className="text-[13px] md:text-sm font-semibold text-gray-900 leading-snug truncate">{item.name}</div>
-        <div className="flex items-end justify-between mt-2">
+      <div className="p-2.5">
+        <div className="text-[12px] md:text-[13px] font-semibold text-gray-900 leading-snug truncate">{item.name}</div>
+        <div className="flex items-end justify-between mt-1.5">
           <div>
-            {hasPromo && <div className="text-[11px] text-stone-400 line-through">{money(item.price)}</div>}
-            <div className={`text-lg font-extrabold leading-none ${hasPromo ? 'text-brand-600' : 'text-gray-900'}`}>{money(price)}</div>
+            {hasPromo && <div className="text-[10px] text-stone-400 line-through">{money(item.price)}</div>}
+            <div className={`text-base font-extrabold leading-none ${hasPromo ? 'text-brand-600' : 'text-gray-900'}`}>{money(price)}</div>
           </div>
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${qty === 0 ? 'bg-red-100 text-red-600' : qty <= 5 ? 'bg-amber-100 text-amber-700' : 'bg-brand-50 text-brand-700'}`}>
             {qty === 0 ? 'OUT' : qty}
@@ -115,12 +111,11 @@ export default function POS() {
       )}
 
       {/* Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5">
         {filtered.length === 0 && <div className="col-span-full py-20 text-center text-stone-300 text-sm">No products found</div>}
-        {filtered.map(item => {
+        {filtered.map((item, idx) => {
           if (mode === 'bundle') return (
-            <button key={item.id} onClick={() => doAdd(item)} className="bg-white rounded-3xl p-4 text-left active:scale-[.97] transition-transform">
-              <div className="w-full aspect-[4/3] bg-sage-50 rounded-2xl mb-3 flex items-center justify-center text-3xl opacity-20"></div>
+            <button key={item.id} onClick={() => doAdd(item)} className="bg-white rounded-2xl p-4 text-left active:scale-[.97] transition-transform">
               <div className="text-sm font-semibold">{item.name}</div>
               <div className="text-lg font-extrabold mt-1">{money(item.bundlePrice)}</div>
             </button>
