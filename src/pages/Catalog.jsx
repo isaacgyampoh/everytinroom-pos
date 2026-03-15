@@ -19,6 +19,7 @@ export default function Catalog() {
   const [cart, setCart] = useState([]) // { id, name, price, qty, image }
   const [showCart, setShowCart] = useState(false)
   const [viewProduct, setViewProduct] = useState(null)
+  const [orderSent, setOrderSent] = useState(false)
 
   useEffect(() => { loadProducts() }, [])
 
@@ -216,7 +217,7 @@ export default function Catalog() {
               <span className="text-sm text-stone-500">Total ({cartCount} item{cartCount !== 1 ? 's' : ''})</span>
               <span className="text-2xl font-extrabold">{money(cartTotal)}</span>
             </div>
-            <button onClick={() => { orderViaWhatsApp(); setShowCart(false) }}
+            <button onClick={() => { orderViaWhatsApp(); setShowCart(false); setCart([]); setOrderSent(true); setTimeout(() => setOrderSent(false), 8000) }}
               className="w-full h-16 bg-[#25d366] text-white rounded-2xl text-lg font-extrabold flex items-center justify-center gap-3 active:scale-[.98] transition shadow-lg shadow-green-500/20">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492l4.612-1.21A11.95 11.95 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75c-2.115 0-4.142-.588-5.904-1.699l-.424-.252-2.732.717.73-2.667-.276-.44A9.72 9.72 0 012.25 12C2.25 6.624 6.624 2.25 12 2.25S21.75 6.624 21.75 12 17.376 21.75 12 21.75z"/></svg>
               Order on WhatsApp
@@ -255,6 +256,21 @@ export default function Catalog() {
                 Add to Order
               </button>
             </div>
+          </div>
+        </>
+      )}
+
+      {/* Order Sent Confirmation */}
+      {orderSent && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-[400]" onClick={() => setOrderSent(false)} />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-[380px] bg-white rounded-3xl p-8 z-[401] text-center shadow-2xl">
+            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            </div>
+            <h3 className="text-xl font-extrabold text-stone-900 mb-2">Order Received</h3>
+            <p className="text-sm text-stone-500 leading-relaxed">Thank you for your order. Your invoice will be sent to you shortly for you to proceed with payment.</p>
+            <button onClick={() => setOrderSent(false)} className="w-full h-12 bg-[#1a3d30] text-white rounded-2xl text-sm font-bold mt-6 active:scale-[.98] transition">Continue Browsing</button>
           </div>
         </>
       )}
