@@ -25,6 +25,7 @@ import StockTakesPage from './pages/StockTakesPage'
 import StockAdjustmentsPage from './pages/StockAdjustmentsPage'
 import RestockPage from './pages/RestockPage'
 import InvoicePay from './pages/InvoicePay'
+import Catalog from './pages/Catalog'
 import toast from 'react-hot-toast'
 
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000 // 30 minutes
@@ -103,10 +104,9 @@ export default function App() {
       .subscribe()
   }
 
-  // Public invoice page - no login required
-  if (window.location.hash.includes('/pay/')) {
-    return <InvoicePay />
-  }
+  // Public pages - no login required
+  if (window.location.hash.includes('/pay/')) return <InvoicePay />
+  if (window.location.hash.includes('/catalog')) return <Catalog />
 
   if (loading) return <><Loader /><Toaster /></>
   if (!user) return <><Login /><Toaster /></>
