@@ -249,7 +249,10 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
               if (error) { toast.error('Failed to create invoice'); setProcessing(false); return }
 
               const link = window.location.origin + '/#/pay/' + data.id
-              const msg = `Hi, your order from EVERYTINROOM&BEDTIME is ready.\n\n${orderItems.map(it => `${it.qty}x ${it.name} - GHS ${Number(it.lineTotal).toFixed(2)}`).join('\n')}\n\nTotal: GHS ${Number(total).toFixed(2)}\n\nPlease click the link below to make payment and fill in your delivery details:\n${link}\n\nThank you.`
+              const lines = ['Hi, your order from EVERYTINROOM is ready.', '']
+              orderItems.forEach(it => lines.push(`${it.qty}x ${it.name} - GHS ${Number(it.lineTotal).toFixed(2)}`))
+              lines.push('', `Total: GHS ${Number(total).toFixed(2)}`, '', 'Please click the link below to make payment and fill in your delivery details:', link, '', 'Thank you.')
+              const msg = lines.join('\n')
 
               // Copy message to clipboard first
               try { await navigator.clipboard.writeText(msg) } catch {}

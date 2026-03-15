@@ -66,8 +66,16 @@ export default function Catalog() {
 
   const orderViaWhatsApp = () => {
     if (cart.length === 0) return
-    const items = cart.map(c => `${c.qty}x ${c.name} - ${money(c.price * c.qty)}${c.isWholesale ? ' (wholesale)' : ''}`).join('\n')
-    const msg = `Hi, I'd like to order from EVERYTINROOM&BEDTIME:\n\n${items}\n\nTotal: ${money(cartTotal)}\n\nPlease send me an invoice. Thank you.`
+    const lines = [`Hi, I'd like to order from EVERYTINROOM:`]
+    lines.push('')
+    cart.forEach(c => {
+      lines.push(`${c.qty}x ${c.name} - ${money(c.price * c.qty)}${c.isWholesale ? ' (wholesale)' : ''}`)
+    })
+    lines.push('')
+    lines.push(`Total: ${money(cartTotal)}`)
+    lines.push('')
+    lines.push('Please send me an invoice. Thank you.')
+    const msg = lines.join('\n')
     const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent)
     if (isMobile) window.location.href = `whatsapp://send?phone=${SHOP_WHATSAPP}&text=${encodeURIComponent(msg)}`
     else window.open(`https://web.whatsapp.com/send?phone=${SHOP_WHATSAPP}&text=${encodeURIComponent(msg)}`, '_blank')

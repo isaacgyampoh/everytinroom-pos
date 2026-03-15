@@ -43,7 +43,10 @@ export default function WhatsAppOrders() {
 
   const resendInvoice = (o) => {
     const link = window.location.origin + '/#/pay/' + o.id
-    const msg = `Hi${o.customerName ? ' ' + o.customerName : ''}, just a reminder about your order from EVERYTINROOM&BEDTIME.\n\n${o.items.map(it => `${it.qty}x ${it.name} - ${money(it.lineTotal || it.price * it.qty)}`).join('\n')}\n\nTotal: ${money(o.total)}\n\nPlease click the link below to make payment:\n${link}\n\nThank you.`
+    const lines = [`Hi${o.customerName ? ' ' + o.customerName : ''}, just a reminder about your order from EVERYTINROOM.`, '']
+    o.items.forEach(it => lines.push(`${it.qty}x ${it.name} - ${money(it.lineTotal || it.price * it.qty)}`))
+    lines.push('', `Total: ${money(o.total)}`, '', 'Please click the link below to make payment:', link, '', 'Thank you.')
+    const msg = lines.join('\n')
     const waPhone = (o.customerPhone || '').replace(/^0/, '233')
     const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent)
     if (isMobile) window.location.href = `whatsapp://send?phone=${waPhone}&text=${encodeURIComponent(msg)}`
