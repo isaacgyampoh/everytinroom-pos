@@ -13,14 +13,16 @@ const SHOP_WHATSAPP = '233245315581' // Main WhatsApp number for orders
 
 export default function Catalog() {
   const [products, setProducts] = useState([])
+  const [promoMap, setPromoMap] = useState({}) // productId → promoPrice
+  const [bundles, setBundles] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selectedCat, setSelectedCat] = useState('all')
-  const [cart, setCart] = useState([]) // { id, name, price, qty, image }
+  const [cart, setCart] = useState([])
   const [showCart, setShowCart] = useState(false)
   const [viewProduct, setViewProduct] = useState(null)
 
-  useEffect(() => { loadProducts() }, [])
+  useEffect(() => { loadProducts(); loadPromos(); loadBundles() }, [])
 
   // Deep link: /#/catalog/PRODUCT_ID opens that product
   useEffect(() => {
@@ -59,6 +61,37 @@ export default function Catalog() {
     const { data } = await sb.from('products').select('id,name,category,price,wholesale_price,wholesale_min_qty,quantity,image').order('name', { ascending: true })
     setProducts((data || []).filter(p => p.quantity > 0))
     setLoading(false)
+  }
+
+  const loadPromos = async () => {
+    const sb = getSupabase()
+    const { data } = await sb.from('promos').select('id,name,start_date,end_date,items,active').eq('active', true)
+    if (!data) return
+    const now = new Date()
+    const map = {}
+    for (const p of data) {
+      if (p.start_date && new Date(p.start_date) > now) continue
+      if (p.end_date && new Date(p.end_date) < now) continue
+      const items = typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || [])
+      for (const it of items) {
+        const pp = Number(it.promoPrice || 0)
+        if (pp > 0 && (!map[it.productId] || pp < map[it.productId].price)) {
+          map[it.productId] = { price: pp, promoName: p.name }
+        }
+      }
+    }
+    setPromoMap(map)
+  }
+
+  const loadBundles = async () => {
+    const sb = getSupabase()
+    const { data } = await sb.from('bundles').select('id,name,items,bundle_price,active').eq('active', true)
+    if (!data) return
+    setBundles(data.map(b => ({
+      ...b,
+      items: typeof b.items === 'string' ? JSON.parse(b.items) : (b.items || []),
+      bundlePrice: Number(b.bundle_price || 0)
+    })))
   }
 
   const categories = useMemo(() => ['all', ...new Set(products.filter(p => p.category).map(p => p.category))], [products])
@@ -158,6 +191,36 @@ export default function Catalog() {
           ))}
         </div>
 
+        {/* Promo Banner */}
+        {Object.keys(promoMap).length > 0 && (
+          <div className="mb-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              <h2 className="text-sm font-bold text-stone-800">On Sale Now</h2>
+            </div>
+            <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+              {products.filter(p => promoMap[p.id]).map(p => {
+                const promo = promoMap[p.id]
+                return (
+                  <div key={'promo-'+p.id} onClick={() => openProduct(p)} className="flex-shrink-0 w-36 bg-white rounded-2xl overflow-hidden cursor-pointer">
+                    <div className="w-full h-24 bg-stone-100 overflow-hidden relative">
+                      {p.image ? <img src={thumb(p.image, 150)} alt="" className="w-full h-full object-cover" loading="lazy" /> : <div className="w-full h-full" />}
+                      <div className="absolute top-1.5 left-1.5 bg-red-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-md">SALE</div>
+                    </div>
+                    <div className="p-2.5">
+                      <div className="text-[11px] font-semibold text-stone-800 leading-snug truncate">{p.name}</div>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-[10px] text-stone-400 line-through">{money(p.price)}</span>
+                        <span className="text-[13px] font-extrabold text-red-500">{money(promo.price)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Product count */}
         <p className="text-xs text-stone-400 mb-4 font-medium">{filtered.length} product{filtered.length !== 1 ? 's' : ''}</p>
 
@@ -165,21 +228,28 @@ export default function Catalog() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
           {filtered.map(p => {
             const hasWholesale = Number(p.wholesale_price || 0) > 0 && Number(p.wholesale_min_qty || 0) > 0
+            const promo = promoMap[p.id]
+            const displayPrice = promo ? promo.price : p.price
             return (
             <div key={p.id} className="bg-white rounded-2xl overflow-hidden group">
               <div onClick={() => openProduct(p)} className="cursor-pointer">
-                <div className="w-full aspect-[4/3] bg-stone-100 overflow-hidden">
+                <div className="w-full aspect-[4/3] bg-stone-100 overflow-hidden relative">
                   {p.image ? <img src={thumb(p.image)} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" /> : <div className="w-full h-full flex items-center justify-center text-stone-200 text-2xl">□</div>}
+                  {promo && <div className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg">SALE</div>}
                 </div>
                 <div className="p-3">
                   <div className="text-[13px] font-semibold text-stone-800 leading-snug">{p.name}</div>
                   {p.category && <div className="text-[11px] text-stone-400 mt-0.5">{p.category}</div>}
-                  <div className="text-base font-extrabold text-[#1a3d30] mt-1.5">{money(p.price)}</div>
-                  {hasWholesale && <div className="text-[10px] text-emerald-600 font-semibold mt-0.5">Buy {p.wholesale_min_qty}+ for {money(p.wholesale_price)} each</div>}
+                  <div className="mt-1.5">
+                    {promo && <div className="text-xs text-stone-400 line-through">{money(p.price)}</div>}
+                    <div className={`text-base font-extrabold ${promo ? 'text-red-500' : 'text-[#1a3d30]'}`}>{money(displayPrice)}</div>
+                  </div>
+                  {promo && <div className="text-[10px] text-red-500 font-semibold mt-0.5">{promo.promoName}</div>}
+                  {!promo && hasWholesale && <div className="text-[10px] text-emerald-600 font-semibold mt-0.5">Buy {p.wholesale_min_qty}+ for {money(p.wholesale_price)} each</div>}
                 </div>
               </div>
               <div className="px-3 pb-3">
-                <button onClick={() => { addToCart(p); }} className="w-full h-9 bg-[#1a3d30] text-white rounded-xl text-xs font-semibold hover:bg-[#265a44] active:scale-[.97] transition">
+                <button onClick={() => { addToCart({ ...p, price: displayPrice, originalPrice: p.price, isPromo: !!promo }); }} className="w-full h-9 bg-[#1a3d30] text-white rounded-xl text-xs font-semibold hover:bg-[#265a44] active:scale-[.97] transition">
                   Add to Order
                 </button>
               </div>
@@ -259,6 +329,8 @@ export default function Catalog() {
       {/* Product Detail Modal */}
       {viewProduct && (() => {
         const related = products.filter(p => p.id !== viewProduct.id && p.category === viewProduct.category && p.image).slice(0, 4)
+        const promo = promoMap[viewProduct.id]
+        const displayPrice = promo ? promo.price : viewProduct.price
         return (
         <>
           <div className="fixed inset-0 bg-black/50 z-[300]" onClick={() => closeProduct()} />
@@ -276,8 +348,17 @@ export default function Catalog() {
               <div className="p-5">
                 {viewProduct.category && <div className="text-xs text-stone-400 font-medium mb-1">{viewProduct.category}</div>}
                 <h2 className="text-xl font-extrabold text-stone-900">{viewProduct.name}</h2>
-                <div className="text-2xl font-extrabold text-[#1a3d30] mt-2">{money(viewProduct.price)}</div>
-                {Number(viewProduct.wholesale_price || 0) > 0 && Number(viewProduct.wholesale_min_qty || 0) > 0 && (
+                <div className="mt-2">
+                  {promo && <div className="text-sm text-stone-400 line-through">{money(viewProduct.price)}</div>}
+                  <div className={`text-2xl font-extrabold ${promo ? 'text-red-500' : 'text-[#1a3d30]'}`}>{money(displayPrice)}</div>
+                </div>
+                {promo && (
+                  <div className="mt-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                    <div className="text-sm font-semibold text-red-600">{promo.promoName}</div>
+                    <div className="text-xs text-red-500">You save {money(viewProduct.price - promo.price)}</div>
+                  </div>
+                )}
+                {!promo && Number(viewProduct.wholesale_price || 0) > 0 && Number(viewProduct.wholesale_min_qty || 0) > 0 && (
                   <div className="mt-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
                     <div className="text-sm font-semibold text-emerald-700">Wholesale: {money(viewProduct.wholesale_price)} each</div>
                     <div className="text-xs text-emerald-600">When you buy {viewProduct.wholesale_min_qty} or more pieces</div>
@@ -310,7 +391,7 @@ export default function Catalog() {
               </div>
             </div>
             <div className="p-5 pt-0 border-t border-stone-100">
-              <button onClick={() => { addToCart(viewProduct); closeProduct() }}
+              <button onClick={() => { addToCart({ ...viewProduct, price: displayPrice, originalPrice: viewProduct.price, isPromo: !!promo }); closeProduct() }}
                 className="w-full h-12 bg-[#1a3d30] text-white rounded-2xl text-sm font-bold hover:bg-[#265a44] active:scale-[.98] transition">
                 Add to Order
               </button>
