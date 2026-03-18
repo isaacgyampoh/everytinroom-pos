@@ -201,7 +201,7 @@ export default function Catalog() {
           <div className="mb-5">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              <h2 className="text-sm font-bold text-stone-800">On Sale Now</h2>
+              <h2 className="text-sm font-bold text-stone-800">Promo</h2>
             </div>
             <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
               {products.filter(p => promoMap[p.id]).map(p => {
@@ -210,7 +210,7 @@ export default function Catalog() {
                   <div key={'promo-'+p.id} onClick={() => openProduct(p)} className="flex-shrink-0 w-36 bg-white rounded-2xl overflow-hidden cursor-pointer">
                     <div className="w-full h-24 bg-stone-100 overflow-hidden relative">
                       {p.image ? <img src={thumb(p.image, 150)} alt="" className="w-full h-full object-cover" loading="lazy" /> : <div className="w-full h-full" />}
-                      <div className="absolute top-1.5 left-1.5 bg-red-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-md">SALE</div>
+                      <div className="absolute top-1.5 left-1.5 bg-red-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-md">PROMO</div>
                     </div>
                     <div className="p-2.5">
                       <div className="text-[11px] font-semibold text-stone-800 leading-snug truncate">{p.name}</div>
@@ -240,7 +240,7 @@ export default function Catalog() {
               <div onClick={() => openProduct(p)} className="cursor-pointer">
                 <div className="w-full aspect-[4/3] bg-stone-100 overflow-hidden relative">
                   {p.image ? <img src={thumb(p.image)} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" /> : <div className="w-full h-full flex items-center justify-center text-stone-200 text-2xl">□</div>}
-                  {promo && <div className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg">SALE</div>}
+                  {promo && <div className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg">PROMO</div>}
                 </div>
                 <div className="p-3">
                   <div className="text-[13px] font-semibold text-stone-800 leading-snug">{p.name}</div>
@@ -360,7 +360,7 @@ export default function Catalog() {
                 {promo && (
                   <div className="mt-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
                     <div className="text-sm font-semibold text-red-600">{promo.promoName}</div>
-                    <div className="text-xs text-red-500">You save {money(viewProduct.price - promo.price)}</div>
+                    <div className="text-xs text-red-500">Save {money(viewProduct.price - promo.price)}</div>
                   </div>
                 )}
                 {!promo && Number(viewProduct.wholesale_price || 0) > 0 && Number(viewProduct.wholesale_min_qty || 0) > 0 && (
