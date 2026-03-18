@@ -66,17 +66,22 @@ export default function Catalog() {
   const loadPromos = async () => {
     const sb = getSupabase()
     const { data } = await sb.from('promos').select('id,name,start_date,end_date,items,active').eq('active', true)
-    if (!data) return
+    if (!data || data.length === 0) return
     const now = new Date()
     const map = {}
     for (const p of data) {
+      // Check date range
       if (p.start_date && new Date(p.start_date) > now) continue
       if (p.end_date && new Date(p.end_date) < now) continue
-      const items = typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || [])
+      // Parse items - could be string or array
+      let items = p.items
+      if (typeof items === 'string') { try { items = JSON.parse(items) } catch { continue } }
+      if (!Array.isArray(items)) continue
       for (const it of items) {
-        const pp = Number(it.promoPrice || 0)
-        if (pp > 0 && (!map[it.productId] || pp < map[it.productId].price)) {
-          map[it.productId] = { price: pp, promoName: p.name }
+        const pid = it.productId || it.product_id
+        const pp = Number(it.promoPrice || it.promo_price || 0)
+        if (pid && pp > 0 && (!map[pid] || pp < map[pid].price)) {
+          map[pid] = { price: pp, promoName: p.name }
         }
       }
     }
