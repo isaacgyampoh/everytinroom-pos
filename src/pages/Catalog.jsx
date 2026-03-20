@@ -247,20 +247,13 @@ export default function Catalog() {
         )}
       </div>
 
-      {/* Floating buttons - Cart + WhatsApp */}
-      <div className="fixed bottom-5 right-5 flex flex-col gap-3 z-50">
-        {cartCount === 0 && (
-          <a href={`https://wa.me/${SHOP_WHATSAPP}`} className="w-14 h-14 bg-[#25d366] rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/20">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492l4.612-1.21A11.95 11.95 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75c-2.115 0-4.142-.588-5.904-1.699l-.424-.252-2.732.717.73-2.667-.276-.44A9.72 9.72 0 012.25 12C2.25 6.624 6.624 2.25 12 2.25S21.75 6.624 21.75 12 17.376 21.75 12 21.75z"/></svg>
-          </a>
-        )}
-        {cartCount > 0 && (
-          <button onClick={() => setShowCart(true)} className="h-16 px-7 bg-[#f97316] text-white rounded-2xl shadow-lg shadow-orange-500/30 flex items-center gap-3 font-extrabold text-base active:scale-95 transition">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-            {cartCount} item{cartCount !== 1 ? 's' : ''} · {money(cartTotal)}
-          </button>
-        )}
-      </div>
+      {/* Floating Cart Button */}
+      {cartCount > 0 && (
+        <button onClick={() => setShowCart(true)} className="fixed bottom-5 right-5 h-16 px-7 bg-[#f97316] text-white rounded-2xl shadow-lg shadow-orange-500/30 flex items-center gap-3 font-extrabold text-base active:scale-95 transition z-50">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+          {cartCount} item{cartCount !== 1 ? 's' : ''} · {money(cartTotal)}
+        </button>
+      )}
 
       {/* Cart Drawer */}
       {showCart && <div className="fixed inset-0 bg-black/40 z-[200]" onClick={() => setShowCart(false)} />}
@@ -319,7 +312,15 @@ export default function Catalog() {
 
       {/* Product Detail Modal */}
       {viewProduct && (() => {
-        const related = products.filter(p => p.id !== viewProduct.id && p.category === viewProduct.category && p.image).slice(0, 4)
+        // Related: same category first, then products with similar words in name
+        const sameCat = products.filter(p => p.id !== viewProduct.id && p.category && viewProduct.category && p.category === viewProduct.category && p.image)
+        let related = sameCat.slice(0, 4)
+        // If not enough from same category, find products with similar name words
+        if (related.length < 4) {
+          const words = viewProduct.name.toLowerCase().split(/\s+/).filter(w => w.length > 3)
+          const similar = products.filter(p => p.id !== viewProduct.id && p.image && !related.find(r => r.id === p.id) && words.some(w => p.name.toLowerCase().includes(w)))
+          related = [...related, ...similar.slice(0, 4 - related.length)]
+        }
         const promo = promoMap[viewProduct.id]
         const displayPrice = promo ? promo.price : viewProduct.price
         return (
