@@ -146,7 +146,6 @@ export default function Catalog() {
           <p className="text-white/40 text-sm mt-0.5">{SHOP.tagline} · {SHOP.address}</p>
           {/* Mobile contact buttons */}
           <div className="flex gap-2 mt-3 md:hidden">
-            <a href={`https://wa.me/${SHOP_WHATSAPP}`} className="h-9 px-4 bg-[#25d366] rounded-xl text-xs font-semibold flex items-center gap-1.5">WhatsApp</a>
             <a href={`tel:${SHOP.phone.split('/')[0].trim().replace(/\s/g, '')}`} className="h-9 px-4 bg-white/10 rounded-xl text-xs font-semibold flex items-center gap-1.5">Call Us</a>
           </div>
         </div>
@@ -399,7 +398,6 @@ export default function Catalog() {
           <p className="text-white/40 text-sm mt-1">{SHOP.address}</p>
           <p className="text-white/40 text-sm">{SHOP.phone}</p>
           <div className="flex justify-center gap-3 mt-4">
-            <a href={`https://wa.me/${SHOP_WHATSAPP}`} className="h-11 px-6 bg-[#25d366] rounded-xl text-sm font-semibold flex items-center gap-2">WhatsApp Us</a>
             <a href={`tel:${SHOP.phone.split('/')[0].trim().replace(/\s/g, '')}`} className="h-11 px-6 bg-white/10 rounded-xl text-sm font-semibold flex items-center gap-2">Call Us</a>
           </div>
         </div>
