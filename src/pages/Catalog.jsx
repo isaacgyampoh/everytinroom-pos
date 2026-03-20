@@ -9,51 +9,40 @@ const thumb = (url, w = 300) => {
   return url
 }
 
-const SHOP_WHATSAPP = '233245315581' // Main WhatsApp number for orders
+const SHOP_WHATSAPP = '233245315581'
+
+// Simple toast
+function Toast({ msg, onDone }) {
+  useEffect(() => { const t = setTimeout(onDone, 2000); return () => clearTimeout(t) }, [])
+  return <div className="fixed top-5 left-1/2 -translate-x-1/2 bg-[#1a3d30] text-white px-5 py-2.5 rounded-xl text-sm font-semibold z-[500] shadow-lg animate-fade">{msg}</div>
+}
 
 export default function Catalog() {
   const [products, setProducts] = useState([])
-  const [promoMap, setPromoMap] = useState({}) // productId → promoPrice
-  const [bundles, setBundles] = useState([])
+  const [promoMap, setPromoMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selectedCat, setSelectedCat] = useState('all')
   const [cart, setCart] = useState([])
   const [showCart, setShowCart] = useState(false)
   const [viewProduct, setViewProduct] = useState(null)
+  const [toast, setToast] = useState('')
 
-  useEffect(() => { loadProducts(); loadPromos(); loadBundles() }, [])
+  useEffect(() => { loadProducts(); loadPromos() }, [])
 
-  // Deep link: /#/catalog/PRODUCT_ID opens that product
   useEffect(() => {
     if (!products.length) return
-    const hash = window.location.hash
-    const match = hash.match(/\/catalog\/(.+)$/)
-    if (match) {
-      const p = products.find(pr => pr.id === match[1])
-      if (p) setViewProduct(p)
-    }
+    const match = window.location.hash.match(/\/catalog\/(.+)$/)
+    if (match) { const p = products.find(pr => pr.id === match[1]); if (p) setViewProduct(p) }
   }, [products])
 
-  const openProduct = (p) => {
-    setViewProduct(p)
-    window.location.hash = `/catalog/${p.id}`
-  }
-
-  const closeProduct = () => {
-    setViewProduct(null)
-    window.location.hash = '/catalog'
-  }
+  const openProduct = (p) => { setViewProduct(p); window.location.hash = `/catalog/${p.id}` }
+  const closeProduct = () => { setViewProduct(null); window.location.hash = '/catalog' }
 
   const shareProduct = (p) => {
     const link = `${window.location.origin}/#/catalog/${p.id}`
-    const text = `Check out ${p.name} from EVERYTINROOM - ${money(p.price)}\n${link}`
-    if (navigator.share) {
-      navigator.share({ title: p.name, text: `${p.name} - ${money(p.price)}`, url: link }).catch(() => {})
-    } else {
-      navigator.clipboard?.writeText(text)
-      alert('Link copied!')
-    }
+    if (navigator.share) navigator.share({ title: p.name, text: `${p.name} - ${money(p.price)}`, url: link }).catch(() => {})
+    else { navigator.clipboard?.writeText(link); setToast('Link copied') }
   }
 
   const loadProducts = async () => {
@@ -67,39 +56,32 @@ export default function Catalog() {
     const sb = getSupabase()
     const { data } = await sb.from('promos').select('id,name,start_date,end_date,items,active').eq('active', true)
     if (!data || data.length === 0) return
-    const now = new Date()
-    const map = {}
+    const now = new Date(); const map = {}
     for (const p of data) {
-      // Check date range
       if (p.start_date && new Date(p.start_date) > now) continue
       if (p.end_date && new Date(p.end_date) < now) continue
-      // Parse items - could be string or array
       let items = p.items
       if (typeof items === 'string') { try { items = JSON.parse(items) } catch { continue } }
       if (!Array.isArray(items)) continue
       for (const it of items) {
         const pid = it.productId || it.product_id
         const pp = Number(it.promoPrice || it.promo_price || 0)
-        if (pid && pp > 0 && (!map[pid] || pp < map[pid].price)) {
-          map[pid] = { price: pp, promoName: p.name }
-        }
+        if (pid && pp > 0 && (!map[pid] || pp < map[pid].price)) map[pid] = { price: pp, promoName: p.name }
       }
     }
     setPromoMap(map)
   }
 
-  const loadBundles = async () => {
-    const sb = getSupabase()
-    const { data } = await sb.from('bundles').select('id,name,items,bundle_price,active').eq('active', true)
-    if (!data) return
-    setBundles(data.map(b => ({
-      ...b,
-      items: typeof b.items === 'string' ? JSON.parse(b.items) : (b.items || []),
-      bundlePrice: Number(b.bundle_price || 0)
-    })))
-  }
+  const categories = useMemo(() => {
+    const cats = [...new Set(products.filter(p => p.category).map(p => p.category))]
+    return ['all', ...cats.sort()]
+  }, [products])
 
-  const categories = useMemo(() => ['all', ...new Set(products.filter(p => p.category).map(p => p.category))], [products])
+  const catCounts = useMemo(() => {
+    const counts = { all: products.length }
+    products.forEach(p => { if (p.category) counts[p.category] = (counts[p.category] || 0) + 1 })
+    return counts
+  }, [products])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -111,13 +93,13 @@ export default function Catalog() {
       const existing = prev.find(c => c.id === product.id)
       if (existing) {
         const newQty = existing.qty + 1
-        const wp = Number(product.wholesale_price || 0)
-        const wm = Number(product.wholesale_min_qty || 0)
+        const wp = Number(product.wholesale_price || 0), wm = Number(product.wholesale_min_qty || 0)
         const price = (wp > 0 && wm > 0 && newQty >= wm) ? wp : Number(product.price)
         return prev.map(c => c.id === product.id ? { ...c, qty: newQty, price, isWholesale: wp > 0 && wm > 0 && newQty >= wm } : c)
       }
       return [...prev, { id: product.id, name: product.name, price: Number(product.price), retailPrice: Number(product.price), wholesalePrice: Number(product.wholesale_price || 0), wholesaleMinQty: Number(product.wholesale_min_qty || 0), qty: 1, image: product.image, isWholesale: false }]
     })
+    setToast('Added to order')
   }
 
   const updateQty = (id, delta) => {
@@ -126,8 +108,7 @@ export default function Catalog() {
       const newQty = Math.max(0, c.qty + delta)
       if (newQty === 0) return { ...c, qty: 0 }
       const isWholesale = c.wholesalePrice > 0 && c.wholesaleMinQty > 0 && newQty >= c.wholesaleMinQty
-      const price = isWholesale ? c.wholesalePrice : c.retailPrice
-      return { ...c, qty: newQty, price, isWholesale }
+      return { ...c, qty: newQty, price: isWholesale ? c.wholesalePrice : c.retailPrice, isWholesale }
     }).filter(c => c.qty > 0))
   }
 
@@ -136,13 +117,9 @@ export default function Catalog() {
 
   const orderViaWhatsApp = () => {
     if (cart.length === 0) return
-    const lines = ['Hi, I would like to order the following from EVERYTINROOM:']
-    lines.push('')
-    cart.forEach(c => {
-      lines.push(`- ${c.qty}x ${c.name}`)
-    })
-    lines.push('')
-    lines.push('Your invoice will be sent to you shortly. Thank you.')
+    const lines = ['Hi, I would like to order the following from EVERYTINROOM:', '']
+    cart.forEach(c => lines.push(`- ${c.qty}x ${c.name}`))
+    lines.push('', 'Your invoice will be sent to you shortly. Thank you.')
     const msg = lines.join('\n')
     const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent)
     if (isMobile) window.location.href = `whatsapp://send?phone=${SHOP_WHATSAPP}&text=${encodeURIComponent(msg)}`
@@ -158,22 +135,19 @@ export default function Catalog() {
 
   return (
     <div className="min-h-screen bg-[#f6f4ef]">
+      {toast && <Toast msg={toast} onDone={() => setToast('')} />}
+
       {/* Header */}
       <div className="bg-[#1a3d30] text-white relative overflow-hidden">
         <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full border border-white/5" />
-        <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full border border-white/5" />
         <div className="absolute -left-8 -bottom-8 w-32 h-32 rounded-full border border-white/5" />
-        <div className="absolute left-1/3 top-2 w-12 h-12 rounded-full bg-white/3" />
-
-        <div className="max-w-5xl mx-auto px-4 md:px-8 py-6 md:py-8 relative z-10">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>{SHOP.name}</h1>
-              <p className="text-white/40 text-sm mt-0.5">{SHOP.tagline} · {SHOP.address}</p>
-            </div>
-            <a href={`tel:${SHOP.phone.split('/')[0].trim().replace(/\s/g, '')}`} className="hidden md:flex h-10 px-5 bg-white/10 rounded-xl text-sm font-medium items-center gap-2 hover:bg-white/15 transition">
-              Call us · {SHOP.phone.split('/')[0].trim()}
-            </a>
+        <div className="max-w-5xl mx-auto px-4 md:px-8 py-6 relative z-10">
+          <h1 className="text-xl md:text-3xl font-extrabold tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>{SHOP.name}</h1>
+          <p className="text-white/40 text-sm mt-0.5">{SHOP.tagline} · {SHOP.address}</p>
+          {/* Mobile contact buttons */}
+          <div className="flex gap-2 mt-3 md:hidden">
+            <a href={`https://wa.me/${SHOP_WHATSAPP}`} className="h-9 px-4 bg-[#25d366] rounded-xl text-xs font-semibold flex items-center gap-1.5">WhatsApp</a>
+            <a href={`tel:${SHOP.phone.split('/')[0].trim().replace(/\s/g, '')}`} className="h-9 px-4 bg-white/10 rounded-xl text-xs font-semibold flex items-center gap-1.5">Call Us</a>
           </div>
         </div>
       </div>
@@ -182,16 +156,18 @@ export default function Catalog() {
         {/* Search */}
         <div className="relative mb-4">
           <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          <input className="w-full h-12 pl-11 pr-4 bg-white rounded-2xl text-sm font-medium placeholder:text-stone-300 focus:outline-none focus:ring-2 focus:ring-[#3d8b6a]/20 border border-stone-200/50"
+          <input className="w-full h-12 pl-11 pr-10 bg-white rounded-2xl text-sm font-medium placeholder:text-stone-300 focus:outline-none focus:ring-2 focus:ring-[#3d8b6a]/20 border border-stone-200/50"
             placeholder="Search products..." value={search} onChange={e => setSearch(e.target.value)} />
+          {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 bg-stone-100 rounded-full flex items-center justify-center text-stone-400 text-xs">✕</button>}
         </div>
 
-        {/* Categories */}
+        {/* Categories with counts */}
         <div className="flex gap-1.5 overflow-x-auto mb-5 scrollbar-hide pb-1">
           {categories.map(c => (
             <button key={c} onClick={() => setSelectedCat(c)}
-              className={`h-9 px-4 rounded-full text-xs font-semibold whitespace-nowrap transition ${selectedCat === c ? 'bg-[#1a3d30] text-white' : 'bg-white text-stone-400 hover:text-stone-600 border border-stone-200/50'}`}>
-              {c === 'all' ? 'All Products' : c}
+              className={`h-9 px-4 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${selectedCat === c ? 'bg-[#1a3d30] text-white' : 'bg-white text-stone-400 hover:text-stone-600 border border-stone-200/50'}`}>
+              {c === 'all' ? 'All' : c}
+              <span className={`text-[10px] ${selectedCat === c ? 'text-white/60' : 'text-stone-300'}`}>{catCounts[c] || 0}</span>
             </button>
           ))}
         </div>
@@ -209,7 +185,7 @@ export default function Catalog() {
                 return (
                   <div key={'promo-'+p.id} onClick={() => openProduct(p)} className="flex-shrink-0 w-36 bg-white rounded-2xl overflow-hidden cursor-pointer">
                     <div className="w-full h-24 bg-stone-100 overflow-hidden relative">
-                      {p.image ? <img src={thumb(p.image, 150)} alt="" className="w-full h-full object-cover" loading="lazy" /> : <div className="w-full h-full" />}
+                      {p.image ? <img src={thumb(p.image, 150)} alt="" className="w-full h-full object-cover" loading="lazy" /> : <div className="w-full h-full bg-stone-50" />}
                       <div className="absolute top-1.5 left-1.5 bg-red-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-md">PROMO</div>
                     </div>
                     <div className="p-2.5">
@@ -239,11 +215,11 @@ export default function Catalog() {
             <div key={p.id} className="bg-white rounded-2xl overflow-hidden group">
               <div onClick={() => openProduct(p)} className="cursor-pointer">
                 <div className="w-full aspect-[4/3] bg-stone-100 overflow-hidden relative">
-                  {p.image ? <img src={thumb(p.image)} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" /> : <div className="w-full h-full flex items-center justify-center text-stone-200 text-2xl">□</div>}
+                  {p.image ? <img src={thumb(p.image)} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" /> : <div className="w-full h-full bg-stone-50" />}
                   {promo && <div className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg">PROMO</div>}
                 </div>
                 <div className="p-3">
-                  <div className="text-[13px] font-semibold text-stone-800 leading-snug">{p.name}</div>
+                  <div className="text-[13px] font-semibold text-stone-800 leading-snug line-clamp-2">{p.name}</div>
                   {p.category && <div className="text-[11px] text-stone-400 mt-0.5">{p.category}</div>}
                   <div className="mt-1.5">
                     {promo && <div className="text-xs text-stone-400 line-through">{money(p.price)}</div>}
@@ -254,7 +230,7 @@ export default function Catalog() {
                 </div>
               </div>
               <div className="px-3 pb-3">
-                <button onClick={() => { addToCart({ ...p, price: displayPrice, originalPrice: p.price, isPromo: !!promo }); }} className="w-full h-9 bg-[#1a3d30] text-white rounded-xl text-xs font-semibold hover:bg-[#265a44] active:scale-[.97] transition">
+                <button onClick={() => addToCart({ ...p, price: displayPrice, originalPrice: p.price, isPromo: !!promo })} className="w-full h-10 bg-[#1a3d30] text-white rounded-xl text-xs font-semibold hover:bg-[#265a44] active:scale-[.97] transition">
                   Add to Order
                 </button>
               </div>
@@ -266,23 +242,33 @@ export default function Catalog() {
         {filtered.length === 0 && (
           <div className="text-center py-20">
             <p className="text-stone-400 text-sm">No products found</p>
+            {search && <button onClick={() => setSearch('')} className="mt-3 text-sm text-brand-600 font-medium">Clear search</button>}
           </div>
         )}
       </div>
 
-      {/* Floating Cart Button */}
-      {cartCount > 0 && (
-        <button onClick={() => setShowCart(true)} className="fixed bottom-5 right-5 h-16 px-7 bg-[#f97316] text-white rounded-2xl shadow-lg shadow-orange-500/30 flex items-center gap-3 font-extrabold text-base active:scale-95 transition z-50">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-          {cartCount} item{cartCount !== 1 ? 's' : ''} · {money(cartTotal)}
-        </button>
-      )}
+      {/* Floating buttons - Cart + WhatsApp */}
+      <div className="fixed bottom-5 right-5 flex flex-col gap-3 z-50">
+        {cartCount === 0 && (
+          <a href={`https://wa.me/${SHOP_WHATSAPP}`} className="w-14 h-14 bg-[#25d366] rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/20">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492l4.612-1.21A11.95 11.95 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75c-2.115 0-4.142-.588-5.904-1.699l-.424-.252-2.732.717.73-2.667-.276-.44A9.72 9.72 0 012.25 12C2.25 6.624 6.624 2.25 12 2.25S21.75 6.624 21.75 12 17.376 21.75 12 21.75z"/></svg>
+          </a>
+        )}
+        {cartCount > 0 && (
+          <button onClick={() => setShowCart(true)} className="h-16 px-7 bg-[#f97316] text-white rounded-2xl shadow-lg shadow-orange-500/30 flex items-center gap-3 font-extrabold text-base active:scale-95 transition">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+            {cartCount} item{cartCount !== 1 ? 's' : ''} · {money(cartTotal)}
+          </button>
+        )}
+      </div>
 
       {/* Cart Drawer */}
       {showCart && <div className="fixed inset-0 bg-black/40 z-[200]" onClick={() => setShowCart(false)} />}
       <div className={`fixed bottom-0 left-0 right-0 md:left-auto md:right-0 md:top-0 md:w-[400px] bg-white z-[201] flex flex-col transition-transform duration-300 rounded-t-3xl md:rounded-none max-h-[85vh] md:max-h-full shadow-2xl ${showCart ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:translate-y-0 md:translate-x-full'}`}>
-        <div className="flex items-center justify-between p-5 border-b border-stone-100">
-          <h3 className="text-lg font-bold">Your Order</h3>
+        {/* Drag handle on mobile */}
+        <div className="md:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 bg-stone-200 rounded-full" /></div>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-stone-100">
+          <h3 className="text-lg font-bold">Your Order <span className="text-sm text-stone-400 font-normal">({cartCount})</span></h3>
           <button onClick={() => setShowCart(false)} className="w-8 h-8 bg-stone-100 rounded-lg flex items-center justify-center">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
@@ -296,18 +282,18 @@ export default function Catalog() {
               {cart.map(c => (
                 <div key={c.id} className="flex items-center gap-3 p-3 bg-stone-50 rounded-xl">
                   <div className="w-12 h-12 bg-stone-100 rounded-lg overflow-hidden flex-shrink-0">
-                    {c.image ? <img src={thumb(c.image, 100)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-stone-300 text-sm">□</div>}
+                    {c.image ? <img src={thumb(c.image, 100)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-stone-50" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold truncate">{c.name}</div>
                     <div className="text-xs text-stone-400">{money(c.price)} each</div>
-                    {c.isWholesale && <div className="text-[10px] font-bold text-emerald-600 mt-0.5">Wholesale price applied</div>}
+                    {c.isWholesale && <div className="text-[10px] font-bold text-emerald-600 mt-0.5">Wholesale price</div>}
                     {!c.isWholesale && c.wholesaleMinQty > 0 && c.qty < c.wholesaleMinQty && <div className="text-[10px] text-stone-400 mt-0.5">Buy {c.wholesaleMinQty}+ for {money(c.wholesalePrice)} each</div>}
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => updateQty(c.id, -1)} className="w-8 h-8 border border-stone-300 rounded-lg text-sm font-bold flex items-center justify-center text-stone-600 hover:bg-stone-100 transition">−</button>
+                    <button onClick={() => updateQty(c.id, -1)} className="w-8 h-8 border border-stone-300 rounded-lg text-sm font-bold flex items-center justify-center text-stone-600">−</button>
                     <span className="text-sm font-bold w-6 text-center">{c.qty}</span>
-                    <button onClick={() => updateQty(c.id, 1)} className="w-8 h-8 border border-stone-300 rounded-lg text-sm font-bold flex items-center justify-center text-stone-600 hover:bg-stone-100 transition">+</button>
+                    <button onClick={() => updateQty(c.id, 1)} className="w-8 h-8 border border-stone-300 rounded-lg text-sm font-bold flex items-center justify-center text-stone-600">+</button>
                   </div>
                 </div>
               ))}
@@ -326,7 +312,7 @@ export default function Catalog() {
               <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492l4.612-1.21A11.95 11.95 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75c-2.115 0-4.142-.588-5.904-1.699l-.424-.252-2.732.717.73-2.667-.276-.44A9.72 9.72 0 012.25 12C2.25 6.624 6.624 2.25 12 2.25S21.75 6.624 21.75 12 17.376 21.75 12 21.75z"/></svg>
               Order on WhatsApp
             </button>
-            <button onClick={() => setCart([])} className="w-full h-9 text-stone-400 text-xs font-medium mt-3 hover:text-stone-600 transition">Clear order</button>
+            <button onClick={() => setCart([])} className="w-full h-9 text-stone-400 text-xs font-medium mt-3">Clear order</button>
           </div>
         )}
       </div>
@@ -342,13 +328,14 @@ export default function Catalog() {
           <div className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[480px] md:max-h-[85vh] bg-white rounded-3xl z-[301] overflow-hidden flex flex-col">
             <div className="flex-1 overflow-y-auto">
               <div className="w-full aspect-[4/3] bg-stone-100 overflow-hidden relative">
-                {viewProduct.image ? <img src={thumb(viewProduct.image, 500)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-stone-200 text-4xl">□</div>}
+                {viewProduct.image ? <img src={thumb(viewProduct.image, 500)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-stone-50" />}
                 <button onClick={() => closeProduct()} className="absolute top-4 right-4 w-9 h-9 bg-white/90 backdrop-blur rounded-xl flex items-center justify-center shadow-md">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
                 </button>
                 <button onClick={() => shareProduct(viewProduct)} className="absolute top-4 left-4 w-9 h-9 bg-white/90 backdrop-blur rounded-xl flex items-center justify-center shadow-md">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
                 </button>
+                {promo && <div className="absolute bottom-3 left-3 bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl">PROMO</div>}
               </div>
               <div className="p-5">
                 {viewProduct.category && <div className="text-xs text-stone-400 font-medium mb-1">{viewProduct.category}</div>}
@@ -366,17 +353,15 @@ export default function Catalog() {
                 {!promo && Number(viewProduct.wholesale_price || 0) > 0 && Number(viewProduct.wholesale_min_qty || 0) > 0 && (
                   <div className="mt-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
                     <div className="text-sm font-semibold text-emerald-700">Wholesale: {money(viewProduct.wholesale_price)} each</div>
-                    <div className="text-xs text-emerald-600">When you buy {viewProduct.wholesale_min_qty} or more pieces</div>
+                    <div className="text-xs text-emerald-600">When you buy {viewProduct.wholesale_min_qty} or more</div>
                   </div>
                 )}
 
-                {/* Share link */}
-                <button onClick={() => shareProduct(viewProduct)} className="flex items-center gap-2 mt-3 text-sm text-brand-600 font-medium">
+                <button onClick={() => shareProduct(viewProduct)} className="flex items-center gap-2 mt-3 text-sm font-medium text-[#3d8b6a]">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
                   Share this product
                 </button>
 
-                {/* You may also like */}
                 {related.length > 0 && (
                   <div className="mt-5 pt-4 border-t border-stone-100">
                     <h4 className="text-sm font-bold text-stone-700 mb-3">You may also like</h4>
@@ -395,7 +380,7 @@ export default function Catalog() {
                 )}
               </div>
             </div>
-            <div className="p-5 pt-0 border-t border-stone-100">
+            <div className="p-5 pt-3 border-t border-stone-100">
               <button onClick={() => { addToCart({ ...viewProduct, price: displayPrice, originalPrice: viewProduct.price, isPromo: !!promo }); closeProduct() }}
                 className="w-full h-12 bg-[#1a3d30] text-white rounded-2xl text-sm font-bold hover:bg-[#265a44] active:scale-[.98] transition">
                 Add to Order
@@ -412,10 +397,9 @@ export default function Catalog() {
           <h3 className="font-bold text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>{SHOP.name}</h3>
           <p className="text-white/40 text-sm mt-1">{SHOP.address}</p>
           <p className="text-white/40 text-sm">{SHOP.phone}</p>
-          <p className="text-white/40 text-sm">{SHOP.website}</p>
           <div className="flex justify-center gap-3 mt-4">
-            <a href={`https://wa.me/${SHOP_WHATSAPP}`} className="h-10 px-5 bg-white/10 rounded-xl text-sm font-medium flex items-center gap-2 hover:bg-white/15 transition">WhatsApp Us</a>
-            <a href={`tel:${SHOP.phone.split('/')[0].trim().replace(/\s/g, '')}`} className="h-10 px-5 bg-white/10 rounded-xl text-sm font-medium flex items-center gap-2 hover:bg-white/15 transition">Call Us</a>
+            <a href={`https://wa.me/${SHOP_WHATSAPP}`} className="h-11 px-6 bg-[#25d366] rounded-xl text-sm font-semibold flex items-center gap-2">WhatsApp Us</a>
+            <a href={`tel:${SHOP.phone.split('/')[0].trim().replace(/\s/g, '')}`} className="h-11 px-6 bg-white/10 rounded-xl text-sm font-semibold flex items-center gap-2">Call Us</a>
           </div>
         </div>
       </div>
