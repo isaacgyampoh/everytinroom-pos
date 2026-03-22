@@ -59,35 +59,22 @@ export default function CameraScanner({ products, onMatch, onClose }) {
     const productList = products.slice(0, 200).map(p => p.name + (p.category ? ` (${p.category})` : '')).join(', ')
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/scan-product', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 200,
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageData } },
-              { type: 'text', text: `You are a product scanner for a store called EVERYTINROOM. Look at this image carefully.
-
-First, read ANY text visible in the image - product labels, tags, stickers, handwriting, printed names, price tags, packaging text.
-
-Then match what you see (text OR the product itself) to these store products: ${productList}
-
-Return ONLY a JSON array of 1-3 matching product names EXACTLY as listed above. If no match, return [].` }
-            ]
-          }]
+          imageData,
+          productList
         })
       })
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}))
-        throw new Error(errData.error?.message || `API error ${res.status}`)
+      const data = await res.json()
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Scan failed')
       }
 
-      const data = await res.json()
-      const text = (data.content?.[0]?.text || '[]').replace(/```json|```/g, '').trim()
+      const text = (data.matches || '[]').replace(/```json|```/g, '').trim()
 
       let matches = []
       try { matches = JSON.parse(text) } catch {
