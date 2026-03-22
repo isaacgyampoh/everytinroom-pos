@@ -16,7 +16,14 @@ export default function CameraScanner({ products, onMatch, onClose }) {
   const startCamera = async () => {
     try {
       const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          focusMode: { ideal: 'continuous' },
+          autoGainControl: true,
+          exposureMode: { ideal: 'continuous' }
+        }
       })
       setStream(s)
       if (videoRef.current) {
@@ -25,7 +32,7 @@ export default function CameraScanner({ products, onMatch, onClose }) {
       }
       setStatus('Point camera at the product and tap Scan')
     } catch (e) {
-      setStatus('Camera access denied. Please allow camera access.')
+      setStatus('Camera access denied. Please allow camera access in your browser settings.')
     }
   }
 
@@ -41,14 +48,15 @@ export default function CameraScanner({ products, onMatch, onClose }) {
 
     const canvas = canvasRef.current
     const video = videoRef.current
-    canvas.width = 640
-    canvas.height = 480
+    // Capture at video's actual resolution
+    canvas.width = video.videoWidth || 1280
+    canvas.height = video.videoHeight || 720
     const ctx = canvas.getContext('2d')
-    ctx.drawImage(video, 0, 0, 640, 480)
-    const imageData = canvas.toDataURL('image/jpeg', 0.7).split(',')[1]
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    const imageData = canvas.toDataURL('image/jpeg', 0.85).split(',')[1]
 
-    // Build product list for AI
-    const productList = products.map(p => `- ${p.name} (${p.category || 'General'})`).join('\n')
+    // Build product list for matching
+    const productList = products.slice(0, 200).map(p => p.name + (p.category ? ` (${p.category})` : '')).join(', ')
 
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -56,58 +64,46 @@ export default function CameraScanner({ products, onMatch, onClose }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
-          max_tokens: 300,
+          max_tokens: 200,
           messages: [{
             role: 'user',
             content: [
-              {
-                type: 'image',
-                source: { type: 'base64', media_type: 'image/jpeg', data: imageData }
-              },
-              {
-                type: 'text',
-                text: `You are a product identification system for a home furnishing store called EVERYTINROOM. Look at this image and identify which product(s) from the store's inventory it matches.
-
-Here are ALL the products in the store:
-${productList}
-
-Rules:
-- Return ONLY a JSON array of the top 1-3 most likely matching product names from the list above
-- Match EXACTLY as spelled in the list
-- If you're not sure, return your best 2-3 guesses
-- If the image doesn't match any product, return an empty array []
-- Return ONLY the JSON array, nothing else
-
-Example response: ["16 pieces dinner set white", "16 pieces dinner set black"]`
-              }
+              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageData } },
+              { type: 'text', text: `Identify this product. Match it to one of these store products: ${productList}. Return ONLY a JSON array of 1-3 matching product names exactly as listed. If no match, return [].` }
             ]
           }]
         })
       })
 
-      const data = await res.json()
-      const text = data.content?.[0]?.text || '[]'
-      const clean = text.replace(/```json|```/g, '').trim()
-      
-      let matches = []
-      try { matches = JSON.parse(clean) } catch { matches = [] }
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error?.message || `API error ${res.status}`)
+      }
 
-      if (matches.length > 0) {
-        const matched = matches.map(name => products.find(p => p.name === name)).filter(Boolean)
-        if (matched.length === 1) {
-          setStatus(`Found: ${matched[0].name}`)
-          setSuggestions(matched)
-        } else if (matched.length > 1) {
-          setStatus('Select the correct product:')
+      const data = await res.json()
+      const text = (data.content?.[0]?.text || '[]').replace(/```json|```/g, '').trim()
+
+      let matches = []
+      try { matches = JSON.parse(text) } catch {
+        // Try to extract product names from text
+        const found = products.filter(p => text.toLowerCase().includes(p.name.toLowerCase()))
+        matches = found.slice(0, 3).map(p => p.name)
+      }
+
+      if (Array.isArray(matches) && matches.length > 0) {
+        const matched = matches.map(name => products.find(p => p.name === name || p.name.toLowerCase() === name.toLowerCase())).filter(Boolean)
+        if (matched.length >= 1) {
+          setStatus(matched.length === 1 ? `Found: ${matched[0].name}` : 'Select the correct product:')
           setSuggestions(matched)
         } else {
-          setStatus('Could not identify. Try again or search manually.')
+          setStatus('Product not recognized. Try moving closer or adjusting the angle.')
         }
       } else {
-        setStatus('Could not identify. Try again or search manually.')
+        setStatus('Product not recognized. Try again.')
       }
     } catch (e) {
-      setStatus('Error identifying. Check your connection.')
+      console.error('Scan error:', e)
+      setStatus('Could not identify. Try again.')
     }
     setScanning(false)
   }
@@ -124,21 +120,29 @@ Example response: ["16 pieces dinner set white", "16 pieces dinner set black"]`
       <div className="flex-1 relative overflow-hidden">
         <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
         <canvas ref={canvasRef} className="hidden" />
-        
-        {/* Scan frame overlay */}
+
+        {/* Scan frame */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-64 h-64 border-2 border-white/40 rounded-3xl relative">
-            <div className="absolute -top-0.5 -left-0.5 w-8 h-8 border-t-3 border-l-3 border-white rounded-tl-2xl" />
-            <div className="absolute -top-0.5 -right-0.5 w-8 h-8 border-t-3 border-r-3 border-white rounded-tr-2xl" />
-            <div className="absolute -bottom-0.5 -left-0.5 w-8 h-8 border-b-3 border-l-3 border-white rounded-bl-2xl" />
-            <div className="absolute -bottom-0.5 -right-0.5 w-8 h-8 border-b-3 border-r-3 border-white rounded-br-2xl" />
+          <div className="w-72 h-72 relative">
+            <div className="absolute -top-0.5 -left-0.5 w-10 h-10 border-t-[3px] border-l-[3px] border-white rounded-tl-2xl" />
+            <div className="absolute -top-0.5 -right-0.5 w-10 h-10 border-t-[3px] border-r-[3px] border-white rounded-tr-2xl" />
+            <div className="absolute -bottom-0.5 -left-0.5 w-10 h-10 border-b-[3px] border-l-[3px] border-white rounded-bl-2xl" />
+            <div className="absolute -bottom-0.5 -right-0.5 w-10 h-10 border-b-[3px] border-r-[3px] border-white rounded-br-2xl" />
+            {scanning && <div className="absolute top-0 left-0 right-0 h-0.5 bg-[#f97316] animate-pulse" />}
           </div>
         </div>
 
-        {/* Close button */}
-        <button onClick={() => { stopCamera(); onClose() }} className="absolute top-5 right-5 w-10 h-10 bg-black/40 backdrop-blur rounded-xl flex items-center justify-center text-white safe-top">
+        {/* Close */}
+        <button onClick={() => { stopCamera(); onClose() }} className="absolute top-5 right-5 w-10 h-10 bg-black/50 backdrop-blur-sm rounded-xl flex items-center justify-center text-white">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
+
+        {/* Tip */}
+        <div className="absolute top-5 left-5 right-16 safe-top">
+          <div className="bg-black/50 backdrop-blur-sm rounded-xl px-3 py-2">
+            <p className="text-white/80 text-xs">Hold the product inside the frame, then tap Scan</p>
+          </div>
+        </div>
       </div>
 
       {/* Bottom panel */}
@@ -147,18 +151,18 @@ Example response: ["16 pieces dinner set white", "16 pieces dinner set black"]`
 
         {/* Suggestions */}
         {suggestions.length > 0 && (
-          <div className="space-y-2 mb-4">
+          <div className="space-y-2 mb-4 max-h-44 overflow-y-auto">
             {suggestions.map(p => (
               <button key={p.id} onClick={() => selectProduct(p)}
                 className="w-full flex items-center gap-3 p-3 bg-white/10 rounded-xl text-left active:bg-white/20 transition">
                 <div className="w-12 h-12 bg-white/10 rounded-lg overflow-hidden flex-shrink-0">
-                  {p.image ? <img src={p.image + '?width=100&quality=60'} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full" />}
+                  {p.image ? <img src={p.image + '?width=100&quality=60'} alt="" className="w-full h-full object-cover" /> : null}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-white text-sm font-semibold truncate">{p.name}</div>
-                  <div className="text-white/40 text-xs">{p.category}</div>
+                  <div className="text-white/40 text-xs">{p.category || ''}</div>
                 </div>
-                <div className="text-white font-bold text-sm">Add</div>
+                <div className="text-[#f97316] font-bold text-sm flex-shrink-0">Add</div>
               </button>
             ))}
           </div>
