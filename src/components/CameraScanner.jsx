@@ -69,7 +69,13 @@ export default function CameraScanner({ products, onMatch, onClose }) {
             role: 'user',
             content: [
               { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageData } },
-              { type: 'text', text: `Identify this product. Match it to one of these store products: ${productList}. Return ONLY a JSON array of 1-3 matching product names exactly as listed. If no match, return [].` }
+              { type: 'text', text: `You are a product scanner for a store called EVERYTINROOM. Look at this image carefully.
+
+First, read ANY text visible in the image - product labels, tags, stickers, handwriting, printed names, price tags, packaging text.
+
+Then match what you see (text OR the product itself) to these store products: ${productList}
+
+Return ONLY a JSON array of 1-3 matching product names EXACTLY as listed above. If no match, return [].` }
             ]
           }]
         })
@@ -140,7 +146,7 @@ export default function CameraScanner({ products, onMatch, onClose }) {
         {/* Tip */}
         <div className="absolute top-5 left-5 right-16 safe-top">
           <div className="bg-black/50 backdrop-blur-sm rounded-xl px-3 py-2">
-            <p className="text-white/80 text-xs">Hold the product inside the frame, then tap Scan</p>
+            <p className="text-white/80 text-xs">Point at the product or its name tag, then tap Scan</p>
           </div>
         </div>
       </div>
