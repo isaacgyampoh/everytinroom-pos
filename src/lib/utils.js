@@ -21,9 +21,9 @@ export const SHOP = {
 
 export const ADMIN_PIN = null // Admin PIN verified server-side via verify_pin()
 
-// Generate thumbnail URL for Supabase images
-export const thumb = (url, w = 200) => {
+// Generate thumbnail URL for Supabase images - low quality to save bandwidth
+export const thumb = (url, w = 120) => {
   if (!url) return ''
-  if (url.includes('supabase')) return url + (url.includes('?') ? '&' : '?') + `width=${w}&quality=60`
+  if (url.includes('supabase')) return url + (url.includes('?') ? '&' : '?') + `width=${w}&quality=40`
   return url
 }

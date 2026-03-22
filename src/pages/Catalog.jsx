@@ -5,7 +5,7 @@ import { SHOP } from '../lib/utils'
 const money = v => 'GHS ' + Number(v || 0).toFixed(2)
 const thumb = (url, w = 300) => {
   if (!url) return ''
-  if (url.includes('supabase')) return url + (url.includes('?') ? '&' : '?') + `width=${w}&quality=70`
+  if (url.includes('supabase')) return url + (url.includes('?') ? '&' : '?') + `width=${w}&quality=40`
   return url
 }
 
@@ -184,7 +184,7 @@ export default function Catalog() {
                 return (
                   <div key={'promo-'+p.id} onClick={() => openProduct(p)} className="flex-shrink-0 w-36 bg-white rounded-2xl overflow-hidden cursor-pointer">
                     <div className="w-full h-24 bg-stone-100 overflow-hidden relative">
-                      {p.image ? <img src={thumb(p.image, 150)} alt="" className="w-full h-full object-cover" loading="lazy" /> : <div className="w-full h-full bg-stone-50" />}
+                      {p.image ? <img src={thumb(p.image, 100)} alt="" className="w-full h-full object-cover" loading="lazy" /> : <div className="w-full h-full bg-stone-50" />}
                       <div className="absolute top-1.5 left-1.5 bg-red-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-md">PROMO</div>
                     </div>
                     <div className="p-2.5">
@@ -214,7 +214,7 @@ export default function Catalog() {
             <div key={p.id} className="bg-white rounded-2xl overflow-hidden group">
               <div onClick={() => openProduct(p)} className="cursor-pointer">
                 <div className="w-full aspect-[4/3] bg-stone-100 overflow-hidden relative">
-                  {p.image ? <img src={thumb(p.image)} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" /> : <div className="w-full h-full bg-stone-50" />}
+                  {p.image ? <img src={thumb(p.image, 200)} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" /> : <div className="w-full h-full bg-stone-50" />}
                   {promo && <div className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg">PROMO</div>}
                 </div>
                 <div className="p-3">
@@ -328,7 +328,7 @@ export default function Catalog() {
           <div className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[480px] md:max-h-[85vh] bg-white rounded-3xl z-[301] overflow-hidden flex flex-col">
             <div className="flex-1 overflow-y-auto">
               <div className="w-full aspect-[4/3] bg-stone-100 overflow-hidden relative">
-                {viewProduct.image ? <img src={thumb(viewProduct.image, 500)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-stone-50" />}
+                {viewProduct.image ? <img src={thumb(viewProduct.image, 300)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-stone-50" />}
                 <button onClick={() => closeProduct()} className="absolute top-4 right-4 w-9 h-9 bg-white/90 backdrop-blur rounded-xl flex items-center justify-center shadow-md">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
                 </button>
@@ -369,7 +369,7 @@ export default function Catalog() {
                       {related.map(r => (
                         <div key={r.id} onClick={() => openProduct(r)} className="flex-shrink-0 w-28 cursor-pointer">
                           <div className="w-28 h-20 bg-stone-100 rounded-xl overflow-hidden">
-                            <img src={thumb(r.image, 150)} alt="" className="w-full h-full object-cover" loading="lazy" />
+                            <img src={thumb(r.image, 80)} alt="" className="w-full h-full object-cover" loading="lazy" />
                           </div>
                           <div className="text-[11px] font-semibold text-stone-700 mt-1.5 leading-tight line-clamp-2">{r.name}</div>
                           <div className="text-[11px] font-extrabold text-[#1a3d30]">{money(r.price)}</div>
