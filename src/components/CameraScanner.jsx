@@ -96,7 +96,7 @@ export default function CameraScanner({ products, onMatch, onClose }) {
       }
     } catch (e) {
       console.error('Scan error:', e)
-      setStatus('Could not identify. Try again.')
+      setStatus('Error: ' + (e.message || 'Unknown error'))
     }
     setScanning(false)
   }
