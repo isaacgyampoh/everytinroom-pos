@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_API_KEY') || ''
+const OPENAI_KEY = Deno.env.get('OPENAI_API_KEY') || ''
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -18,24 +18,23 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Missing image or product list' }), { headers: CORS, status: 400 })
     }
 
-    if (!ANTHROPIC_KEY) {
+    if (!OPENAI_KEY) {
       return new Response(JSON.stringify({ error: 'API key not configured' }), { headers: CORS, status: 500 })
     }
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_KEY,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${OPENAI_KEY}`,
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'gpt-4o-mini',
         max_tokens: 200,
         messages: [{
           role: 'user',
           content: [
-            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageData } },
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageData}`, detail: 'low' } },
             { type: 'text', text: `You are a product scanner for a store called EVERYTINROOM. Look at this image carefully.
 
 First, read ANY text visible in the image - product labels, tags, stickers, handwriting, printed names, price tags, packaging text.
@@ -54,7 +53,7 @@ Return ONLY a JSON array of 1-3 matching product names EXACTLY as listed above. 
       return new Response(JSON.stringify({ error: data.error?.message || 'AI API error' }), { headers: CORS, status: 500 })
     }
 
-    const text = (data.content?.[0]?.text || '[]').replace(/```json|```/g, '').trim()
+    const text = (data.choices?.[0]?.message?.content || '[]').replace(/```json|```/g, '').trim()
     return new Response(JSON.stringify({ matches: text }), { headers: CORS })
 
   } catch (e) {
