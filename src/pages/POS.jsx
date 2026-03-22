@@ -2,7 +2,6 @@ import { useState, useMemo, memo } from 'react'
 import { useStore } from '../hooks/useStore'
 import { money, num, today, thumb } from '../lib/utils'
 import toast from 'react-hot-toast'
-import CameraScanner from '../components/CameraScanner'
 
 const ProductCard = memo(({ item, price, hasPromo, onAdd }) => {
   const qty = item.quantity
@@ -32,7 +31,6 @@ const ProductCard = memo(({ item, price, hasPromo, onAdd }) => {
 export default function POS() {
   const { products, bundles, promos, mode, setMode, selectedCat, setCat, addToCart } = useStore()
   const [query, setQuery] = useState('')
-  const [showScanner, setShowScanner] = useState(false)
 
   const categories = useMemo(() => ['all', ...new Set(products.filter(p => p.category).map(p => p.category))], [products])
 
@@ -82,22 +80,14 @@ export default function POS() {
         </div>
       )}
 
-      {/* Search + Scan */}
-      <div className="flex gap-2 mt-5 mb-4">
-        <div className="relative flex-1">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 text-lg">⌕</span>
-          <input className="w-full h-12 md:h-13 pl-12 pr-4 bg-white rounded-2xl text-sm font-medium placeholder:text-stone-300 focus:outline-none focus:ring-2 focus:ring-brand-400/30" placeholder="Search or scan barcode..." value={query}
-            onChange={e => { setQuery(e.target.value); const v = e.target.value.trim(); if (v.length > 3) { const ex = products.find(p => p.name.toLowerCase() === v.toLowerCase()); if (ex && searchAdd(ex)) setQuery('') } }}
-            onKeyDown={e => { if (e.key === 'Enter' && query.trim() && filtered[0] && mode !== 'bundle') { if (searchAdd(filtered[0])) setQuery('') } }}
-          />
-        </div>
-        <button onClick={() => setShowScanner(true)} className="w-12 h-12 md:h-13 bg-white rounded-2xl flex items-center justify-center text-stone-500 hover:text-brand-600 hover:bg-brand-50 transition flex-shrink-0" title="Scan product with camera">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-        </button>
+      {/* Search */}
+      <div className="relative mt-5 mb-4">
+        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 text-lg">⌕</span>
+        <input className="w-full h-12 md:h-13 pl-12 pr-4 bg-white rounded-2xl text-sm font-medium placeholder:text-stone-300 focus:outline-none focus:ring-2 focus:ring-brand-400/30" placeholder="Search or scan barcode..." value={query}
+          onChange={e => { setQuery(e.target.value); const v = e.target.value.trim(); if (v.length > 3) { const ex = products.find(p => p.name.toLowerCase() === v.toLowerCase()); if (ex && searchAdd(ex)) setQuery('') } }}
+          onKeyDown={e => { if (e.key === 'Enter' && query.trim() && filtered[0] && mode !== 'bundle') { if (searchAdd(filtered[0])) setQuery('') } }}
+        />
       </div>
-
-      {/* Camera Scanner */}
-      {showScanner && <CameraScanner products={products} onMatch={(p) => { const pr = getPrice(p); if (addToCart({ productId: p.id, name: p.name, price: pr, costPrice: p.costPrice, image: p.image, originalPrice: p.price, isPromo: !!promoPriceMap[p.id] })) toast.success(p.name + ' added') }} onClose={() => setShowScanner(false)} />}
 
       {/* Modes */}
       <div className="flex gap-2 mb-3">
