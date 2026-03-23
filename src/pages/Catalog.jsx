@@ -74,7 +74,7 @@ export default function Catalog() {
         <div className="max-w-6xl mx-auto px-4 py-12 md:py-16 relative z-10">
           <p className="text-green-400 text-xs font-semibold tracking-[0.2em] uppercase mb-3">{SHOP.address}</p>
           <h1 className="text-white text-3xl md:text-5xl font-bold leading-tight mb-3" style={{ fontFamily: "'Playfair Display', serif" }}>Home essentials,<br />delivered to you.</h1>
-          <p className="text-green-300/60 text-sm md:text-base max-w-md mb-6">Quality cookware, curtains, bedding and more. Browse, pick, and order via WhatsApp.</p>
+          <p className="text-green-300/60 text-sm md:text-base max-w-md mb-6">Quality cookware, curtains, bedding and more. Nationwide delivery across Ghana.</p>
           <div className="relative max-w-lg">
             <svg className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round"/></svg>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="What are you looking for?" className="w-full h-12 pl-11 pr-10 bg-white/10 border border-white/10 rounded-xl text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-green-400/40 focus:bg-white/15 transition" />
@@ -133,7 +133,7 @@ export default function Catalog() {
           {[
             ['How do I place an order?', 'Browse products, tap "Add to Order", then tap the cart button and click "Order on WhatsApp". We will send your invoice shortly after.'],
             ['What payment methods do you accept?', 'We accept Mobile Money (MTN, Vodafone, AirtelTigo) and card payments through a secure payment link.'],
-            ['Do you offer delivery?', 'Yes. We deliver across Accra and surrounding areas. Delivery fees are based on your location.'],
+            ['Do you offer delivery?', 'Yes. We deliver nationwide across Ghana. Delivery fees are based on your location.'],
             ['Do you have wholesale prices?', 'Yes. Buy in bulk on selected products to get reduced wholesale pricing automatically.'],
           ].map(([q, a], i) => <div key={i} onClick={() => setFaq(faq === i ? null : i)} className={`mb-2 rounded-2xl cursor-pointer transition-all ${faq === i ? 'bg-green-50 border border-green-100' : 'bg-stone-50 border border-transparent hover:bg-stone-100'}`}>
             <div className="flex justify-between items-center px-5 py-4">
@@ -151,7 +151,7 @@ export default function Catalog() {
           <div className="flex flex-wrap gap-10 mb-8">
             <div className="flex-1 min-w-[200px]">
               <h3 className="text-lg font-bold mb-2">Everytin Room</h3>
-              <p className="text-xs text-stone-500 leading-relaxed max-w-xs">Quality home furnishings — cookware, curtains, bedding and more. Serving Adenta and Accra at the best prices.</p>
+              <p className="text-xs text-stone-500 leading-relaxed max-w-xs">Quality home furnishings — cookware, curtains, bedding and more. Nationwide delivery across Ghana.</p>
             </div>
             <div>
               <h4 className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-3">Useful Links</h4>
