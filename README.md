@@ -12,7 +12,7 @@ Supabase database + Vercel hosting + mNotify SMS reports.
 
 ---
 
-## 🚀 SETUP (5 steps)
+##  SETUP (5 steps)
 
 ### 1. Supabase Database
 - Go to Supabase Dashboard → **SQL Editor** → New Query
@@ -48,7 +48,7 @@ vercel
 
 ---
 
-## 📁 Structure
+##  Structure
 ```
 src/
 ├── App.jsx              # Main app + routing
@@ -90,16 +90,16 @@ supabase/
 ---
 
 ## Features
-- 🛒 POS with Retail/Wholesale/Bundle modes
-- 📱 WhatsApp orders with Paystack integration (realtime)
-- 🧾 Thermal receipt printing
-- 📊 Dashboard with live stats
-- 👥 Staff performance tracking
-- ↩️ Refund processing with stock restoration
-- 💸 Expense tracking
-- 🎁 Product bundles
-- 📈 Daily/weekly/monthly reports
-- 📲 SMS reports (mNotify) via pg_cron
-- 🔑 PIN-based auth (admin: 1024)
+-  POS with Retail/Wholesale/Bundle modes
+-  WhatsApp orders with Paystack integration (realtime)
+- Thermal receipt printing
+-  Dashboard with live stats
+- Staff performance tracking
+- Refund processing with stock restoration
+-  Expense tracking
+-  Product bundles
+-  Daily/weekly/monthly reports
+-  SMS reports (mNotify) via pg_cron
+-  PIN-based auth (admin: 1024)
 - ⚡ Realtime updates via Supabase WebSockets
-- 📱 Mobile-first responsive design
+-  Mobile-first responsive design
