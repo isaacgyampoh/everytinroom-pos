@@ -221,88 +221,44 @@ export default function Catalog() {
 
       {/* Product modal */}
       {view && (() => {
-        const rel = products.filter(p => p.id !== view.id && p.category && view.category && p.category === view.category && p.image).slice(0, 6)
+        const rel = products.filter(p => p.id !== view.id && p.category && view.category && p.category === view.category && p.image).slice(0, 4)
         const pr = promoMap[view.id], dp = pr ? pr.price : view.price
-        const hw = !pr && Number(view.wholesale_price || 0) > 0 && Number(view.wholesale_min_qty || 0) > 0
         return <>
           <div onClick={close} className="fixed inset-0 bg-black/50 z-[300]" />
-          <div className="fixed inset-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[460px] md:max-h-[90vh] bg-stone-50 md:rounded-3xl z-[301] overflow-hidden flex flex-col">
+          <div className="fixed inset-3 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[460px] md:max-h-[85vh] bg-white rounded-3xl z-[301] overflow-hidden flex flex-col shadow-2xl">
             <div className="flex-1 overflow-y-auto">
-
-              {/* Hero image card with overlay */}
-              <div className="relative mx-3 mt-3 rounded-2xl overflow-hidden" style={{ aspectRatio: '4/3' }}>
-                {view.image ? <img src={thumb(view.image, 500)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-stone-200" />}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-
-                {/* Back button */}
-                <button onClick={close} className="absolute top-3 left-3 w-9 h-9 bg-black/30 backdrop-blur-md rounded-full flex items-center justify-center text-white">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+              <div className="w-full aspect-square bg-stone-100 relative">
+                {view.image ? <img src={thumb(view.image, 400)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-stone-50" />}
+                <button onClick={close} className="absolute top-3 right-3 w-9 h-9 bg-white/90 backdrop-blur rounded-xl flex items-center justify-center text-stone-500 text-sm shadow">✕</button>
+                <button onClick={() => share(view)} className="absolute top-3 left-3 w-9 h-9 bg-white/90 backdrop-blur rounded-xl flex items-center justify-center shadow">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
                 </button>
-
-                {/* Share button */}
-                <button onClick={() => share(view)} className="absolute top-3 right-3 w-9 h-9 bg-black/30 backdrop-blur-md rounded-full flex items-center justify-center">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
-                </button>
-
-                {/* Price overlay */}
-                <div className="absolute bottom-3 left-3 right-3">
-                  <div className="flex items-end justify-between">
-                    <div>
-                      {pr && <span className="text-white/60 text-sm line-through mr-2">{money(view.price)}</span>}
-                      <span className="text-white text-xl font-bold">{money(dp)}</span>
-                    </div>
-                    {pr && <span className="bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-full">PROMO</span>}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {view.category && <span className="bg-white/15 backdrop-blur-sm text-white text-[11px] px-2.5 py-1 rounded-full">{view.category}</span>}
-                    {hw && <span className="bg-green-500/80 text-white text-[11px] px-2.5 py-1 rounded-full">Wholesale available</span>}
-                  </div>
-                </div>
+                {pr && <div className="absolute bottom-3 left-3 bg-red-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl">{pr.name}</div>}
               </div>
-
-              {/* Thumbnail strip */}
-              {rel.length > 0 && <div className="flex gap-1.5 px-3 mt-3 overflow-x-auto scrollbar-hide">
-                <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 ring-2 ring-green-500">{view.image ? <img src={thumb(view.image, 80)} alt="" className="w-full h-full object-cover" /> : null}</div>
-                {rel.slice(0, 5).map(r => <div key={r.id} onClick={() => open(r)} className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 cursor-pointer opacity-60 hover:opacity-100 transition"><img src={thumb(r.image, 80)} alt="" className="w-full h-full object-cover" /></div>)}
-              </div>}
-
-              {/* Product info */}
-              <div className="px-4 pt-4 pb-2">
-                <h2 className="text-lg font-bold text-stone-900 leading-snug">{view.name}</h2>
-
-                {pr && <div className="mt-3 bg-red-50 rounded-xl px-3.5 py-2.5 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-semibold text-red-700">{pr.name}</p>
-                    <p className="text-[11px] text-red-500">Save {money(view.price - pr.price)} on this item</p>
+              <div className="p-5">
+                {view.category && <p className="text-xs text-stone-400 mb-1">{view.category}</p>}
+                <h2 className="text-lg font-bold text-stone-900 mb-2">{view.name}</h2>
+                {pr && <p className="text-sm text-stone-400 line-through">{money(view.price)}</p>}
+                <p className={`text-2xl font-bold ${pr ? 'text-red-600' : 'text-stone-900'}`}>{money(dp)}</p>
+                {pr && <div className="mt-2 bg-red-50 rounded-xl px-3 py-2 text-xs text-red-600 font-medium">Save {money(view.price - pr.price)}</div>}
+                {!pr && Number(view.wholesale_price || 0) > 0 && Number(view.wholesale_min_qty || 0) > 0 && <div className="mt-2 bg-green-50 rounded-xl px-3 py-2"><p className="text-xs text-green-700 font-semibold">Wholesale: {money(view.wholesale_price)} each</p><p className="text-[11px] text-green-600">Buy {view.wholesale_min_qty}+ pieces</p></div>}
+                <button onClick={() => share(view)} className="flex items-center gap-1.5 mt-3 text-xs text-green-700 font-medium">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>Share
+                </button>
+                {rel.length > 0 && <div className="mt-5 pt-4 border-t border-stone-100">
+                  <h4 className="text-xs font-bold text-stone-800 mb-3 uppercase tracking-wider">You may also like</h4>
+                  <div className="flex gap-2.5 overflow-x-auto scrollbar-hide">
+                    {rel.map(r => <div key={r.id} onClick={() => open(r)} className="flex-shrink-0 w-24 cursor-pointer">
+                      <div className="w-24 h-20 bg-stone-100 rounded-lg overflow-hidden"><img src={thumb(r.image, 100)} alt="" className="w-full h-full object-cover" loading="lazy" /></div>
+                      <p className="text-[10px] font-medium text-stone-700 mt-1.5 line-clamp-2">{r.name}</p>
+                      <p className="text-[10px] font-bold text-stone-900">{money(r.price)}</p>
+                    </div>)}
                   </div>
                 </div>}
-
-                {hw && <div className="mt-3 bg-green-50 rounded-xl px-3.5 py-2.5">
-                  <p className="text-xs font-semibold text-green-800">Wholesale: {money(view.wholesale_price)} each</p>
-                  <p className="text-[11px] text-green-600">When you buy {view.wholesale_min_qty} or more pieces</p>
-                </div>}
               </div>
-
-              {/* You may also like */}
-              {rel.length > 0 && <div className="px-4 pt-3 pb-4">
-                <h4 className="text-sm font-bold text-stone-800 mb-3">You may also like</h4>
-                <div className="grid grid-cols-3 gap-2">
-                  {rel.slice(0, 3).map(r => <div key={r.id} onClick={() => open(r)} className="cursor-pointer">
-                    <div className="w-full aspect-square bg-stone-100 rounded-xl overflow-hidden"><img src={thumb(r.image, 120)} alt="" className="w-full h-full object-cover" loading="lazy" /></div>
-                    <p className="text-[11px] font-medium text-stone-700 mt-1.5 line-clamp-1">{r.name}</p>
-                    <p className="text-[11px] font-bold text-stone-900">{money(r.price)}</p>
-                  </div>)}
-                </div>
-              </div>}
             </div>
-
-            {/* Sticky bottom bar */}
-            <div className="bg-white border-t border-stone-200 px-4 py-3 flex items-center gap-3 safe-bottom">
-              <div className="flex-1">
-                {pr && <p className="text-[10px] text-stone-400 line-through">{money(view.price)}</p>}
-                <p className={`text-lg font-bold ${pr ? 'text-red-600' : 'text-stone-900'}`}>{money(dp)}</p>
-              </div>
-              <button onClick={() => { add({ ...view, price: dp }); close() }} className="h-12 px-8 bg-green-600 hover:bg-green-700 text-white rounded-full text-sm font-bold transition-colors">Add to Order</button>
+            <div className="p-4 border-t border-stone-100">
+              <button onClick={() => { add({ ...view, price: dp }); close() }} className="w-full h-12 bg-stone-900 hover:bg-green-800 text-white rounded-xl text-sm font-semibold transition-colors">Add to Order</button>
             </div>
           </div>
         </>
