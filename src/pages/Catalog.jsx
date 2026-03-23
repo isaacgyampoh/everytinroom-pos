@@ -258,15 +258,6 @@ export default function Catalog() {
         </div>
       </div>
 
-      {/* CTA BANNER */}
-      <div style={{ background:`linear-gradient(135deg, ${C.bright} 0%, ${C.lime} 50%, ${C.lightLime} 100%)`,padding:'48px 20px',textAlign:'center',position:'relative',overflow:'hidden' }}>
-        <div style={{ position:'absolute',right:-30,top:-30,width:120,height:120,borderRadius:'50%',background:'rgba(255,255,255,0.15)' }} />
-        <div style={{ position:'absolute',left:-20,bottom:-20,width:100,height:100,borderRadius:'50%',background:'rgba(22,101,52,0.08)' }} />
-        <div style={{ position:'relative',zIndex:1 }}>
-          <h2 style={{ fontSize:28,fontWeight:800,color:C.dark,margin:'0 0 8px' }}>Your One Stop Shop</h2>
-          <p style={{ fontSize:14,color:C.mid,margin:'0 0 24px' }}>Quality home furnishings at the best prices</p>
-          <a href={`tel:${SHOP.phone.split('/')[0].trim().replace(/\s/g,'')}`} style={{ display:'inline-flex',alignItems:'center',gap:8,background:C.dark,color:'#fff',padding:'14px 32px',borderRadius:50,fontSize:14,fontWeight:700,textDecoration:'none',boxShadow:'0 4px 15px rgba(22,101,52,0.3)' }}>Call to Order</a>
-        </div>
       </div>
 
       {/* FOOTER */}
@@ -280,9 +271,10 @@ export default function Catalog() {
             <div style={{ flex:'0 0 auto' }}>
               <h4 style={{ fontSize:13,fontWeight:700,margin:'0 0 12px',opacity:0.5,textTransform:'uppercase',letterSpacing:1 }}>Quick Links</h4>
               <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
-                <span style={{ fontSize:13,opacity:0.7 }}>Home</span>
-                <span style={{ fontSize:13,opacity:0.7 }}>Products</span>
-                <span style={{ fontSize:13,opacity:0.7 }}>Wholesale</span>
+                <span style={{ fontSize:13,opacity:0.7 }}>Our Products</span>
+                <span style={{ fontSize:13,opacity:0.7 }}>How to Order</span>
+                <span style={{ fontSize:13,opacity:0.7 }}>FAQs</span>
+                <span style={{ fontSize:13,opacity:0.7 }}>{SHOP.website}</span>
               </div>
             </div>
             <div style={{ flex:'0 0 auto' }}>
