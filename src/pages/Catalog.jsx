@@ -162,22 +162,13 @@ export default function Catalog() {
           <div className="flex flex-wrap gap-10 mb-8">
             <div className="flex-1 min-w-[200px]">
               <h3 className="text-lg font-bold mb-2 text-white">EVERYTINROOM&BEDTIME</h3>
-              <p className="text-xs text-stone-500 leading-relaxed max-w-xs">Quality home furnishings — cookware, curtains, bedding and more. Nationwide delivery across Ghana.</p>
-            </div>
-            <div>
-              <h4 className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-3">Useful Links</h4>
-              <div className="flex flex-col gap-2 text-xs text-stone-400">
-                <span>Our Products</span>
-                <span>How to Order</span>
-                <span>FAQs</span>
-              </div>
+              <p className="text-xs text-stone-500 leading-relaxed max-w-xs">Quality home furnishings — cookware, curtains, bedding, kitchenware and more. Nationwide delivery across Ghana.</p>
             </div>
             <div>
               <h4 className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-3">Contact</h4>
               <div className="flex flex-col gap-2 text-xs text-stone-400">
                 <span>{SHOP.phone}</span>
                 <span>{SHOP.address}</span>
-                <span>{SHOP.website}</span>
               </div>
             </div>
           </div>
