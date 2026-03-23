@@ -142,10 +142,10 @@ export default function Catalog() {
           <h2 className="text-2xl md:text-3xl font-bold text-center text-stone-900 mb-1" style={{ fontFamily: "'Playfair Display', serif" }}>Got Questions?</h2>
           <p className="text-2xl md:text-3xl font-bold text-center text-stone-900 mb-8" style={{ fontFamily: "'Playfair Display', serif" }}>We've Got Answers.</p>
           {[
-            ['How do I place an order?', 'Browse products, tap "Add to Order", then tap the cart button and click "Order on WhatsApp". We will send your invoice shortly after.'],
-            ['What payment methods do you accept?', 'We accept Mobile Money (MTN, Vodafone, AirtelTigo) and card payments through a secure payment link.'],
-            ['Do you offer delivery?', 'Yes. We deliver nationwide across Ghana. Delivery fees are based on your location.'],
-            ['Do you have wholesale prices?', 'Yes. Buy in bulk on selected products to get reduced wholesale pricing automatically.'],
+            ['How do I place an order?', 'Browse our products and tap "Add to Order" on the items you want. Tap the cart button and click "Order on WhatsApp" — this opens our official WhatsApp number where you send your order. An invoice will be sent to you immediately. Click on your invoice to fill in your delivery details and make payment. We then package and deliver your order.'],
+            ['What payment methods do you accept?', 'We accept Mobile Money (MTN, Vodafone, AirtelTigo) and card payments. You will receive a secure payment link with your invoice.'],
+            ['Do you offer delivery?', 'Yes. We deliver nationwide across Ghana. Delivery fees depend on your location and will be communicated after your order is confirmed.'],
+            ['Do you have wholesale prices?', 'Yes. Selected products have reduced prices when you buy in bulk. The wholesale price applies automatically when you reach the minimum quantity.'],
           ].map(([q, a], i) => <div key={i} onClick={() => setFaq(faq === i ? null : i)} className={`mb-2 rounded-2xl cursor-pointer transition-all ${faq === i ? 'bg-green-50 border border-green-100' : 'bg-stone-50 border border-transparent hover:bg-stone-100'}`}>
             <div className="flex justify-between items-center px-5 py-4">
               <span className="text-sm font-semibold text-stone-900 pr-4">{q}</span>
