@@ -50,25 +50,36 @@ export default function Catalog() {
     const msg = lines.join('\n'); /Android|iPhone|iPad/i.test(navigator.userAgent) ? (window.location.href = `whatsapp://send?phone=${WA}&text=${encodeURIComponent(msg)}`) : window.open(`https://web.whatsapp.com/send?phone=${WA}&text=${encodeURIComponent(msg)}`, '_blank'); try { navigator.clipboard.writeText(msg) } catch {}
   }
 
-  if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><div className="w-7 h-7 border-[2.5px] border-stone-200 border-t-green-700 rounded-full animate-spin" /></div>
+  if (loading) return <div className="min-h-screen bg-white flex items-center justify-center" style={{ colorScheme: 'light' }}><div className="w-7 h-7 border-[2.5px] border-stone-200 border-t-green-700 rounded-full animate-spin" /></div>
 
   return (
-    <div className="min-h-screen bg-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-white catalog-light" style={{ fontFamily: "'DM Sans', sans-serif", colorScheme: 'light', color: '#111827' }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet" />
+      <style>{`
+        .catalog-light, .catalog-light * { color-scheme: light !important; }
+        body.dark .catalog-light { background: #fff !important; color: #111827 !important; }
+        body.dark .catalog-light input { color: #fff !important; }
+        body.dark .catalog-light .cat-nav { background: rgba(255,255,255,0.92) !important; }
+        body.dark .catalog-light .cat-footer { background: #0c0a09 !important; }
+        body.dark .catalog-light .cat-hero { background: #14532d !important; }
+      `}</style>
 
       {/* Toast */}
       {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-green-800 text-white px-5 py-2 rounded-full text-sm font-medium z-[500] shadow-lg">{toast}</div>}
 
       {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-stone-100">
+      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-stone-100 cat-nav">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-          <span className="text-base font-bold tracking-tight text-stone-900">Everytin Room</span>
-          <a href={`tel:${SHOP.phone.split('/')[0].trim().replace(/\s/g, '')}`} className="text-xs font-medium text-green-700 border border-green-200 rounded-full px-4 py-1.5 hover:bg-green-50 transition">{SHOP.phone.split('/')[0].trim()}</a>
+          <span className="text-base font-bold tracking-tight text-stone-900">EVERYTINROOM&BEDTIME</span>
+          <a href={`tel:${SHOP.phone.split('/')[0].trim().replace(/\s/g, '')}`} className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-full px-4 py-2 hover:bg-green-100 transition">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#166534" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            <span className="text-xs font-semibold text-green-800">{SHOP.phone.split('/')[0].trim()}</span>
+          </a>
         </div>
       </nav>
 
       {/* Hero */}
-      <div className="bg-green-900 relative overflow-hidden">
+      <div className="bg-green-900 relative overflow-hidden cat-hero">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,rgba(34,197,94,0.15),transparent_60%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(74,222,128,0.1),transparent_50%)]" />
         <div className="max-w-6xl mx-auto px-4 py-12 md:py-16 relative z-10">
@@ -146,11 +157,11 @@ export default function Catalog() {
       </div>
 
       {/* Footer */}
-      <footer className="bg-stone-950 text-white">
+      <footer className="bg-stone-950 text-white cat-footer">
         <div className="max-w-6xl mx-auto px-4 py-10">
           <div className="flex flex-wrap gap-10 mb-8">
             <div className="flex-1 min-w-[200px]">
-              <h3 className="text-lg font-bold mb-2">Everytin Room</h3>
+              <h3 className="text-lg font-bold mb-2 text-white">EVERYTINROOM&BEDTIME</h3>
               <p className="text-xs text-stone-500 leading-relaxed max-w-xs">Quality home furnishings — cookware, curtains, bedding and more. Nationwide delivery across Ghana.</p>
             </div>
             <div>

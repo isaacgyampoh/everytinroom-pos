@@ -99,10 +99,10 @@ export default function Navigation({ onOpenCart }) {
       {/* Bottom */}
       <div className="relative z-10 px-2 pb-3 flex-shrink-0 space-y-0.5">
         <div className="my-2 mx-2 h-px bg-stone-200/60" />
-        <button onClick={toggleDark} className="w-full flex items-center gap-3 h-10 px-3 rounded-xl text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition">
+        {isAdmin && <button onClick={toggleDark} className="w-full flex items-center gap-3 h-10 px-3 rounded-xl text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition">
           <span className="flex-shrink-0 w-5 flex justify-center">{darkMode ? <I d="M12 3v1m0 16v1m9-9h-1M4 12H3m3.34-5.66l-.7-.7m12.73 0l-.71.7M6.34 17.66l-.7.7m12.73 0l-.71-.7M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" /> : <I d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />}</span>
           <span className={`text-[13px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'}`}>{darkMode ? 'Light mode' : 'Dark mode'}</span>
-        </button>
+        </button>}
         <div className="flex items-center gap-3 h-10 px-3 rounded-xl">
           <div className="w-6 h-6 bg-brand-600 rounded-lg flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0">{user?.name?.charAt(0)}</div>
           <span className={`text-[13px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'}`}>{user?.name}</span>
@@ -166,10 +166,10 @@ export default function Navigation({ onOpenCart }) {
         </div>
       </div>
       <div className="p-3 safe-bottom space-y-2 border-t border-stone-100">
-        <button onClick={toggleDark} className="w-full py-3 bg-stone-100 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
+        {isAdmin && <button onClick={toggleDark} className="w-full py-3 bg-stone-100 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
           {darkMode ? <I d="M12 3v1m0 16v1m9-9h-1M4 12H3m3.34-5.66l-.7-.7m12.73 0l-.71.7M6.34 17.66l-.7.7m12.73 0l-.71-.7M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" /> : <I d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />}
           {darkMode ? 'Light Mode' : 'Dark Mode'}
-        </button>
+        </button>}
         <button onClick={() => { logout(); setMobileOpen(false) }} className="w-full py-3 bg-red-50 rounded-xl text-sm font-semibold text-red-500">Sign Out</button>
       </div>
     </div>
