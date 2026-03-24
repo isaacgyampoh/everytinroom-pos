@@ -10,7 +10,7 @@ const ProductCard = memo(({ item, price, hasPromo, onAdd }) => {
       className={`bg-white rounded-2xl overflow-hidden text-left transition-transform active:scale-[.97] ${hasPromo ? 'ring-2 ring-brand-300' : ''} ${qty === 0 ? 'opacity-30 pointer-events-none' : ''}`}>
       {hasPromo && <div className="bg-brand-600 text-white text-[10px] font-bold text-center py-1 tracking-wider uppercase">Promo</div>}
       <div className="w-full aspect-[4/3] bg-stone-100 overflow-hidden">
-        {item.image ? <img src={thumb(item.image, 100)} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" fetchPriority="low" /> : <div className="w-full h-full flex items-center justify-center text-stone-200 text-xl">□</div>}
+        {item.image ? <img src={thumb(item.image, 200)} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" fetchPriority="low" /> : <div className="w-full h-full flex items-center justify-center text-stone-200 text-xl">□</div>}
       </div>
       <div className="p-2.5">
         <div className="text-[12px] md:text-[13px] font-semibold text-gray-900 leading-snug truncate">{item.name}</div>

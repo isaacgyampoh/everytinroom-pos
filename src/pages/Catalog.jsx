@@ -3,10 +3,10 @@ import { getSupabase } from '../lib/supabase'
 import { SHOP } from '../lib/utils'
 
 const money = v => 'GHS ' + Number(v || 0).toFixed(2)
-const thumb = (url, w = 200) => {
+const thumb = (url, w = 300) => {
   if (!url) return ''
-  if (url.includes('cloudinary')) return url.replace('/upload/', `/upload/w_${w},q_auto,f_auto/`)
-  if (url.includes('supabase')) return url + (url.includes('?') ? '&' : '?') + `width=${w}&quality=40`
+  if (url.includes('cloudinary')) return url.replace('/upload/', `/upload/w_${w},c_fill,q_80,f_auto/`)
+  if (url.includes('supabase')) return url + (url.includes('?') ? '&' : '?') + `width=${w}&quality=60`
   return url
 }
 const WA = '233245315581'
@@ -116,7 +116,7 @@ export default function Catalog() {
           <div className="flex items-center gap-2 mb-3"><div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" /><span className="text-xs font-bold text-stone-800 uppercase tracking-wider">Promo</span></div>
           <div className="flex gap-3 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-2">
             {products.filter(p => promoMap[p.id]).map(p => <div key={'p'+p.id} onClick={() => open(p)} className="flex-shrink-0 w-[140px] cursor-pointer group">
-              <div className="w-full h-24 bg-stone-100 rounded-xl overflow-hidden relative">{p.image ? <img src={thumb(p.image, 150)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" /> : <div className="w-full h-full bg-stone-50" />}<div className="absolute top-1.5 left-1.5 bg-red-500 text-white text-[8px] font-bold px-2 py-0.5 rounded">PROMO</div></div>
+              <div className="w-full h-24 bg-stone-100 rounded-xl overflow-hidden relative">{p.image ? <img src={thumb(p.image, 250)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" /> : <div className="w-full h-full bg-stone-50" />}<div className="absolute top-1.5 left-1.5 bg-red-500 text-white text-[8px] font-bold px-2 py-0.5 rounded">PROMO</div></div>
               <p className="text-[11px] font-medium text-stone-700 mt-2 truncate">{p.name}</p>
               <div className="flex items-center gap-1.5"><span className="text-[10px] text-stone-400 line-through">{money(p.price)}</span><span className="text-xs font-bold text-red-600">{money(promoMap[p.id].price)}</span></div>
             </div>)}
@@ -206,7 +206,7 @@ export default function Catalog() {
         <div className="flex-1 overflow-y-auto p-5">
           {!cart.length ? <p className="text-center py-16 text-stone-400 text-sm">Empty</p> : <div className="space-y-2.5">
             {cart.map(c => <div key={c.id} className="flex items-center gap-3 p-3 bg-stone-50 rounded-xl">
-              <div className="w-11 h-11 bg-stone-200 rounded-lg overflow-hidden flex-shrink-0">{c.img ? <img src={thumb(c.img, 80)} alt="" className="w-full h-full object-cover" /> : null}</div>
+              <div className="w-11 h-11 bg-stone-200 rounded-lg overflow-hidden flex-shrink-0">{c.img ? <img src={thumb(c.img, 150)} alt="" className="w-full h-full object-cover" /> : null}</div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold truncate">{c.name}</p>
                 <p className="text-[11px] text-stone-400">{money(c.price)} each</p>
@@ -239,7 +239,7 @@ export default function Catalog() {
           <div className="fixed inset-3 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[460px] md:max-h-[85vh] bg-white rounded-3xl z-[301] overflow-hidden flex flex-col shadow-2xl">
             <div className="flex-1 overflow-y-auto">
               <div className="w-full aspect-square bg-stone-100 relative">
-                {view.image ? <img src={thumb(view.image, 400)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-stone-50" />}
+                {view.image ? <img src={thumb(view.image, 600)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-stone-50" />}
                 <button onClick={close} className="absolute top-3 right-3 w-9 h-9 bg-white/90 backdrop-blur rounded-xl flex items-center justify-center text-stone-500 text-sm shadow">✕</button>
                 <button onClick={() => share(view)} className="absolute top-3 left-3 w-9 h-9 bg-white/90 backdrop-blur rounded-xl flex items-center justify-center shadow">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
@@ -260,7 +260,7 @@ export default function Catalog() {
                   <h4 className="text-xs font-bold text-stone-800 mb-3 uppercase tracking-wider">You may also like</h4>
                   <div className="flex gap-2.5 overflow-x-auto scrollbar-hide">
                     {rel.map(r => <div key={r.id} onClick={() => open(r)} className="flex-shrink-0 w-24 cursor-pointer">
-                      <div className="w-24 h-20 bg-stone-100 rounded-lg overflow-hidden"><img src={thumb(r.image, 100)} alt="" className="w-full h-full object-cover" loading="lazy" /></div>
+                      <div className="w-24 h-20 bg-stone-100 rounded-lg overflow-hidden"><img src={thumb(r.image, 200)} alt="" className="w-full h-full object-cover" loading="lazy" /></div>
                       <p className="text-[10px] font-medium text-stone-700 mt-1.5 line-clamp-2">{r.name}</p>
                       <p className="text-[10px] font-bold text-stone-900">{money(r.price)}</p>
                     </div>)}
