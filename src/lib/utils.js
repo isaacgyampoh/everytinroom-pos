@@ -22,11 +22,10 @@ export const SHOP = {
 export const ADMIN_PIN = null // Admin PIN verified server-side via verify_pin()
 
 // Generate thumbnail URL - works with both Supabase and Cloudinary
-export const thumb = (url, w = 300) => {
+export const thumb = (url, w = 500) => {
   if (!url) return ''
-  // Cloudinary: use good quality transforms
-  if (url.includes('cloudinary')) return url.replace('/upload/', `/upload/w_${w},c_fill,q_80,f_auto/`)
-  // Supabase fallback
-  if (url.includes('supabase')) return url + (url.includes('?') ? '&' : '?') + `width=${w}&quality=60`
+  // Cloudinary: only resize width, keep full quality
+  if (url.includes('cloudinary')) return url.replace('/upload/', `/upload/w_${w},f_auto/`)
+  if (url.includes('supabase')) return url + (url.includes('?') ? '&' : '?') + `width=${w}&quality=80`
   return url
 }
