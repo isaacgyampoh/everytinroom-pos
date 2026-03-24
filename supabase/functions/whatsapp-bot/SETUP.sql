@@ -1,0 +1,44 @@
+-- ============================================
+-- SETUP: WhatsApp AI Bot
+-- ============================================
+--
+-- STEP 1: Run 009_whatsapp_bot.sql in Supabase SQL Editor
+--         (creates the wa_conversations table)
+--
+-- STEP 2: Add secrets to Supabase Edge Functions
+--         Go to: Supabase → Settings → Edge Functions → Manage Secrets
+--
+--         Add these 4 secrets:
+--         WHAPI_TOKEN = xfykKAIsRnay4mSY7iV6NOWIJAhLbtY3
+--         OPENAI_API_KEY = (your OpenAI key)
+--         SUPABASE_URL = https://noiiuwkovoojkcwzupye.supabase.co
+--         SUPABASE_SERVICE_ROLE_KEY = (find in Supabase → Settings → API → service_role key)
+--
+-- STEP 3: Deploy the edge function
+--         In Supabase dashboard → Edge Functions → Create new function
+--         Name: whatsapp-bot
+--         Paste the code from supabase/functions/whatsapp-bot/index.ts
+--         Click Deploy
+--         IMPORTANT: Turn OFF "Verify JWT" for this function
+--
+-- STEP 4: Set webhook in Whapi.Cloud
+--         Go to whapi.cloud → your channel → Settings
+--         Webhook URL: https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/whatsapp-bot
+--         Enable events: messages (POST)
+--         Mode: Body
+--         Click Save
+--
+-- STEP 5: Test it!
+--         Send a message to the bot's WhatsApp number (0533547740)
+--         from a different phone. Ask "what products do you have?"
+--         The AI should respond with products from your catalog.
+--
+-- COSTS:
+--   OpenAI GPT-4o-mini: ~$0.001 per message (~1 pesewa)
+--   OpenAI Whisper (voice): ~$0.006 per minute (~5 pesewas)
+--   OpenAI Vision (image): ~$0.003 per image (~3 pesewas)
+--   Whapi Sandbox: Free
+--   Supabase Edge Function: Free tier (500K invocations)
+--
+-- Total: About GHS 0.05-0.10 per customer conversation
+-- ============================================
