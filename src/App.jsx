@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { getSupabase } from './lib/supabase'
 import { useStore } from './hooks/useStore'
@@ -7,26 +7,28 @@ import Login from './components/Login'
 import Navigation from './components/Navigation'
 import CartDrawer from './components/CartDrawer'
 import ReceiptPreview from './components/ReceiptPreview'
-import Dashboard from './pages/Dashboard'
-import POS from './pages/POS'
-import WhatsAppOrders from './pages/WhatsAppOrders'
-import Receipts from './pages/Receipts'
-import Products from './pages/Products'
-import StaffPage from './pages/StaffPage'
-import ExpensesPage from './pages/ExpensesPage'
-import CustomersPage from './pages/CustomersPage'
-import BundlesPage from './pages/BundlesPage'
-import PerformancePage from './pages/PerformancePage'
-import RefundsPage from './pages/RefundsPage'
-import ReportsPage from './pages/ReportsPage'
-import PromosPage from './pages/PromosPage'
-import InvoicesPage from './pages/InvoicesPage'
-import StockTakesPage from './pages/StockTakesPage'
-import StockAdjustmentsPage from './pages/StockAdjustmentsPage'
-import RestockPage from './pages/RestockPage'
-import InvoicePay from './pages/InvoicePay'
-import Catalog from './pages/Catalog'
 import toast from 'react-hot-toast'
+
+// Lazy load all pages — only loads when needed
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const POS = lazy(() => import('./pages/POS'))
+const WhatsAppOrders = lazy(() => import('./pages/WhatsAppOrders'))
+const Receipts = lazy(() => import('./pages/Receipts'))
+const Products = lazy(() => import('./pages/Products'))
+const StaffPage = lazy(() => import('./pages/StaffPage'))
+const ExpensesPage = lazy(() => import('./pages/ExpensesPage'))
+const CustomersPage = lazy(() => import('./pages/CustomersPage'))
+const BundlesPage = lazy(() => import('./pages/BundlesPage'))
+const PerformancePage = lazy(() => import('./pages/PerformancePage'))
+const RefundsPage = lazy(() => import('./pages/RefundsPage'))
+const ReportsPage = lazy(() => import('./pages/ReportsPage'))
+const PromosPage = lazy(() => import('./pages/PromosPage'))
+const InvoicesPage = lazy(() => import('./pages/InvoicesPage'))
+const StockTakesPage = lazy(() => import('./pages/StockTakesPage'))
+const StockAdjustmentsPage = lazy(() => import('./pages/StockAdjustmentsPage'))
+const RestockPage = lazy(() => import('./pages/RestockPage'))
+const InvoicePay = lazy(() => import('./pages/InvoicePay'))
+const Catalog = lazy(() => import('./pages/Catalog'))
 
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000 // 30 minutes
 const ADMIN_PAGES = ['products', 'staff', 'promos', 'invoices', 'stocktakes', 'stockadjustments', 'restock']
@@ -105,8 +107,8 @@ export default function App() {
   }
 
   // Public pages - no login required
-  if (window.location.hash.includes('/pay/')) return <InvoicePay />
-  if (window.location.hash.includes('/catalog')) return <Catalog />
+  if (window.location.hash.includes('/pay/')) return <Suspense fallback={<Loader />}><InvoicePay /></Suspense>
+  if (window.location.hash.includes('/catalog')) return <Suspense fallback={<Loader />}><Catalog /></Suspense>
 
   if (loading) return <><Loader /><Toaster /></>
   if (!user) return <><Login /><Toaster /></>
@@ -153,7 +155,9 @@ export default function App() {
 
       <main className="pt-14 md:pt-0 md:ml-16 pb-24 md:pb-10 min-h-screen">
         <div className="px-4 md:px-8 lg:px-10 py-5 md:py-6">
-          {pages[page] || <POS />}
+          <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-7 h-7 border-[2.5px] border-stone-200 border-t-brand-600 rounded-full animate-spin" /></div>}>
+            {pages[page] || <POS />}
+          </Suspense>
         </div>
       </main>
     </div>

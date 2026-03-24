@@ -25,7 +25,13 @@ export default function Catalog() {
   const close = () => { setView(null); window.location.hash = '/catalog' }
   const share = p => { const l = `${window.location.origin}/#/catalog/${p.id}`; navigator.share ? navigator.share({ title: p.name, url: l }).catch(() => {}) : (navigator.clipboard?.writeText(l), setToast('Link copied')) }
 
-  const load = async () => { const sb = getSupabase(); const { data } = await sb.from('products').select('id,name,category,price,wholesale_price,wholesale_min_qty,quantity,image').order('name'); setProducts((data || []).filter(p => p.quantity > 0)); setLoading(false) }
+  const load = async () => {
+    const cached = sessionStorage.getItem('cat_p'), ct = sessionStorage.getItem('cat_t')
+    if (cached && ct && Date.now() - Number(ct) < 300000) { setProducts(JSON.parse(cached)); setLoading(false); return }
+    const sb = getSupabase(); const { data } = await sb.from('products').select('id,name,category,price,wholesale_price,wholesale_min_qty,quantity,image').order('name')
+    const items = (data || []).filter(p => p.quantity > 0); setProducts(items); setLoading(false)
+    try { sessionStorage.setItem('cat_p', JSON.stringify(items)); sessionStorage.setItem('cat_t', String(Date.now())) } catch {}
+  }
   const loadPromos = async () => {
     const sb = getSupabase(); const { data } = await sb.from('promos').select('id,name,start_date,end_date,items,active').eq('active', true)
     if (!data?.length) return; const now = new Date(), map = {}
