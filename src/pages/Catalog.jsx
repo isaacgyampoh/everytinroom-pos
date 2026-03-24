@@ -3,7 +3,12 @@ import { getSupabase } from '../lib/supabase'
 import { SHOP } from '../lib/utils'
 
 const money = v => 'GHS ' + Number(v || 0).toFixed(2)
-const thumb = (url, w = 200) => url ? (url.includes('supabase') ? url + (url.includes('?') ? '&' : '?') + `width=${w}&quality=40` : url) : ''
+const thumb = (url, w = 200) => {
+  if (!url) return ''
+  if (url.includes('cloudinary')) return url.replace('/upload/', `/upload/w_${w},q_auto,f_auto/`)
+  if (url.includes('supabase')) return url + (url.includes('?') ? '&' : '?') + `width=${w}&quality=40`
+  return url
+}
 const WA = '233245315581'
 
 export default function Catalog() {

@@ -21,9 +21,16 @@ export default function Products() {
     if (!form.name.trim()) { toast.error('Enter name'); return }
     setLoading(true, 'Saving...'); const sb = getSupabase(); let imageUrl = form.existingImage || ''
     if (form.file) {
-      const ext = form.file.name.split('.').pop(); const path = `prod_${Date.now()}.${ext}`
-      const { error: upErr } = await sb.storage.from('product-images').upload(path, form.file)
-      if (!upErr) { const { data: u } = sb.storage.from('product-images').getPublicUrl(path); imageUrl = u?.publicUrl || '' }
+      // Upload to Cloudinary
+      try {
+        const fd = new FormData()
+        fd.append('file', form.file)
+        fd.append('upload_preset', 'everytinroom')
+        fd.append('folder', 'everytinroom')
+        const res = await fetch('https://api.cloudinary.com/v1_1/dls9fai0i/image/upload', { method: 'POST', body: fd })
+        const data = await res.json()
+        if (data.secure_url) imageUrl = data.secure_url
+      } catch (e) { toast.error('Image upload failed') }
     }
     const data = { name: form.name.trim(), category: form.category.trim(), cost_price: num(form.costPrice), price: num(form.price), wholesale_price: num(form.wholesalePrice), wholesale_min_qty: num(form.wholesaleMinQty), quantity: num(form.quantity), image: imageUrl }
     if (form.id) await sb.from('products').update(data).eq('id', form.id); else await sb.from('products').insert(data)
