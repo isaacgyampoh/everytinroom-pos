@@ -24,11 +24,9 @@ export default function Products() {
     let done = 0, failed = 0
     for (const p of toMigrate) {
       try {
+        // Send Supabase URL directly to Cloudinary (no CORS issues)
         const fd = new FormData()
-        // Fetch image as blob first
-        const imgResp = await fetch(p.image)
-        const blob = await imgResp.blob()
-        fd.append('file', blob)
+        fd.append('file', p.image)
         fd.append('upload_preset', 'everytinroom')
         fd.append('folder', 'everytinroom')
         const res = await fetch('https://api.cloudinary.com/v1_1/dls9fai0i/image/upload', { method: 'POST', body: fd })
@@ -36,13 +34,19 @@ export default function Products() {
         if (data.secure_url) {
           await sb.from('products').update({ image: data.secure_url }).eq('id', p.id)
           done++
-          toast.success(`${done}/${toMigrate.length} migrated`)
-        } else { failed++ }
-      } catch (e) { failed++ }
+        } else {
+          console.error('Cloudinary error:', data)
+          failed++
+        }
+      } catch (e) {
+        console.error('Migration error for', p.name, e)
+        failed++
+      }
     }
     await refreshProducts()
     setMigrating(false)
-    toast.success(`Done! ${done} migrated, ${failed} failed`)
+    if (done > 0) toast.success(`${done} images migrated to Cloudinary`)
+    if (failed > 0) toast.error(`${failed} images failed - check Cloudinary upload preset`)
   }
 
   const openNew = () => { setForm({ id: '', name: '', category: '', costPrice: '', price: '', wholesalePrice: '', wholesaleMinQty: '', quantity: '', file: null, existingImage: '' }); setPreview(''); setModal(true) }
