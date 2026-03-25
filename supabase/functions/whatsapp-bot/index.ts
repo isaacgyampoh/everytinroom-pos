@@ -6,83 +6,64 @@ const WAWP_TOKEN = Deno.env.get('WAWP_ACCESS_TOKEN') || ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
 const SUPABASE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 const WAWP_API = 'https://wawp.net/wp-json/awp/v1'
-const CATALOG_LINK = 'https://www.everytinroom.store/#/catalog'
-const SHOP_PHONE = '024 531 5581'
+const CATALOG = 'https://www.everytinroom.store/#/catalog'
+const PHONE = '024 531 5581'
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Content-Type': 'application/json' }
 
 function getDb() { return createClient(SUPABASE_URL, SUPABASE_KEY) }
 
-async function sendText(chatId: string, message: string) {
-  try {
-    await fetch(`${WAWP_API}/send?instance_id=${WAWP_INSTANCE}&access_token=${WAWP_TOKEN}&chatId=${encodeURIComponent(chatId)}&message=${encodeURIComponent(message)}`, { method: 'POST' })
-  } catch (e) { console.error('Send error:', e) }
+async function sendText(chatId: string, msg: string) {
+  try { await fetch(`${WAWP_API}/send?instance_id=${WAWP_INSTANCE}&access_token=${WAWP_TOKEN}&chatId=${encodeURIComponent(chatId)}&message=${encodeURIComponent(msg)}`, { method: 'POST' }) } catch (e) { console.error(e) }
 }
 
-function getGreeting(): string {
-  // Ghana is UTC+0
-  const hour = new Date().getUTCHours()
-  if (hour >= 5 && hour < 12) return 'Good morning'
-  if (hour >= 12 && hour < 17) return 'Good afternoon'
+function timeGreet(): string {
+  const h = new Date().getUTCHours()
+  if (h >= 5 && h < 12) return 'Good morning'
+  if (h >= 12 && h < 17) return 'Good afternoon'
   return 'Good evening'
 }
 
-// Track last reply time per customer to avoid spamming
+// Search products database for keyword matches
+async function findProducts(query: string): Promise<string[]> {
+  const db = getDb()
+  const { data } = await db.from('products').select('name,category').gt('quantity', 0)
+  if (!data) return []
+  const q = query.toLowerCase()
+  const matches = data.filter(p => {
+    const n = p.name.toLowerCase()
+    const c = (p.category || '').toLowerCase()
+    return n.includes(q) || c.includes(q) || q.split(' ').some(w => w.length > 3 && (n.includes(w) || c.includes(w)))
+  })
+  return [...new Set(matches.map(m => m.category || m.name.split(' ')[0]))]
+}
+
+// Extract product keywords from message
+function getProductKeywords(msg: string): string[] {
+  const words = ['bedsheet', 'bed sheet', 'bed cover', 'bedcover', 'duvet', 'pillow', 'blanket',
+    'curtain', 'towel', 'cookware', 'pot', 'pan', 'frying', 'kettle', 'flask',
+    'rack', 'shelf', 'hanger', 'mat', 'rug', 'carpet', 'toilet', 'bathroom',
+    'kitchen', 'plate', 'cup', 'glass', 'bowl', 'spoon', 'fork', 'knife',
+    'iron', 'blender', 'dispenser', 'container', 'basket', 'bin', 'bucket',
+    'mop', 'broom', 'duster', 'cloth', 'napkin', 'apron', 'oven', 'cooker']
+  const lower = msg.toLowerCase()
+  return words.filter(w => lower.includes(w))
+}
+
 const lastReply = new Map<string, number>()
-
-// Check if message is asking about order status
-function isOrderQuery(msg: string): boolean {
-  const lower = msg.toLowerCase()
-  return lower.includes('order') || lower.includes('delivery') || lower.includes('where is') || 
-         lower.includes('my package') || lower.includes('tracking') || lower.includes('status') ||
-         lower.includes('when will') || lower.includes('not delivered') || lower.includes('still waiting') ||
-         lower.includes('order number') || lower.includes('order id')
-}
-
-// Check if message is a greeting
-function isGreeting(msg: string): boolean {
-  const lower = msg.toLowerCase().trim()
-  return /^(hi|hello|hey|good morning|good afternoon|good evening|yo|sup|hii+|helo+|greetings|howdy|hy)[\s!.,?]*$/i.test(lower) ||
-         lower.startsWith('hi ') || lower.startsWith('hello ') || lower.startsWith('hey ') ||
-         lower.startsWith('good morning') || lower.startsWith('good afternoon') || lower.startsWith('good evening')
-}
-
-// Check if asking about products
-function isProductQuery(msg: string): boolean {
-  const lower = msg.toLowerCase()
-  return lower.includes('product') || lower.includes('bedsheet') || lower.includes('bed sheet') ||
-         lower.includes('cookware') || lower.includes('curtain') || lower.includes('pillow') ||
-         lower.includes('bed cover') || lower.includes('duvet') || lower.includes('blanket') ||
-         lower.includes('pot') || lower.includes('pan') || lower.includes('kitchen') ||
-         lower.includes('what do you sell') || lower.includes('what do you have') ||
-         lower.includes('available') || lower.includes('price') || lower.includes('how much') ||
-         lower.includes('catalog') || lower.includes('catalogue') || lower.includes('show me') ||
-         lower.includes('i want') || lower.includes('i need') || lower.includes('looking for') ||
-         lower.includes('do you have') || lower.includes('can i get') || lower.includes('sell')
-}
-
-// Check if asking about payment/delivery methods
-function isPaymentQuery(msg: string): boolean {
-  const lower = msg.toLowerCase()
-  return lower.includes('payment') || lower.includes('pay on delivery') || lower.includes('cash on delivery') ||
-         lower.includes('cod') || lower.includes('momo') || lower.includes('mobile money') ||
-         lower.includes('how to pay') || lower.includes('walk in') || lower.includes('pick up') ||
-         lower.includes('walk-in') || lower.includes('pickup')
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
   try {
     const body = await req.json()
-    
-    // Handle payment confirmation sending
+
+    // Handle payment confirmation
     if (body.action === 'send_confirmation' && body.chatId && body.message) {
       await sendText(body.chatId, body.message)
-      console.log('Confirmation sent to:', body.chatId)
       return new Response(JSON.stringify({ ok: true }), { headers: CORS })
     }
-    
+
     if (body.event !== 'message') return new Response(JSON.stringify({ ok: true }), { headers: CORS })
 
     const payload = body.payload || {}
@@ -93,44 +74,63 @@ serve(async (req) => {
     if (!sender || sender.length < 8) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
 
     const chatId = `${sender}@c.us`
-    const msgBody = String(payload.body || payload.text || '').trim()
-    if (!msgBody) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
+    const msg = String(payload.body || payload.text || '').trim()
+    if (!msg) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
 
-    const customerName = payload._data?.notifyName || payload.notifyName || body.me?.pushName || ''
-    const nameGreet = customerName ? ` ${customerName}` : ''
-    const greeting = getGreeting()
-
-    // Prevent replying too fast (minimum 3 seconds between replies to same person)
+    // 5 second cooldown
     const now = Date.now()
-    const lastTime = lastReply.get(sender) || 0
-    if (now - lastTime < 3000) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
+    if (now - (lastReply.get(sender) || 0) < 5000) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
     lastReply.set(sender, now)
-    // Clean old entries
-    if (lastReply.size > 200) lastReply.clear()
+    if (lastReply.size > 300) lastReply.clear()
 
-    console.log(`MSG from${nameGreet} (${sender}): ${msgBody}`)
+    const name = payload._data?.notifyName || payload.notifyName || body.me?.pushName || ''
+    const hi = name ? ` ${name}` : ''
+    const lower = msg.toLowerCase().trim()
+
+    console.log(`${name} (${sender}): ${msg}`)
 
     let reply = ''
 
-    if (isGreeting(msgBody)) {
-      // GREETING
-      reply = `${greeting}${nameGreet}! This is EVERYTINROOM&BEDTIME. How may we help you today?`
+    // 1. GREETING
+    if (/^(hi|hello|hey|good\s?(morning|afternoon|evening)|yo|sup|hii+|helo+|howdy|hy)[\s!.,?]*$/i.test(lower) || lower === 'hi' || lower === 'hello') {
+      reply = `${timeGreet()}${hi}! This is EVERYTINROOM&BEDTIME, how may we help you?`
+    }
 
-    } else if (isOrderQuery(msgBody)) {
-      // ORDER STATUS
-      reply = `We'd be happy to help with your order${nameGreet}! Please share your order number or the phone number you used during payment, and we'll check the status for you right away.\n\nIf you have any urgent concerns, please call us directly on ${SHOP_PHONE}.`
+    // 2. PRODUCT INQUIRY - check if they mention a product
+    else if (getProductKeywords(msg).length > 0) {
+      const keywords = getProductKeywords(msg)
+      const found = await findProducts(keywords[0])
+      if (found.length > 0) {
+        reply = `Yes${hi}, we have ${keywords[0]}s available! Please click on this link to select the exact type and design you want:\n\n${CATALOG}\n\nJust send your order and we'll prepare your invoice within the shortest possible time so you can make payment and fill in your delivery details.\n\nIf you need any help, feel free to message us or call ${PHONE}.`
+      } else {
+        reply = `Sorry${hi}, we don't currently have ${keywords[0]}s in stock. But please check our catalog for other available products:\n\n${CATALOG}\n\nOr call us on ${PHONE} and we'll help you find what you need.`
+      }
+    }
 
-    } else if (isPaymentQuery(msgBody)) {
-      // PAYMENT/DELIVERY INFO
-      reply = `Thank you for your interest${nameGreet}!\n\nWe offer two options:\n\n1. Online Payment - You'll receive a secure payment link to pay via Mobile Money (MTN, Vodafone, AirtelTigo) or card. Your order will then be delivered to your location.\n\n2. Walk-in - Visit our shop at Adenta Aviation Road to buy directly.\n\nPlease note: We do not offer cash on delivery.\n\nWould you like to browse our products? Click here:\n${CATALOG_LINK}`
+    // 3. ORDER STATUS
+    else if (/order|delivery|where is|my package|tracking|status|when will|not delivered|still waiting|not come|hasn.t arrived/i.test(lower)) {
+      reply = `Sure${hi}! Please share your order number so we can check the status for you.\n\nIf you have any urgent concerns, call us on ${PHONE}.`
+    }
 
-    } else if (isProductQuery(msgBody)) {
-      // PRODUCT INQUIRY
-      reply = `Thank you for reaching out${nameGreet}! We have a wide variety of home furnishings including bedsheets, bed covers, cookware, curtains, pillows and more.\n\nPlease click the link below to browse our full catalog and select the products you want:\n\n${CATALOG_LINK}\n\nOnce you select your items and place your order, your invoice will be sent to you so you can fill in your delivery details and make payment.\n\nIf you need any help, feel free to message us or call ${SHOP_PHONE}.`
+    // 4. PAYMENT / DELIVERY METHOD
+    else if (/cash on delivery|pay on delivery|cod|how.*(to|do).*(pay|payment)|walk.?in|pick.?up|payment method/i.test(lower)) {
+      reply = `Hi${hi}! We offer two options:\n\n1. Online Payment - pay via Mobile Money or card, then we deliver to you.\n2. Walk-in - come to our shop at Adenta Aviation Road.\n\nWe don't do cash on delivery.\n\nWould you like to browse our products? ${CATALOG}`
+    }
 
-    } else {
-      // GENERAL / ANYTHING ELSE
-      reply = `${greeting}${nameGreet}! Thank you for messaging EVERYTINROOM&BEDTIME.\n\nTo browse and order our products, please click the link below:\n\n${CATALOG_LINK}\n\nYou can select the items you want, place your order via WhatsApp, and we'll send you an invoice with a payment link.\n\nFor any questions, reply here or call us on ${SHOP_PHONE}. We're here to help!`
+    // 5. THANK YOU
+    else if (/^(thank|thanks|thank you|God bless|appreciate)/i.test(lower)) {
+      reply = `You're welcome${hi}! We're always here to help. Have a lovely ${new Date().getUTCHours() >= 17 ? 'evening' : 'day'}!`
+    }
+
+    // 6. GENERAL - anything else, assume they want products
+    else {
+      // Try to find products matching their message
+      const found = await findProducts(msg)
+      if (found.length > 0) {
+        reply = `Yes${hi}, we have that! Please click this link to select exactly what you want:\n\n${CATALOG}\n\nSend your order and we'll prepare your invoice right away.\n\nNeed help? Call ${PHONE}.`
+      } else {
+        reply = `Hi${hi}! Thanks for messaging EVERYTINROOM&BEDTIME.\n\nPlease click here to browse our products and place your order:\n\n${CATALOG}\n\nOnce you order, we'll send your invoice so you can make payment and fill in your delivery details.\n\nNeed help? Call or message us on ${PHONE}.`
+      }
     }
 
     if (reply) await sendText(chatId, reply)
