@@ -22,85 +22,110 @@ async function getProducts() {
 async function sendText(chatId: string, message: string) {
   try {
     const res = await fetch(`${WAWP_API}/send?instance_id=${WAWP_INSTANCE}&access_token=${WAWP_TOKEN}&chatId=${encodeURIComponent(chatId)}&message=${encodeURIComponent(message)}`, { method: 'POST' })
-    console.log('Sent to', chatId, ':', (await res.text()).slice(0, 100))
+    console.log('Sent:', (await res.text()).slice(0, 80))
   } catch (e) { console.error('Send error:', e) }
 }
 
 async function sendImage(chatId: string, imageUrl: string, caption: string) {
   try {
-    const url = `${WAWP_API}/sendImage?instance_id=${WAWP_INSTANCE}&access_token=${WAWP_TOKEN}&chatId=${encodeURIComponent(chatId)}&file%5Burl%5D=${encodeURIComponent(imageUrl)}&file%5Bfilename%5D=product.jpg&file%5Bmimetype%5D=image/jpeg&caption=${encodeURIComponent(caption)}`
-    const res = await fetch(url, { method: 'POST' })
-    console.log('Image sent:', (await res.text()).slice(0, 100))
+    // Use POST body instead of URL params for image
+    const res = await fetch(`${WAWP_API}/sendImage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        instance_id: WAWP_INSTANCE,
+        access_token: WAWP_TOKEN,
+        chatId: chatId,
+        file: { url: imageUrl, filename: 'product.jpg', mimetype: 'image/jpeg' },
+        caption: caption
+      })
+    })
+    const r = await res.text()
+    console.log('Image result:', r.slice(0, 100))
+    // If JSON body didn't work, try URL params
+    if (r.includes('error') || r.includes('false')) {
+      const url2 = `${WAWP_API}/sendImage?instance_id=${WAWP_INSTANCE}&access_token=${WAWP_TOKEN}&chatId=${encodeURIComponent(chatId)}&file%5Burl%5D=${encodeURIComponent(imageUrl)}&file%5Bfilename%5D=product.jpg&file%5Bmimetype%5D=image/jpeg&caption=${encodeURIComponent(caption)}`
+      const res2 = await fetch(url2, { method: 'POST' })
+      console.log('Image fallback:', (await res2.text()).slice(0, 100))
+    }
   } catch (e) { console.error('Image error:', e) }
 }
 
+// Describe image using OpenAI Vision
+async function describeImage(imageUrl: string) {
+  try {
+    const imgResp = await fetch(imageUrl)
+    const imgBuf = await imgResp.arrayBuffer()
+    const bytes = new Uint8Array(imgBuf)
+    // Convert to base64 in chunks to avoid stack overflow
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+    const base64 = btoa(binary)
+
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_KEY}` },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini', max_tokens: 150,
+        messages: [{ role: 'user', content: [
+          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}`, detail: 'low' } },
+          { type: 'text', text: 'What product is in this image? Describe it briefly - type of product, color, material. Example: "blue bedsheet set", "stainless steel pot", "white curtain". Keep it to 5-10 words.' }
+        ]}]
+      })
+    })
+    const data = await res.json()
+    return data.choices?.[0]?.message?.content || ''
+  } catch (e) { console.error('Vision error:', e); return '' }
+}
+
 async function askAI(msg: string, products: any[], history: any[]) {
-  const list = products.map(p => {
-    let s = `${p.name} | Category: ${p.category || 'General'} | Price: GHS ${p.price}`
+  // Build product list with IDs for exact matching
+  const list = products.map((p, i) => {
+    let s = `[${i}] ${p.name} | GHS ${p.price}`
+    if (p.category) s += ` | ${p.category}`
     if (p.wholesale_price && p.wholesale_min_qty) s += ` | Buy ${p.wholesale_min_qty}+ for GHS ${p.wholesale_price} each`
-    if (p.quantity <= 3) s += ' | LOW STOCK'
     return s
   }).join('\n')
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_KEY}` },
-    body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 600, temperature: 0.7, messages: [
-      { role: 'system', content: `You are a human sales assistant for ${SHOP_NAME}, a home furnishings and bedding shop located at Adenta Aviation Road, Accra, Ghana. Phone: 024 531 5581 / 024 936 5339. We do nationwide delivery across Ghana.
+    body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 600, temperature: 0.6, messages: [
+      { role: 'system', content: `You are a human sales assistant for ${SHOP_NAME}, a home furnishings shop at Adenta Aviation Road, Accra, Ghana. Phone: 024 531 5581.
 
-HOW TO BEHAVE:
-- You are a real person, part of the ${SHOP_NAME} team. NEVER say you are AI or a bot.
-- Be warm, friendly, and professional. Like chatting with a helpful shop assistant.
-- Keep messages SHORT - 2 to 4 sentences max. This is WhatsApp, not email.
-- Use plain text only. No bold, no italic, no bullet points, no markdown.
-- Reply in whatever language the customer uses (English, Twi, Pidgin).
-- If a customer greets you (hi, hello, etc), greet them back warmly and ask how you can help.
+PERSONALITY: Warm, friendly, professional. You are a real person. NEVER mention AI or bot.
+FORMAT: Plain text only. Max 3 sentences. No markdown, no bold, no bullets.
+LANGUAGE: Reply in whatever language the customer uses.
 
 WHEN CUSTOMER ASKS ABOUT PRODUCTS:
-- Search the product list below carefully
-- Only mention products that ACTUALLY exist in the list
-- Include the exact price for each product
-- If you find matching products, list them naturally like: "We have the [name] for GHS [price]"
-- If no exact match, suggest the closest alternatives
-- NEVER invent or make up product names or prices
+- Search the product list and mention ONLY products that exist
+- Always include the GHS price
+- If no match, suggest closest alternatives
 
-WHEN CUSTOMER WANTS TO SEE A PRODUCT PHOTO:
-- Say something like "Here's what it looks like" or "Let me show you"
-- Then add this exact tag on its own line: [IMG:exact product name from list]
-- Example: [IMG:3-in-1 Bedsheet Set Blue]
-- ONLY use product names exactly as they appear in the list below
+SHOWING PRODUCT IMAGES:
+When customer wants to see a product, put this on its own line:
+[IMG:NUMBER]
+where NUMBER is the product number from the list. Example: [IMG:5]
+You can show multiple: [IMG:3] [IMG:7]
 
-WHEN CUSTOMER WANTS TO ORDER:
-- Confirm what they want and the quantity
-- Calculate the total
-- Ask them to confirm
-- When they say YES or confirm, create the order by adding this tag on its own line:
-  [ORDER:Product Name x Quantity, Another Product x Quantity]
-- Example: [ORDER:3-in-1 Bedsheet Set Blue x 2, Pillow Case White x 4]
+CREATING ORDERS:
+When customer confirms they want to buy, put this on its own line:
+[ORDER:NUMBER x QUANTITY]
+Multiple items: [ORDER:5 x 2, 12 x 1]
+Use the product NUMBER from the list, not the name.
 
-ABOUT DELIVERY:
-- We deliver nationwide across Ghana
-- Delivery fees depend on location and will be communicated after order confirmation
+DELIVERY: Nationwide across Ghana. Fees depend on location.
+PAYMENT: Mobile Money or card. Secure payment link sent with invoice.
 
-ABOUT PAYMENT:
-- We accept Mobile Money (MTN, Vodafone, AirtelTigo) and card payments
-- Customer will receive a secure payment link with their invoice
-
-HERE ARE ALL OUR AVAILABLE PRODUCTS:
-${list}
-
-CRITICAL RULES:
-- Only recommend products from the list above
-- Never make up products that don't exist
-- Keep every response under 4 sentences
-- Be human and natural` },
+PRODUCT LIST:
+${list}` },
       ...history.slice(-8),
       { role: 'user', content: msg }
     ]})
   })
   const data = await res.json()
-  if (data.error) { console.error('OpenAI error:', data.error); return "Sorry, I'm having trouble right now. Please call us on 024 531 5581." }
-  return data.choices?.[0]?.message?.content || "Sorry, please try again or call us on 024 531 5581."
+  if (data.error) { console.error('AI error:', data.error); return "Sorry, having trouble. Call us on 024 531 5581." }
+  return data.choices?.[0]?.message?.content || "Sorry, please call us on 024 531 5581."
 }
 
 async function getConversation(id: string) {
@@ -114,23 +139,34 @@ async function saveConversation(id: string, msgs: any[], name: string) {
   await db.from('wa_conversations').upsert({ chat_id: id, customer_name: name, messages: msgs.slice(-16), updated_at: new Date().toISOString() }, { onConflict: 'chat_id' })
 }
 
-async function createOrder(phone: string, name: string, items: string[], products: any[]) {
+async function createOrder(phone: string, name: string, orderTag: string, products: any[]) {
   const db = getDb()
   const orderItems: any[] = []; let total = 0
-  for (const item of items) {
-    const m = item.match(/(.+?)\s*x\s*(\d+)/i)
+  
+  // Parse [ORDER:5 x 2, 12 x 1] format (using product index numbers)
+  const parts = orderTag.split(',').map(s => s.trim())
+  for (const part of parts) {
+    const m = part.match(/(\d+)\s*x\s*(\d+)/i)
     if (!m) continue
-    const searchName = m[1].trim().toLowerCase()
-    const p = products.find(x => x.name.toLowerCase() === searchName || x.name.toLowerCase().includes(searchName))
+    const idx = parseInt(m[1])
+    const qty = parseInt(m[2])
+    const p = products[idx]
     if (p) {
-      const qty = parseInt(m[2])
       const price = qty >= (p.wholesale_min_qty || 999) && p.wholesale_price ? p.wholesale_price : p.price
       orderItems.push({ productId: p.id, name: p.name, price, qty })
       total += price * qty
+      console.log(`Order item: ${p.name} x${qty} @ GHS ${price}`)
+    } else {
+      console.log(`Product index ${idx} not found`)
     }
   }
-  if (!orderItems.length) return null
-  const { data } = await db.from('whatsapp_orders').insert({
+
+  if (!orderItems.length) {
+    console.log('No valid order items from:', orderTag)
+    return null
+  }
+  
+  const { data, error } = await db.from('whatsapp_orders').insert({
     customer: name || 'WhatsApp Customer',
     phone: phone,
     items: orderItems,
@@ -138,6 +174,9 @@ async function createOrder(phone: string, name: string, items: string[], product
     status: 'Pending',
     date: new Date().toISOString()
   }).select().single()
+  
+  if (error) console.error('Order DB error:', error)
+  console.log('Order created:', data?.id, 'Total:', total)
   return data
 }
 
@@ -148,90 +187,104 @@ serve(async (req) => {
     const body = await req.json()
     const event = body.event || ''
 
-    // FIX DOUBLE MESSAGES: Only process 'message' event, ignore 'message.any'
-    if (event !== 'message') {
-      return new Response(JSON.stringify({ ok: true }), { headers: CORS })
-    }
+    // Only process 'message' event — skip message.any, message_ack, etc.
+    if (event !== 'message') return new Response(JSON.stringify({ ok: true }), { headers: CORS })
 
     const payload = body.payload || {}
-    if (!payload.from) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
-
-    // Skip our own messages
-    if (payload.fromMe) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
-
-    // Skip groups
+    if (!payload.from || payload.fromMe) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
     if (String(payload.from).includes('@g.us')) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
 
     const sender = String(payload.from).replace('@c.us', '').replace('@s.whatsapp.net', '')
     if (!sender || sender.length < 8) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
 
-    // Get message content
+    const chatId = `${sender}@c.us`
+    const customerName = payload._data?.notifyName || payload.notifyName || body.me?.pushName || 'Customer'
     const msgType = payload.type || 'chat'
-    let msgBody = ''
 
-    if (msgType === 'chat' || msgType === 'text') {
-      msgBody = payload.body || payload.text || ''
-    } else if (msgType === 'ptt' || msgType === 'audio') {
-      const chatId = `${sender}@c.us`
-      await sendText(chatId, "Got your voice note! Please type your message so we can help you faster.")
-      return new Response(JSON.stringify({ ok: true }), { headers: CORS })
-    } else if (msgType === 'image') {
-      const chatId = `${sender}@c.us`
-      await sendText(chatId, "Thanks for the photo! Could you describe what product you're looking for?")
+    // Get products early — needed for everything
+    const products = await getProducts()
+
+    // Handle IMAGE messages — use Vision API
+    if (msgType === 'image') {
+      const mediaUrl = payload._data?.mediaUrl || payload.mediaUrl || ''
+      if (mediaUrl) {
+        await sendText(chatId, 'Let me check what this is...')
+        const description = await describeImage(mediaUrl)
+        if (description) {
+          // Search products based on AI description
+          const history = await getConversation(sender)
+          history.push({ role: 'user', content: `Customer sent a photo. The image shows: ${description}. Do you have this or anything similar?` })
+          const aiResponse = await askAI(`Customer sent a photo of a product. The image shows: ${description}. Do you have this or anything similar in stock?`, products, history)
+          
+          let reply = aiResponse
+          // Process image tags
+          for (const match of [...reply.matchAll(/\[IMG:(\d+)\]/g)]) {
+            const p = products[parseInt(match[1])]
+            if (p?.image) await sendImage(chatId, p.image, `${p.name}\nGHS ${p.price}`)
+            reply = reply.replace(match[0], '')
+          }
+          reply = reply.trim()
+          if (reply) await sendText(chatId, reply)
+          
+          history.push({ role: 'assistant', content: aiResponse })
+          await saveConversation(sender, history, customerName)
+        } else {
+          await sendText(chatId, "I couldn't make out the product clearly. Could you describe what you're looking for?")
+        }
+      } else {
+        await sendText(chatId, "Thanks for the photo! Could you describe what product you're looking for?")
+      }
       return new Response(JSON.stringify({ ok: true }), { headers: CORS })
     }
 
+    // Handle voice notes
+    if (msgType === 'ptt' || msgType === 'audio') {
+      await sendText(chatId, "Got your voice note! Please type your message so we can help you faster.")
+      return new Response(JSON.stringify({ ok: true }), { headers: CORS })
+    }
+
+    // Handle text messages
+    const msgBody = payload.body || payload.text || ''
     if (!msgBody) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
 
-    const chatId = `${sender}@c.us`
-    const customerName = payload._data?.notifyName || payload.notifyName || body.me?.pushName || 'Customer'
     console.log(`MSG from ${customerName} (${sender}): ${msgBody}`)
 
-    // Get products and conversation
-    const products = await getProducts()
     const history = await getConversation(sender)
     history.push({ role: 'user', content: msgBody })
 
-    // Get AI response
     const aiResponse = await askAI(msgBody, products, history)
     console.log('AI:', aiResponse.slice(0, 300))
 
     let reply = aiResponse
 
-    // Process image tags [IMG:product name]
-    const imgMatches = [...reply.matchAll(/\[IMG:(.+?)\]/g)]
-    for (const match of imgMatches) {
-      const name = match[1].trim()
-      const product = products.find(p =>
-        p.name.toLowerCase() === name.toLowerCase() ||
-        p.name.toLowerCase().includes(name.toLowerCase()) ||
-        name.toLowerCase().includes(p.name.toLowerCase())
-      )
-      if (product?.image) {
-        await sendImage(chatId, product.image, `${product.name}\nGHS ${product.price}`)
+    // Process image tags [IMG:NUMBER]
+    for (const match of [...reply.matchAll(/\[IMG:(\d+)\]/g)]) {
+      const idx = parseInt(match[1])
+      const p = products[idx]
+      if (p?.image) {
+        await sendImage(chatId, p.image, `${p.name}\nGHS ${p.price}`)
+        console.log('Sent image for:', p.name)
+      } else {
+        console.log('No image for index:', idx)
       }
       reply = reply.replace(match[0], '')
     }
 
-    // Process order tags [ORDER:items]
+    // Process order tags [ORDER:5 x 2, 12 x 1]
     const orderMatch = reply.match(/\[ORDER:(.+?)\]/s)
     if (orderMatch) {
-      const itemsRaw = orderMatch[1]
-      const items = itemsRaw.split(',').map(i => i.trim()).filter(Boolean)
-      const order = await createOrder(sender, customerName, items, products)
+      const order = await createOrder(sender, customerName, orderMatch[1], products)
       reply = reply.replace(orderMatch[0], '')
       if (order) {
-        reply += `\n\nYour invoice is ready! Tap the link below to fill in your delivery details and make payment:\n\nhttps://www.everytinroom.store/#/pay/${order.id}\n\nTotal: GHS ${order.total.toFixed(2)}`
+        reply += `\n\nYour invoice is ready! Tap below to fill in your delivery details and make payment:\n\nhttps://www.everytinroom.store/#/pay/${order.id}\n\nTotal: GHS ${order.total.toFixed(2)}`
       } else {
-        reply += "\n\nSorry, I couldn't create the order. Could you tell me the exact product name and quantity again?"
+        reply += "\n\nSorry, I couldn't process that order. Please tell me the product name and quantity again."
       }
     }
 
-    // Clean up and send
     reply = reply.replace(/\n{3,}/g, '\n\n').trim()
     if (reply) await sendText(chatId, reply)
 
-    // Save conversation
     history.push({ role: 'assistant', content: aiResponse })
     await saveConversation(sender, history, customerName)
 
