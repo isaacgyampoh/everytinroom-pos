@@ -100,7 +100,24 @@ export default function InvoicePay() {
         paystack_ref: ref,
         paid_at: new Date().toISOString(),
         status: 'Paid'
-      }).eq('id', orderId).then(() => loadOrder())
+      }).eq('id', orderId).then(async () => {
+        await loadOrder()
+        // Send WhatsApp payment confirmation
+        try {
+          const { data: o } = await sb.from('whatsapp_orders').select('customer_phone,customer_name,order_no,total').eq('id', orderId).single()
+          if (o?.customer_phone) {
+            const name = o.customer_name ? ` ${o.customer_name}` : ''
+            const msg = `Hi${name}! Thank you for completing your payment.\n\nOrder ID: ${o.order_no}\nAmount: GHS ${Number(o.total).toFixed(2)}\n\nYour order will be packaged and our delivery team will contact you to arrange delivery and let you know the delivery fee to your location.\n\nThank you for shopping with EVERYTINROOM&BEDTIME!`
+            const phone = o.customer_phone.replace(/\D/g, '')
+            const chatId = (phone.startsWith('0') ? '233' + phone.slice(1) : phone) + '@c.us'
+            await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/super-processor', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'send_confirmation', chatId, message: msg })
+            }).catch(() => {})
+          }
+        } catch (e) { console.error('Confirmation send error:', e) }
+      })
     }
   }, [])
 
