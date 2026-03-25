@@ -52,10 +52,11 @@ serve(async (req) => {
     if (!payload.from || payload.fromMe) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
     if (String(payload.from).includes('@g.us')) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
 
-    const sender = String(payload.from).replace('@c.us', '').replace('@s.whatsapp.net', '')
+    const sender = String(payload.from).replace('@c.us', '').replace('@s.whatsapp.net', '').replace('@lid', '')
     if (!sender || sender.length < 8) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
 
-    const chatId = `${sender}@c.us`
+    // Use the ORIGINAL from field as chatId — don't modify it
+    const chatId = String(payload.from)
     const msg = String(payload.body || payload.text || '').trim()
     if (!msg) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
 
