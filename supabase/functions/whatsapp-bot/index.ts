@@ -52,11 +52,27 @@ serve(async (req) => {
     if (!payload.from || payload.fromMe) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
     if (String(payload.from).includes('@g.us')) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
 
+    // Log full payload to find correct phone number field
+    console.log('FULL PAYLOAD:', JSON.stringify(payload).slice(0, 1000))
+    
     const sender = String(payload.from).replace('@c.us', '').replace('@s.whatsapp.net', '').replace('@lid', '')
     if (!sender || sender.length < 8) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
 
-    // Use the ORIGINAL from field as chatId — don't modify it
-    const chatId = String(payload.from)
+    // Try to find the actual phone number from different payload fields
+    const chatIdOptions = [
+      payload.from,                          // original from field
+      payload._data?.id,                     // internal chat id
+      payload.to,                            // to field
+      payload.chatId,                        // chatId field
+      `${sender}@c.us`,                      // phone@c.us format
+      sender,                                // just the number
+    ].filter(Boolean)
+    
+    console.log('ChatId options:', chatIdOptions)
+    
+    // Try sending with each format until one works
+    let chatId = payload.from
+    let sent = false
     const msg = String(payload.body || payload.text || '').trim()
     if (!msg) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
 
@@ -130,7 +146,21 @@ serve(async (req) => {
     }
 
     console.log('Reply:', reply.slice(0, 100))
-    if (reply) await sendText(chatId, reply)
+    if (reply) {
+      // Try sending with different chatId formats
+      for (const tryId of chatIdOptions) {
+        console.log('Trying chatId:', tryId)
+        try {
+          const r = await fetch(`${WAWP_API}/send?instance_id=${WAWP_INSTANCE}&access_token=${WAWP_TOKEN}&chatId=${encodeURIComponent(String(tryId))}&message=${encodeURIComponent(reply)}`, { method: 'POST' })
+          const result = await r.text()
+          console.log('Result for', tryId, ':', result.slice(0, 100))
+          if (result.includes('true') || result.includes('success') || result.includes('message_id')) {
+            console.log('SUCCESS with chatId:', tryId)
+            break
+          }
+        } catch (e) { console.error('Send error for', tryId, ':', e) }
+      }
+    }
 
     return new Response(JSON.stringify({ ok: true }), { headers: CORS })
   } catch (e) {
