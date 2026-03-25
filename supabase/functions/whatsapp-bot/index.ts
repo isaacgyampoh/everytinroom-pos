@@ -153,11 +153,12 @@ async function createOrder(phone: string, name: string, orderTag: string, produc
     const p = products[idx]
     if (p) {
       const price = qty >= (p.wholesale_min_qty || 999) && p.wholesale_price ? p.wholesale_price : p.price
-      orderItems.push({ productId: p.id, name: p.name, price, qty })
-      total += price * qty
-      console.log(`Order item: ${p.name} x${qty} @ GHS ${price}`)
+      const lineTotal = price * qty
+      orderItems.push({ name: p.name, qty, price, lineTotal })
+      total += lineTotal
+      console.log(`Order item: ${p.name} x${qty} @ GHS ${price} = GHS ${lineTotal}`)
     } else {
-      console.log(`Product index ${idx} not found`)
+      console.log(`Product index ${idx} not found in list of ${products.length}`)
     }
   }
 
@@ -166,18 +167,27 @@ async function createOrder(phone: string, name: string, orderTag: string, produc
     return null
   }
   
-  const { data, error } = await db.from('whatsapp_orders').insert({
-    customer: name || 'WhatsApp Customer',
-    phone: phone,
-    items: orderItems,
-    total,
-    status: 'Pending',
-    date: new Date().toISOString()
-  }).select().single()
+  const orderNo = 'WA-' + Date.now().toString(36).toUpperCase()
   
-  if (error) console.error('Order DB error:', error)
-  console.log('Order created:', data?.id, 'Total:', total)
-  return data
+  const { data, error } = await db.from('whatsapp_orders').insert({
+    order_no: orderNo,
+    date: new Date().toISOString(),
+    customer_name: name || 'WhatsApp Customer',
+    customer_phone: phone,
+    items: orderItems,
+    subtotal: total,
+    delivery_fee: 0,
+    total: total,
+    status: 'Pending',
+    notes: 'Order via AI WhatsApp Bot'
+  }).select('id').single()
+  
+  if (error) {
+    console.error('Order DB error:', JSON.stringify(error))
+    return null
+  }
+  console.log('Order created:', data?.id, 'OrderNo:', orderNo, 'Total:', total)
+  return { ...data, total }
 }
 
 serve(async (req) => {
