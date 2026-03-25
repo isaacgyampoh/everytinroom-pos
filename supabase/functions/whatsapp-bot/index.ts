@@ -19,62 +19,88 @@ async function getProducts() {
   return data || []
 }
 
-// Fetch latest messages from a chat via WAWP API
-async function fetchMessages(chatId: string) {
-  try {
-    const url = `${WAWP_API}/chats/${chatId}/messages?instance_id=${WAWP_INSTANCE}&access_token=${WAWP_TOKEN}&limit=1&downloadMedia=false`
-    console.log('Fetching messages from:', url)
-    const res = await fetch(url, { method: 'POST' })
-    const data = await res.json()
-    console.log('Fetched messages:', JSON.stringify(data).slice(0, 500))
-    return data
-  } catch (e) { console.error('Fetch messages error:', e); return null }
-}
-
 async function sendText(chatId: string, message: string) {
   try {
-    const url = `${WAWP_API}/send?instance_id=${WAWP_INSTANCE}&access_token=${WAWP_TOKEN}&chatId=${chatId}&message=${encodeURIComponent(message)}`
-    const res = await fetch(url, { method: 'POST' })
-    const r = await res.text()
-    console.log('Send result:', r)
+    const res = await fetch(`${WAWP_API}/send?instance_id=${WAWP_INSTANCE}&access_token=${WAWP_TOKEN}&chatId=${encodeURIComponent(chatId)}&message=${encodeURIComponent(message)}`, { method: 'POST' })
+    console.log('Sent to', chatId, ':', (await res.text()).slice(0, 100))
   } catch (e) { console.error('Send error:', e) }
 }
 
 async function sendImage(chatId: string, imageUrl: string, caption: string) {
   try {
-    const url = `${WAWP_API}/sendImage?instance_id=${WAWP_INSTANCE}&access_token=${WAWP_TOKEN}&chatId=${chatId}&file[url]=${encodeURIComponent(imageUrl)}&file[filename]=product.jpg&file[mimetype]=image/jpeg&caption=${encodeURIComponent(caption)}`
-    await fetch(url, { method: 'POST' })
-  } catch (e) { console.error('Send image error:', e) }
+    const url = `${WAWP_API}/sendImage?instance_id=${WAWP_INSTANCE}&access_token=${WAWP_TOKEN}&chatId=${encodeURIComponent(chatId)}&file%5Burl%5D=${encodeURIComponent(imageUrl)}&file%5Bfilename%5D=product.jpg&file%5Bmimetype%5D=image/jpeg&caption=${encodeURIComponent(caption)}`
+    const res = await fetch(url, { method: 'POST' })
+    console.log('Image sent:', (await res.text()).slice(0, 100))
+  } catch (e) { console.error('Image error:', e) }
 }
 
 async function askAI(msg: string, products: any[], history: any[]) {
   const list = products.map(p => {
-    let s = `- ${p.name} (${p.category || 'General'}) — GHS ${p.price}`
-    if (p.wholesale_price && p.wholesale_min_qty) s += ` | Wholesale: GHS ${p.wholesale_price} for ${p.wholesale_min_qty}+`
+    let s = `${p.name} | Category: ${p.category || 'General'} | Price: GHS ${p.price}`
+    if (p.wholesale_price && p.wholesale_min_qty) s += ` | Buy ${p.wholesale_min_qty}+ for GHS ${p.wholesale_price} each`
+    if (p.quantity <= 3) s += ' | LOW STOCK'
     return s
   }).join('\n')
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_KEY}` },
-    body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 500, messages: [
-      { role: 'system', content: `You are the friendly WhatsApp sales assistant for ${SHOP_NAME}, a home furnishings shop in Adenta, Accra, Ghana. Nationwide delivery.
+    body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 600, temperature: 0.7, messages: [
+      { role: 'system', content: `You are a human sales assistant for ${SHOP_NAME}, a home furnishings and bedding shop located at Adenta Aviation Road, Accra, Ghana. Phone: 024 531 5581 / 024 936 5339. We do nationwide delivery across Ghana.
 
-RULES:
-- Short replies, max 3-4 sentences. No markdown.
-- Search products and share what's available with prices
-- To show an image: [SHOW_IMAGE:exact_product_name]
-- To create order: [CREATE_ORDER:item1 x qty1, item2 x qty2]
-- Never say you're AI. You are the ${SHOP_NAME} team.
-- Reply in customer's language (English/Twi/Pidgin)
+HOW TO BEHAVE:
+- You are a real person, part of the ${SHOP_NAME} team. NEVER say you are AI or a bot.
+- Be warm, friendly, and professional. Like chatting with a helpful shop assistant.
+- Keep messages SHORT - 2 to 4 sentences max. This is WhatsApp, not email.
+- Use plain text only. No bold, no italic, no bullet points, no markdown.
+- Reply in whatever language the customer uses (English, Twi, Pidgin).
+- If a customer greets you (hi, hello, etc), greet them back warmly and ask how you can help.
 
-PRODUCTS:\n${list}` },
-      ...history.slice(-10),
+WHEN CUSTOMER ASKS ABOUT PRODUCTS:
+- Search the product list below carefully
+- Only mention products that ACTUALLY exist in the list
+- Include the exact price for each product
+- If you find matching products, list them naturally like: "We have the [name] for GHS [price]"
+- If no exact match, suggest the closest alternatives
+- NEVER invent or make up product names or prices
+
+WHEN CUSTOMER WANTS TO SEE A PRODUCT PHOTO:
+- Say something like "Here's what it looks like" or "Let me show you"
+- Then add this exact tag on its own line: [IMG:exact product name from list]
+- Example: [IMG:3-in-1 Bedsheet Set Blue]
+- ONLY use product names exactly as they appear in the list below
+
+WHEN CUSTOMER WANTS TO ORDER:
+- Confirm what they want and the quantity
+- Calculate the total
+- Ask them to confirm
+- When they say YES or confirm, create the order by adding this tag on its own line:
+  [ORDER:Product Name x Quantity, Another Product x Quantity]
+- Example: [ORDER:3-in-1 Bedsheet Set Blue x 2, Pillow Case White x 4]
+
+ABOUT DELIVERY:
+- We deliver nationwide across Ghana
+- Delivery fees depend on location and will be communicated after order confirmation
+
+ABOUT PAYMENT:
+- We accept Mobile Money (MTN, Vodafone, AirtelTigo) and card payments
+- Customer will receive a secure payment link with their invoice
+
+HERE ARE ALL OUR AVAILABLE PRODUCTS:
+${list}
+
+CRITICAL RULES:
+- Only recommend products from the list above
+- Never make up products that don't exist
+- Keep every response under 4 sentences
+- Be human and natural` },
+      ...history.slice(-8),
       { role: 'user', content: msg }
     ]})
   })
   const data = await res.json()
-  return data.choices?.[0]?.message?.content || "Sorry, please try again or call us."
+  if (data.error) { console.error('OpenAI error:', data.error); return "Sorry, I'm having trouble right now. Please call us on 024 531 5581." }
+  return data.choices?.[0]?.message?.content || "Sorry, please try again or call us on 024 531 5581."
 }
 
 async function getConversation(id: string) {
@@ -85,24 +111,35 @@ async function getConversation(id: string) {
 
 async function saveConversation(id: string, msgs: any[], name: string) {
   const db = getDb()
-  await db.from('wa_conversations').upsert({ chat_id: id, customer_name: name, messages: msgs.slice(-20), updated_at: new Date().toISOString() }, { onConflict: 'chat_id' })
+  await db.from('wa_conversations').upsert({ chat_id: id, customer_name: name, messages: msgs.slice(-16), updated_at: new Date().toISOString() }, { onConflict: 'chat_id' })
 }
 
-async function createOrder(id: string, name: string, items: string[], products: any[]) {
+async function createOrder(phone: string, name: string, items: string[], products: any[]) {
   const db = getDb()
-  const oi: any[] = []; let total = 0
+  const orderItems: any[] = []; let total = 0
   for (const item of items) {
-    const m = item.match(/(.+)\s*x\s*(\d+)/i); if (!m) continue
-    const p = products.find(x => x.name.toLowerCase().includes(m[1].trim().toLowerCase()))
-    if (p) { const q = parseInt(m[2]); const pr = q >= (p.wholesale_min_qty||999) && p.wholesale_price ? p.wholesale_price : p.price; oi.push({ productId: p.id, name: p.name, price: pr, qty: q }); total += pr * q }
+    const m = item.match(/(.+?)\s*x\s*(\d+)/i)
+    if (!m) continue
+    const searchName = m[1].trim().toLowerCase()
+    const p = products.find(x => x.name.toLowerCase() === searchName || x.name.toLowerCase().includes(searchName))
+    if (p) {
+      const qty = parseInt(m[2])
+      const price = qty >= (p.wholesale_min_qty || 999) && p.wholesale_price ? p.wholesale_price : p.price
+      orderItems.push({ productId: p.id, name: p.name, price, qty })
+      total += price * qty
+    }
   }
-  if (!oi.length) return null
-  const { data } = await db.from('whatsapp_orders').insert({ customer: name, phone: id.replace('@c.us',''), items: oi, total, status: 'Pending', date: new Date().toISOString() }).select().single()
+  if (!orderItems.length) return null
+  const { data } = await db.from('whatsapp_orders').insert({
+    customer: name || 'WhatsApp Customer',
+    phone: phone,
+    items: orderItems,
+    total,
+    status: 'Pending',
+    date: new Date().toISOString()
+  }).select().single()
   return data
 }
-
-// Track processed message IDs to avoid duplicates
-const processed = new Set<string>()
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
@@ -110,121 +147,97 @@ serve(async (req) => {
   try {
     const body = await req.json()
     const event = body.event || ''
-    console.log('Event:', event)
 
-    // Only process actual message events
-    if (event !== 'message' && event !== 'message.any') {
+    // FIX DOUBLE MESSAGES: Only process 'message' event, ignore 'message.any'
+    if (event !== 'message') {
       return new Response(JSON.stringify({ ok: true }), { headers: CORS })
     }
 
-    // Check if payload has message data directly
     const payload = body.payload || {}
-    console.log('Payload:', JSON.stringify(payload).slice(0, 500))
+    if (!payload.from) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
 
-    let sender = ''
-    let msgBody = ''
-    let msgType = ''
-    let fromMe = false
-    let customerName = ''
-    let mediaUrl = ''
-
-    if (payload.from) {
-      // WAWP sends payload with message details
-      sender = String(payload.from).replace('@c.us', '').replace('@s.whatsapp.net', '')
-      fromMe = payload.fromMe || false
-      customerName = payload._data?.notifyName || payload.notifyName || body.me?.pushName || 'Customer'
-      msgType = payload.type || 'chat'
-
-      if (msgType === 'chat' || msgType === 'text') {
-        msgBody = payload.body || payload.text || ''
-      } else if (msgType === 'ptt' || msgType === 'audio') {
-        mediaUrl = payload.mediaUrl || payload._data?.mediaUrl || ''
-      } else if (msgType === 'image') {
-        mediaUrl = payload.mediaUrl || payload._data?.mediaUrl || ''
-      }
-
-      console.log('From payload - Sender:', sender, 'Body:', msgBody, 'Type:', msgType, 'FromMe:', fromMe)
-    }
-
-    // If no sender from payload, try fetching latest messages
-    if (!sender && !fromMe) {
-      console.log('No sender in payload, checking if we can extract from webhook')
-      // The webhook might just be a notification - skip if no data
-      return new Response(JSON.stringify({ ok: true }), { headers: CORS })
-    }
-
-    if (fromMe || !sender || sender.length < 8) {
-      console.log('Skipping: fromMe or no sender')
-      return new Response(JSON.stringify({ ok: true }), { headers: CORS })
-    }
+    // Skip our own messages
+    if (payload.fromMe) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
 
     // Skip groups
-    if (String(payload.from || '').includes('@g.us')) {
+    if (String(payload.from).includes('@g.us')) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
+
+    const sender = String(payload.from).replace('@c.us', '').replace('@s.whatsapp.net', '')
+    if (!sender || sender.length < 8) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
+
+    // Get message content
+    const msgType = payload.type || 'chat'
+    let msgBody = ''
+
+    if (msgType === 'chat' || msgType === 'text') {
+      msgBody = payload.body || payload.text || ''
+    } else if (msgType === 'ptt' || msgType === 'audio') {
+      const chatId = `${sender}@c.us`
+      await sendText(chatId, "Got your voice note! Please type your message so we can help you faster.")
+      return new Response(JSON.stringify({ ok: true }), { headers: CORS })
+    } else if (msgType === 'image') {
+      const chatId = `${sender}@c.us`
+      await sendText(chatId, "Thanks for the photo! Could you describe what product you're looking for?")
       return new Response(JSON.stringify({ ok: true }), { headers: CORS })
     }
 
-    // Skip duplicate messages
-    const msgId = payload.id || body.id || ''
-    if (msgId && processed.has(msgId)) {
-      console.log('Duplicate, skipping:', msgId)
-      return new Response(JSON.stringify({ ok: true }), { headers: CORS })
-    }
-    if (msgId) processed.add(msgId)
-    // Keep set small
-    if (processed.size > 100) processed.clear()
+    if (!msgBody) return new Response(JSON.stringify({ ok: true }), { headers: CORS })
 
     const chatId = `${sender}@c.us`
+    const customerName = payload._data?.notifyName || payload.notifyName || body.me?.pushName || 'Customer'
+    console.log(`MSG from ${customerName} (${sender}): ${msgBody}`)
 
-    // Handle voice/image (skip for now if no direct URL)
-    if (!msgBody && (msgType === 'ptt' || msgType === 'audio')) {
-      await sendText(chatId, "Got your voice note! For now, please type your message so I can help you faster.")
-      return new Response(JSON.stringify({ ok: true }), { headers: CORS })
-    }
-    if (!msgBody && msgType === 'image') {
-      await sendText(chatId, "Thanks for the image! Could you also describe what product you're looking for?")
-      return new Response(JSON.stringify({ ok: true }), { headers: CORS })
-    }
-
-    if (!msgBody) {
-      console.log('No message body, skipping')
-      return new Response(JSON.stringify({ ok: true }), { headers: CORS })
-    }
-
-    console.log('Processing:', sender, msgBody)
-
+    // Get products and conversation
     const products = await getProducts()
     const history = await getConversation(sender)
     history.push({ role: 'user', content: msgBody })
 
+    // Get AI response
     const aiResponse = await askAI(msgBody, products, history)
-    console.log('AI:', aiResponse.slice(0, 200))
+    console.log('AI:', aiResponse.slice(0, 300))
 
-    // Handle images
-    let clean = aiResponse
-    for (const match of [...aiResponse.matchAll(/\[SHOW_IMAGE:(.+?)\]/g)]) {
-      const p = products.find(x => x.name.toLowerCase().includes(match[1].trim().toLowerCase()))
-      if (p?.image) await sendImage(chatId, p.image, `${p.name}\nGHS ${p.price}`)
-      clean = clean.replace(match[0], '')
+    let reply = aiResponse
+
+    // Process image tags [IMG:product name]
+    const imgMatches = [...reply.matchAll(/\[IMG:(.+?)\]/g)]
+    for (const match of imgMatches) {
+      const name = match[1].trim()
+      const product = products.find(p =>
+        p.name.toLowerCase() === name.toLowerCase() ||
+        p.name.toLowerCase().includes(name.toLowerCase()) ||
+        name.toLowerCase().includes(p.name.toLowerCase())
+      )
+      if (product?.image) {
+        await sendImage(chatId, product.image, `${product.name}\nGHS ${product.price}`)
+      }
+      reply = reply.replace(match[0], '')
     }
 
-    // Handle orders
-    const om = clean.match(/\[CREATE_ORDER:(.+?)\]/s)
-    if (om) {
-      const items = om[1].split(',').map(i => i.trim())
+    // Process order tags [ORDER:items]
+    const orderMatch = reply.match(/\[ORDER:(.+?)\]/s)
+    if (orderMatch) {
+      const itemsRaw = orderMatch[1]
+      const items = itemsRaw.split(',').map(i => i.trim()).filter(Boolean)
       const order = await createOrder(sender, customerName, items, products)
-      clean = clean.replace(om[0], '')
-      if (order) clean += `\n\nYour invoice is ready! Click to pay:\nhttps://www.everytinroom.store/#/pay/${order.id}\n\nTotal: GHS ${order.total.toFixed(2)}`
+      reply = reply.replace(orderMatch[0], '')
+      if (order) {
+        reply += `\n\nYour invoice is ready! Tap the link below to fill in your delivery details and make payment:\n\nhttps://www.everytinroom.store/#/pay/${order.id}\n\nTotal: GHS ${order.total.toFixed(2)}`
+      } else {
+        reply += "\n\nSorry, I couldn't create the order. Could you tell me the exact product name and quantity again?"
+      }
     }
 
-    clean = clean.trim()
-    if (clean) await sendText(chatId, clean)
+    // Clean up and send
+    reply = reply.replace(/\n{3,}/g, '\n\n').trim()
+    if (reply) await sendText(chatId, reply)
 
+    // Save conversation
     history.push({ role: 'assistant', content: aiResponse })
     await saveConversation(sender, history, customerName)
 
     return new Response(JSON.stringify({ ok: true }), { headers: CORS })
   } catch (e) {
-    console.error('ERROR:', e.message, e.stack)
+    console.error('ERROR:', e.message)
     return new Response(JSON.stringify({ error: e.message }), { headers: CORS, status: 500 })
   }
 })
