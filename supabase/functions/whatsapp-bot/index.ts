@@ -89,10 +89,39 @@ serve(async (req) => {
 
     console.log(`${name} (${sender}): ${msg}`)
 
+    // Update customer phone on the order if it came from catalog
+    const db = getDb()
+
     let reply = ''
 
+    // 0. CATALOG ORDER — detect "Order ref: XXXX" and reply with invoice
+    const orderRefMatch = msg.match(/Order ref:\s*(.+)/i)
+    if (orderRefMatch || (lower.includes('i would like to order') && lower.includes('everytinroom'))) {
+      const orderId = orderRefMatch ? orderRefMatch[1].trim() : null
+      
+      if (orderId) {
+        // Update the order with customer's phone number
+        await db.from('whatsapp_orders').update({ customer_phone: sender, customer_name: name || '' }).eq('id', orderId)
+        
+        // Get order total
+        const { data: orderData } = await db.from('whatsapp_orders').select('total,order_no,items').eq('id', orderId).single()
+        
+        if (orderData) {
+          const items = orderData.items || []
+          const itemList = items.map((i: any) => `${i.qty}x ${i.name} - GHS ${Number(i.lineTotal || i.price * i.qty).toFixed(2)}`).join('\n')
+          const invoiceLink = `https://www.everytinroom.store/#/pay/${orderId}`
+          
+          reply = `Thank you for your order${hi}!\n\n${itemList}\n\nTotal: GHS ${Number(orderData.total).toFixed(2)}\n\nPlease click the link below to fill in your delivery details and make payment:\n\n${invoiceLink}\n\nOnce payment is confirmed, we'll package your order and our delivery team will contact you. If you need any help, call us on ${PHONE}.`
+        } else {
+          reply = `Thank you for your order${hi}! We're preparing your invoice and will send it to you shortly. If you need urgent help, call ${PHONE}.`
+        }
+      } else {
+        reply = `Thank you for your order${hi}! We're preparing your invoice and will send it to you shortly. If you need urgent help, call ${PHONE}.`
+      }
+    }
+
     // 1. GREETING
-    if (/^(hi|hello|hey|good\s?(morning|afternoon|evening)|yo|sup|hii+|helo+|howdy|hy)[\s!.,?]*$/i.test(lower) || lower === 'hi' || lower === 'hello') {
+    else if (/^(hi|hello|hey|good\s?(morning|afternoon|evening)|yo|sup|hii+|helo+|howdy|hy)[\s!.,?]*$/i.test(lower) || lower === 'hi' || lower === 'hello') {
       reply = `${timeGreet()}${hi}! This is EVERYTINROOM&BEDTIME, how may we help you?`
     }
 

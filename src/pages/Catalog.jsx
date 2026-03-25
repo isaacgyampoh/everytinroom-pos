@@ -59,7 +59,7 @@ export default function Catalog() {
     if (!cart.length) return
     setToast('Creating your order...')
     
-    // Create order in database automatically
+    // Create order in database
     const sb = getSupabase()
     const orderNo = 'WA-' + Date.now().toString(36).toUpperCase()
     const orderItems = cart.map(c => ({ name: c.name, qty: c.qty, price: c.price, lineTotal: c.price * c.qty }))
@@ -82,22 +82,23 @@ export default function Catalog() {
       return
     }
     
-    const invoiceLink = `${window.location.origin}/#/pay/${data.id}`
+    // Store order ID so bot can find it
+    const orderId = data.id
     
-    // Build WhatsApp message with invoice link
+    // Customer message is JUST the order list — no payment link
     const lines = ['Hi, I would like to order the following from EVERYTINROOM:', '']
     cart.forEach(c => lines.push(`- ${c.qty}x ${c.name}`))
-    lines.push('', `Your invoice is ready. Click here to fill in your delivery details and make payment:`, '', invoiceLink, '', `Total: GHS ${ct.toFixed(2)}`, '', 'Thank you for shopping with us!')
+    lines.push('', `Order ref: ${orderId}`)
     const msg = lines.join('\n')
     
-    // Open WhatsApp with the message
+    // Open WhatsApp with simple order message
     if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
       window.location.href = `whatsapp://send?phone=${WA}&text=${encodeURIComponent(msg)}`
     } else {
       window.open(`https://web.whatsapp.com/send?phone=${WA}&text=${encodeURIComponent(msg)}`, '_blank')
     }
     try { navigator.clipboard.writeText(msg) } catch {}
-    setToast('Order created! Send the message on WhatsApp.')
+    setToast('Send the message on WhatsApp!')
   }
 
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center" style={{ colorScheme: 'light' }}><div className="w-7 h-7 border-[2.5px] border-stone-200 border-t-green-700 rounded-full animate-spin" /></div>
