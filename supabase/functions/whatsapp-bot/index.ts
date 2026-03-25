@@ -7,7 +7,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
 const SUPABASE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 const WAWP_API = 'https://wawp.net/wp-json/awp/v1'
 const CATALOG = 'https://www.everytinroom.store/#/catalog'
-const PHONE = '024 531 5581'
+const PHONE = '053 354 7740'
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Content-Type': 'application/json' }
 
