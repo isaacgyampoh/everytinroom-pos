@@ -9,7 +9,7 @@ const thumb = (url, w = 500) => {
   if (url.includes('supabase')) return url + (url.includes('?') ? '&' : '?') + `width=${w}&quality=80`
   return url
 }
-const WA = '233533547740'
+const WA = '233245315581'
 
 export default function Catalog() {
   const [products, setProducts] = useState([])
