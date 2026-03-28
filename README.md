@@ -101,5 +101,5 @@ supabase/
 -  Daily/weekly/monthly reports
 -  SMS reports (mNotify) via pg_cron
 -  PIN-based auth (admin: 1024)
-- ⚡ Realtime updates via Supabase WebSockets
+-  Realtime updates via Supabase WebSockets
 -  Mobile-first responsive design
