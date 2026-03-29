@@ -55,50 +55,15 @@ export default function Catalog() {
   const upd = (id, d) => setCart(prev => prev.map(c => { if (c.id !== id) return c; const n = Math.max(0, c.qty + d); if (!n) return { ...c, qty: 0 }; const iw = c.wp > 0 && c.wm > 0 && n >= c.wm; return { ...c, qty: n, price: iw ? c.wp : c.rp, isW: iw } }).filter(c => c.qty > 0))
   const cc = cart.reduce((a, c) => a + c.qty, 0), ct = cart.reduce((a, c) => a + c.price * c.qty, 0)
 
-  const order = async () => {
+  const order = () => {
     if (!cart.length) return
-    setToast('Creating your order...')
-    
-    // Create order in database
-    const sb = getSupabase()
-    const orderNo = 'WA-' + Date.now().toString(36).toUpperCase()
-    const orderItems = cart.map(c => ({ name: c.name, qty: c.qty, price: c.price, lineTotal: c.price * c.qty }))
-    
-    const { data, error } = await sb.from('whatsapp_orders').insert({
-      order_no: orderNo,
-      date: new Date().toISOString(),
-      customer_name: '',
-      customer_phone: '',
-      items: orderItems,
-      subtotal: ct,
-      delivery_fee: 0,
-      total: ct,
-      status: 'Pending',
-      notes: 'Order from Catalog'
-    }).select('id').single()
-    
-    if (error || !data) {
-      setToast('Order failed, please try again')
-      return
-    }
-    
-    // Store order ID so bot can find it
-    const orderId = data.id
-    
-    // Customer message is JUST the order list — no payment link
     const lines = ['Hi, I would like to order the following from EVERYTINROOM:', '']
     cart.forEach(c => lines.push(`- ${c.qty}x ${c.name}`))
-    lines.push('', `Order ref: ${orderId}`)
+    lines.push('', 'Your invoice will be sent to you shortly. Thank you.')
     const msg = lines.join('\n')
-    
-    // Open WhatsApp with simple order message
-    if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
-      window.location.href = `whatsapp://send?phone=${WA}&text=${encodeURIComponent(msg)}`
-    } else {
-      window.open(`https://web.whatsapp.com/send?phone=${WA}&text=${encodeURIComponent(msg)}`, '_blank')
-    }
+    if (/Android|iPhone|iPad/i.test(navigator.userAgent)) window.location.href = `whatsapp://send?phone=${WA}&text=${encodeURIComponent(msg)}`
+    else window.open(`https://web.whatsapp.com/send?phone=${WA}&text=${encodeURIComponent(msg)}`, '_blank')
     try { navigator.clipboard.writeText(msg) } catch {}
-    setToast('Send the message on WhatsApp!')
   }
 
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center" style={{ colorScheme: 'light' }}><div className="w-7 h-7 border-[2.5px] border-stone-200 border-t-green-700 rounded-full animate-spin" /></div>
