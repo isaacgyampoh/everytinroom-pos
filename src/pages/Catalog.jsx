@@ -46,7 +46,7 @@ export default function Catalog() {
 
   const cats = useMemo(() => ['all', ...[...new Set(products.filter(p => p.category).map(p => p.category))].sort()], [products])
   const counts = useMemo(() => { const c = { all: products.length }; products.forEach(p => { if (p.category) c[p.category] = (c[p.category] || 0) + 1 }); return c }, [products])
-  const filtered = useMemo(() => { const q = search.toLowerCase(); return products.filter(p => (!q || p.name.toLowerCase().includes(q)) && (cat === 'all' || p.category === cat)) }, [products, search, cat])
+  const filtered = useMemo(() => { const q = search.toLowerCase(); const items = products.filter(p => (!q || p.name.toLowerCase().includes(q)) && (cat === 'all' || p.category === cat)); return items.sort((a, b) => (a.category || 'ZZZ').localeCompare(b.category || 'ZZZ') || a.name.localeCompare(b.name)) }, [products, search, cat])
 
   const add = product => {
     setCart(prev => { const ex = prev.find(c => c.id === product.id); if (ex) { const n = ex.qty + 1, wp = Number(product.wholesale_price || 0), wm = Number(product.wholesale_min_qty || 0); return prev.map(c => c.id === product.id ? { ...c, qty: n, price: (wp > 0 && wm > 0 && n >= wm) ? wp : Number(product.price), isW: wp > 0 && wm > 0 && n >= wm } : c) }; return [...prev, { id: product.id, name: product.name, price: Number(product.price), rp: Number(product.price), wp: Number(product.wholesale_price || 0), wm: Number(product.wholesale_min_qty || 0), qty: 1, img: product.image, isW: false }] })
