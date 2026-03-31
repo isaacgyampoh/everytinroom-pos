@@ -245,13 +245,16 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                 total: total,
                 status: 'Pending',
                 notes: 'Invoice from POS'
-              }).select('id').single()
+              }).select('id,ussd_code').single()
               if (error) { toast.error('Failed to create invoice'); setProcessing(false); return }
 
               const link = window.location.origin + '/#/pay/' + data.id
+              const ussd = data.ussd_code ? `\n\nOr dial *920*141*${data.ussd_code}# to pay via USSD` : ''
               const lines = ['Hi, your order from EVERYTINROOM is ready.', '']
               orderItems.forEach(it => lines.push(`${it.qty}x ${it.name} - GHS ${Number(it.lineTotal).toFixed(2)}`))
-              lines.push('', `Total: GHS ${Number(total).toFixed(2)}`, '', 'Please click the link below to make payment and fill in your delivery details:', link, '', 'Thank you.')
+              lines.push('', `Total: GHS ${Number(total).toFixed(2)}`, '', 'Please click the link below to make payment and fill in your delivery details:', link)
+              if (ussd) lines.push(ussd)
+              lines.push('', 'Thank you.')
               const msg = lines.join('\n')
 
               // Copy message to clipboard first

@@ -136,7 +136,7 @@ export default function WhatsAppOrders() {
                 </div>
                 <span className={`px-3 py-1.5 rounded-lg text-[11px] font-bold ${statusColor(order.status)}`}>{order.status}</span>
               </div>
-              <div className="text-xs text-stone-400 mb-2">{order.items.length} item{order.items.length !== 1 ? 's' : ''}{order.address ? ' · Delivery filled' : ' · No delivery details'}</div>
+              <div className="text-xs text-stone-400 mb-2">{order.items.length} item{order.items.length !== 1 ? 's' : ''}{order.address ? ' · Delivery filled' : ' · No delivery details'}{order.ussdCode ? ` · USSD: *920*141*${order.ussdCode}#` : ''}</div>
               <div className="flex items-center justify-between pt-2.5 border-t border-stone-100">
                 <div className="text-lg font-extrabold">{money(order.total)}</div>
                 <span className="text-xs font-medium text-brand-600">View details →</span>
@@ -199,6 +199,19 @@ export default function WhatsAppOrders() {
               </div>
             </div>
 
+            {/* USSD Payment Code */}
+            {o.ussdCode && (
+              <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                <div className="text-xs text-amber-600 uppercase tracking-wider mb-2 font-semibold">USSD Payment Code</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-lg font-extrabold text-amber-900 font-mono tracking-wider">*920*141*{o.ussdCode}#</div>
+                  <button onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(`*920*141*${o.ussdCode}#`); toast.success('USSD code copied!') }}
+                    className="h-9 px-4 bg-amber-500 text-white rounded-lg text-xs font-bold active:scale-95 transition">Copy</button>
+                </div>
+                <p className="text-[11px] text-amber-600 mt-2">Customer dials this code → confirms amount → pays via MoMo</p>
+              </div>
+            )}
+
             {/* Payment Info */}
             {o.paystackRef && (
               <div className="bg-gray-50 rounded-xl p-4">
@@ -223,7 +236,8 @@ export default function WhatsAppOrders() {
                 <button onClick={() => resendInvoice(o)} className="w-full h-12 bg-[#25d366] text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Resend Invoice</button>
                 <div className="flex gap-2">
                   <button onClick={() => copyLink(o)} className="flex-1 h-11 bg-stone-200 text-stone-700 rounded-xl text-sm font-semibold active:scale-[.98] transition">Copy Link</button>
-                  <button onClick={() => cancel(o.id)} className="flex-1 h-11 bg-red-500 text-white rounded-xl text-sm font-semibold active:scale-[.98] transition">Cancel Order</button>
+                  {o.ussdCode && <button onClick={() => { navigator.clipboard?.writeText(`*920*141*${o.ussdCode}#`); toast.success('USSD code copied!') }} className="flex-1 h-11 bg-amber-400 text-black rounded-xl text-sm font-semibold active:scale-[.98] transition">Copy USSD</button>}
+                  <button onClick={() => cancel(o.id)} className="flex-1 h-11 bg-red-500 text-white rounded-xl text-sm font-semibold active:scale-[.98] transition">Cancel</button>
                 </div>
               </div>
             )}

@@ -10,12 +10,13 @@ export default function StaffPage() {
   const [form, setForm] = useState({ id: '', name: '', role: 'Cashier', pin: '' })
 
   const openNew = () => { setForm({ id: '', name: '', role: 'Cashier', pin: '' }); setModal(true) }
-  const openEdit = (s) => { setForm({ id: s.id, name: s.name, role: s.role, pin: s.pin }); setModal(true) }
+  const openEdit = (s) => { setForm({ id: s.id, name: s.name, role: s.role, pin: '' }); setModal(true) }
 
   const save = async () => {
     if (!form.name.trim() || form.pin.length !== 4) { toast.error('Name & 4-digit PIN required'); return }
     setLoading(true, 'Saving...'); const sb = getSupabase()
-    const data = { name: form.name.trim(), role: form.role, pin: form.pin, active: true }
+    const data = { name: form.name.trim(), role: form.role, active: true }
+    if (form.pin) data.pin = form.pin
     if (form.id) await sb.from('staff').update(data).eq('id', form.id)
     else await sb.from('staff').insert(data)
     await refreshStaff(); setLoading(false); setModal(false); toast.success('Saved!')

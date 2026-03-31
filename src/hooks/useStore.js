@@ -8,7 +8,7 @@ const mapSale = s => ({ id: s.id, receiptNo: s.receipt_no, date: s.date, items: 
 const mapStaff = s => ({ id: s.id, name: s.name, role: s.role, active: s.active })
 const mapExpense = e => ({ id: e.id, date: e.date, category: e.category, description: e.description, amount: num(e.amount) })
 const mapCustomer = c => ({ id: c.id, phone: c.phone, visitCount: num(c.visit_count), totalSpent: num(c.total_spent), lastVisit: c.last_visit })
-const mapWAOrder = o => ({ id: o.id, orderNo: o.order_no, date: o.date, customerName: o.customer_name, customerPhone: o.customer_phone, items: typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || []), subtotal: num(o.subtotal), deliveryFee: num(o.delivery_fee), total: num(o.total), address: o.address, notes: o.notes, status: o.status, paystackRef: o.paystack_ref, paidAt: o.paid_at, processedBy: o.processed_by, processedAt: o.processed_at })
+const mapWAOrder = o => ({ id: o.id, orderNo: o.order_no, date: o.date, customerName: o.customer_name, customerPhone: o.customer_phone, items: typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || []), subtotal: num(o.subtotal), deliveryFee: num(o.delivery_fee), total: num(o.total), address: o.address, notes: o.notes, status: o.status, paystackRef: o.paystack_ref, paidAt: o.paid_at, processedBy: o.processed_by, processedAt: o.processed_at, ussdCode: o.ussd_code })
 const mapRefund = r => ({ id: r.id, refundNo: r.refund_no, date: r.date, originalReceiptNo: r.original_receipt_no, items: typeof r.items === 'string' ? JSON.parse(r.items) : (r.items || []), refundAmount: num(r.refund_amount), reason: r.reason, processedBy: r.processed_by, customer: r.customer, status: r.status })
 const mapPromo = p => ({ id: p.id, name: p.name, startDate: p.start_date, endDate: p.end_date, items: typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || []), active: p.active })
 const mapInvoice = i => ({ id: i.id, invoiceId: i.invoice_id, date: i.date, supplier: i.supplier, amount: num(i.amount), notes: i.notes, image: i.image || '' })
@@ -154,7 +154,7 @@ export const useStore = create((set, get) => ({
   refreshProducts: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'products', { order: 'name', asc: true }); set({ products: d.map(mapProduct) }) },
   refreshSales: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'sales', { order: 'date', limit: 300 }); set({ sales: d.map(mapSale) }) },
   refreshWAOrders: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'whatsapp_orders', { order: 'date', limit: 100 }); set({ waOrders: d.map(mapWAOrder) }) },
-  refreshStaff: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'staff'); set({ staff: d.map(mapStaff) }) },
+  refreshStaff: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'staff', { select: 'id,name,role,active' }); set({ staff: d.map(mapStaff) }) },
   refreshBundles: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'bundles'); set({ bundles: d.map(mapBundle) }) },
   refreshExpenses: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'expenses', { order: 'date', limit: 200 }); set({ expenses: d.map(mapExpense) }) },
   refreshCustomers: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'customers', { order: 'total_spent', limit: 500 }); set({ customers: d.map(mapCustomer) }) },

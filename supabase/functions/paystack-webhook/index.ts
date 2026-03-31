@@ -2,9 +2,28 @@
 // Deploy: supabase functions deploy paystack-webhook --no-verify-jwt
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { encode as hexEncode } from 'https://deno.land/std@0.177.0/encoding/hex.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const PAYSTACK_SECRET = Deno.env.get('PAYSTACK_SECRET_KEY') || ''
+
+// Verify Paystack webhook signature using HMAC-SHA512
+async function verifySignature(rawBody: string, signature: string): Promise<boolean> {
+  if (!PAYSTACK_SECRET || !signature) return false
+  try {
+    const key = await crypto.subtle.importKey(
+      'raw', new TextEncoder().encode(PAYSTACK_SECRET),
+      { name: 'HMAC', hash: 'SHA-512' }, false, ['sign']
+    )
+    const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawBody))
+    const hash = new TextDecoder().decode(hexEncode(new Uint8Array(sig)))
+    return hash === signature.toLowerCase()
+  } catch (e) {
+    console.error('Signature verification error:', e)
+    return false
+  }
+}
 
 serve(async (req) => {
   if (req.method !== 'POST') {
@@ -12,7 +31,19 @@ serve(async (req) => {
   }
 
   try {
-    const body = await req.json()
+    // Read raw body for signature verification
+    const rawBody = await req.text()
+    const signature = req.headers.get('x-paystack-signature') || ''
+
+    // Verify the webhook is actually from Paystack
+    if (PAYSTACK_SECRET && !await verifySignature(rawBody, signature)) {
+      console.error('Invalid Paystack webhook signature — rejecting')
+      return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+        status: 401, headers: { 'Content-Type': 'application/json' }
+      })
+    }
+
+    const body = JSON.parse(rawBody)
     
     // Only handle successful charges
     if (body.event !== 'charge.success') {
@@ -24,6 +55,33 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     const paymentData = body.data
     const metadata = paymentData.metadata || {}
+
+    // --- USSD PAYMENT: If this payment came from USSD, update the existing order ---
+    if (metadata.source === 'ussd' && metadata.order_id) {
+      const { error: updateErr } = await supabase.from('whatsapp_orders').update({
+        status: 'Paid',
+        paystack_ref: paymentData.reference,
+        paid_at: paymentData.paid_at || new Date().toISOString(),
+        customer_phone: metadata.customer_phone || paymentData.customer?.phone || ''
+      }).eq('id', metadata.order_id)
+
+      if (updateErr) console.error('USSD order update error:', updateErr)
+      else console.log('USSD payment confirmed for order:', metadata.order_no)
+
+      // Send SMS notification
+      try {
+        await sendSMS(
+          '0533547740,0203600855,0554808341',
+          `📱 USSD Payment!\n${metadata.order_no || ''}\nAmount: GHS ${(paymentData.amount / 100).toFixed(2)}\nCustomer: ${metadata.customer_phone || ''}\n💳 Paid via USSD MoMo\n\nPlease process ASAP!`
+        )
+      } catch (smsErr) { console.error('SMS failed:', smsErr) }
+
+      return new Response(JSON.stringify({ success: true, type: 'ussd', orderNo: metadata.order_no }), {
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+
+    // --- REGULAR PAYMENT: Create new whatsapp_order from webhook ---
 
     // Get products for price lookup
     const { data: products } = await supabase.from('products').select('*')
@@ -96,8 +154,8 @@ serve(async (req) => {
 })
 
 // ===== mNotify SMS Helper =====
-const MNOTIFY_API_KEY = 'iIYFWWI7dFTEuxRbreXWezGDf'
-const MNOTIFY_SENDER_ID = 'EverytinRM'
+const MNOTIFY_API_KEY = Deno.env.get('MNOTIFY_API_KEY') || ''
+const MNOTIFY_SENDER_ID = Deno.env.get('MNOTIFY_SENDER_ID') || 'EverytinRM'
 
 async function sendSMS(to: string, message: string) {
   const recipients = to.split(',').map(r => r.trim())

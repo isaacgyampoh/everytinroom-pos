@@ -109,7 +109,7 @@ export default function InvoicePay() {
             const name = o.customer_name ? ` ${o.customer_name}` : ''
             const msg = `Hi${name}! Thank you for completing your payment.\n\nOrder ID: ${o.order_no}\nAmount: GHS ${Number(o.total).toFixed(2)}\n\nYour order will be packaged and our delivery team will contact you to arrange delivery and let you know the delivery fee to your location.\n\nThank you for shopping with EVERYTINROOM&BEDTIME!`
             const phone = o.customer_phone.replace(/\D/g, '')
-            const chatId = (phone.startsWith('0') ? '233' + phone.slice(1) : phone) + '@c.us'
+            const chatId = phone.startsWith('0') ? '233' + phone.slice(1) : phone
             await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/super-processor', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -306,6 +306,14 @@ export default function InvoicePay() {
             </button>
 
             <p className="text-center text-xs text-gray-400 mt-3">Secured by Paystack · Card and Mobile Money accepted</p>
+
+            {order?.ussd_code && (
+              <div className="mt-4 bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center">
+                <p className="text-xs text-amber-600 font-semibold mb-1">Or pay via USSD (no internet needed)</p>
+                <p className="text-lg font-extrabold text-amber-900 font-mono tracking-wider">*920*141*{order.ussd_code}#</p>
+                <p className="text-[11px] text-amber-500 mt-1">Dial this code on your phone → confirm → pay with MoMo</p>
+              </div>
+            )}
           </div>
         )}
 
