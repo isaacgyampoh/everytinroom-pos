@@ -111,23 +111,35 @@ serve(async (req) => {
         if (!fp.startsWith('233')) fp = '233' + fp
         const ref = `USSD-${order.ussd_code}-${Date.now().toString(36).toUpperCase()}`
 
+        // Auto-detect MoMo provider from phone prefix
+        const num = fp.replace('233', '')
+        let provider = 'mtn' // default
+        if (/^(20|50|24|25|53|54|55|59)/.test(num)) provider = 'mtn'
+        else if (/^(27|57|26|56)/.test(num)) provider = 'vod'
+        else if (/^(23|28|58)/.test(num)) provider = 'atl'
+        console.log(`Phone: ${fp}, prefix: ${num.slice(0,2)}, provider: ${provider}`)
+
         try {
           const cr = await fetch('https://api.paystack.co/charge', {
             method: 'POST', headers: { 'Authorization': 'Bearer ' + PAYSTACK_SECRET, 'Content-Type': 'application/json' },
             body: JSON.stringify({
               email: fp + '@everytinroom.shop', amount: Math.round(Number(order.total) * 100), currency: 'GHS',
-              mobile_money: { phone: fp, provider: 'mtn' }, reference: ref,
+              mobile_money: { phone: fp, provider }, reference: ref,
               metadata: { source: 'ussd', order_id: order.id, order_no: order.order_no, ussd_code: order.ussd_code, customer_phone: phone,
                 custom_fields: [{ display_name: 'Order', variable_name: 'order_no', value: order.order_no }] },
             }),
           })
           const cd = await cr.json()
-          console.log('Paystack:', JSON.stringify(cd).slice(0, 300))
+          console.log('Paystack charge response:', JSON.stringify(cd))
 
           await supabase.from('whatsapp_orders').update({ paystack_ref: ref, customer_phone: phone }).eq('id', order.id)
           if (sessionId) await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
 
-          if (cd.status) return ussdEnd(`Payment of GHS ${total} initiated!\n\nCheck your phone for MoMo prompt.\n\nOrder: ${order.order_no}\nThank you!`)
+          // Check Paystack response status
+          const pStatus = cd.data?.status || ''
+          if (cd.status && (pStatus === 'pay_offline' || pStatus === 'send_otp' || pStatus === 'pending')) {
+            return ussdEnd(`Payment of GHS ${total} initiated!\n\nYou will receive a MoMo prompt shortly. If not, dial *170# > My Wallet > Approvals.\n\nOrder: ${order.order_no}\nThank you!`)
+          }
 
           // Fallback
           const ir = await fetch('https://api.paystack.co/transaction/initialize', {
