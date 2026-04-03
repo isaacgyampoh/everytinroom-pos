@@ -20,7 +20,7 @@ serve(async (req) => {
     const url = new URL(req.url)
     const action = url.searchParams.get('action')
 
-    // ==================== USSD (Nalo Solutions) ====================
+    // ==================== USSD ====================
     if (action === 'ussd') {
       const allParams: Record<string, string> = {}
       for (const [k, v] of url.searchParams) allParams[k] = v
@@ -36,62 +36,32 @@ serve(async (req) => {
       const ussdCon = (msg: string) => new Response(JSON.stringify({ MSGTYPE: true, MSG: msg, USSDMSG: msg }), { headers: { 'Content-Type': 'application/json' } })
       const ussdEnd = (msg: string) => new Response(JSON.stringify({ MSGTYPE: false, MSG: msg, USSDMSG: msg }), { headers: { 'Content-Type': 'application/json' } })
 
-      // Nalo params (now we know the exact names):
-      // USERID, MSISDN, USERDATA, MSGTYPE, NETWORK, SESSIONID
-      const sessionId = allParams.SESSIONID || allParams.sessionid || allParams.SessionId || ''
+      const sessionId = allParams.SESSIONID || allParams.sessionid || ''
       const phone = allParams.MSISDN || allParams.msisdn || ''
-      const userData = allParams.USERDATA || allParams.userdata || allParams.UserData || ''
-      const msgType = allParams.MSGTYPE || allParams.msgtype || ''
+      const userData = allParams.USERDATA || allParams.userdata || ''
 
-      console.log(`session=${sessionId} phone=${phone} userData=${userData} msgType=${msgType}`)
-
-      // USERDATA contains:
-      // First request: "*920*141*50032" (full dial string with order code)
-      // Second request: "1" or "2" (just the user's menu selection)
-      // If user dials *920*141# without order: "" or "*920*141"
-
-      // Check if USERDATA is a menu selection (1 or 2)
       const isMenuChoice = userData === '1' || userData === '2'
 
-      // Extract order code from USERDATA if it contains the full dial string
+      // Extract order code from dial string *920*141*23#
       let orderCode = ''
       if (!isMenuChoice && userData) {
         const parts = userData.replace(/#/g, '').split('*').filter(Boolean)
         const idx = parts.indexOf('141')
-        if (idx >= 0 && parts[idx + 1] && /^\d+$/.test(parts[idx + 1])) {
-          orderCode = parts[idx + 1]
-        }
-        // Also check if userData itself is a 4-6 digit order code
-        if (!orderCode && /^\d{4,6}$/.test(userData.trim())) {
-          orderCode = userData.trim()
-        }
+        if (idx >= 0 && parts[idx + 1] && /^\d+$/.test(parts[idx + 1])) orderCode = parts[idx + 1]
+        if (!orderCode && /^\d{1,6}$/.test(userData.trim())) orderCode = userData.trim()
       }
 
-      // If this is a menu choice (1 or 2), get order code from DB session
-      if (isMenuChoice && sessionId) {
-        const { data: sess } = await supabase.from('ussd_sessions').select('order_code').eq('session_id', sessionId).single()
-        if (sess?.order_code && sess.order_code !== 'LOG') {
-          orderCode = String(sess.order_code)
-          console.log('Session found, order:', orderCode, 'choice:', userData)
-        }
-      }
-
-      // If we still don't have order code, check session anyway
-      if (!orderCode && sessionId) {
+      // Get order from session if menu choice
+      if ((isMenuChoice || !orderCode) && sessionId) {
         const { data: sess } = await supabase.from('ussd_sessions').select('order_code').eq('session_id', sessionId).single()
         if (sess?.order_code && sess.order_code !== 'LOG') orderCode = String(sess.order_code)
       }
 
-      // No order code — ask for it
-      if (!orderCode) {
-        return ussdCon(`Welcome to ${SHOP}\nPlease enter your Order Code:`)
-      }
+      if (!orderCode) return ussdCon(`Welcome to ${SHOP}\nPlease enter your Order Code:`)
 
       // Save session
-      if (sessionId && orderCode) {
-        await supabase.from('ussd_sessions').upsert({
-          session_id: sessionId, order_code: orderCode, phone, updated_at: new Date().toISOString()
-        }, { onConflict: 'session_id' })
+      if (sessionId) {
+        await supabase.from('ussd_sessions').upsert({ session_id: sessionId, order_code: orderCode, phone, updated_at: new Date().toISOString() }, { onConflict: 'session_id' })
       }
 
       // Look up order
@@ -105,57 +75,76 @@ serve(async (req) => {
 
       const total = Number(order.total).toFixed(2)
 
-      // === PAY NOW ===
+      // === PAY NOW (direct MoMo charge — no internet needed) ===
       if (userData === '1') {
         let fp = phone.replace(/\s+/g, '').replace(/^0/, '233').replace(/^\+/, '')
         if (!fp.startsWith('233')) fp = '233' + fp
         const ref = `USSD-${order.ussd_code}-${Date.now().toString(36).toUpperCase()}`
 
+        // Detect provider
+        const num = fp.replace('233', '')
+        let provider = 'mtn'
+        if (/^(20|50|24|25|53|54|55|59)/.test(num)) provider = 'mtn'
+        else if (/^(27|57|26|56)/.test(num)) provider = 'vod'
+        else if (/^(23|28|58)/.test(num)) provider = 'atl'
+
         try {
-          // Initialize transaction — generates a payment link
-          const initRes = await fetch('https://api.paystack.co/transaction/initialize', {
-            method: 'POST', headers: { 'Authorization': 'Bearer ' + PAYSTACK_SECRET, 'Content-Type': 'application/json' },
+          // Direct charge — sends MoMo prompt to phone, no internet needed
+          const cr = await fetch('https://api.paystack.co/charge', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + PAYSTACK_SECRET, 'Content-Type': 'application/json' },
             body: JSON.stringify({
               email: fp + '@everytinroom.shop',
               amount: Math.round(Number(order.total) * 100),
               currency: 'GHS',
+              mobile_money: { phone: fp, provider },
               reference: ref,
-              channels: ['mobile_money'],
-              callback_url: `https://www.everytinroom.store/#/pay/${order.id}`,
-              metadata: { source: 'ussd', order_id: order.id, order_no: order.order_no, ussd_code: order.ussd_code, customer_phone: phone,
-                custom_fields: [{ display_name: 'Order', variable_name: 'order_no', value: order.order_no }] },
+              metadata: {
+                source: 'ussd',
+                order_id: order.id,
+                order_no: order.order_no,
+                ussd_code: order.ussd_code,
+                customer_phone: phone,
+                custom_fields: [{ display_name: 'Order', variable_name: 'order_no', value: order.order_no }]
+              },
             }),
           })
-          const initData = await initRes.json()
-          console.log('Paystack init:', JSON.stringify(initData).slice(0, 400))
+          const cd = await cr.json()
+          console.log('Paystack charge:', JSON.stringify(cd))
 
-          if (initData.status && initData.data?.authorization_url) {
-            // Save ref to order
-            await supabase.from('whatsapp_orders').update({ paystack_ref: initData.data.reference || ref, customer_phone: phone }).eq('id', order.id)
-            if (sessionId) await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
+          await supabase.from('whatsapp_orders').update({ paystack_ref: ref, customer_phone: phone }).eq('id', order.id)
+          if (sessionId) await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
 
-            // Send payment link via SMS
-            const smsKey = Deno.env.get('MNOTIFY_API_KEY') || ''
-            if (smsKey) {
-              try {
-                await fetch(`https://api.mnotify.com/api/sms/quick?key=${smsKey}`, {
-                  method: 'POST', headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    recipient: [fp],
-                    sender: 'EverytinRM',
-                    message: `EVERYTINROOM: Pay GHS ${total} for order ${order.order_no}. Click here: ${initData.data.authorization_url}`,
-                    is_schedule: false, schedule_date: ''
-                  })
-                })
-                console.log('Payment SMS sent to', fp)
-              } catch (e) { console.error('SMS failed:', e) }
-            }
+          // Handle different Paystack responses
+          const pStatus = cd.data?.status || ''
 
-            return ussdEnd(`GHS ${total} for ${order.order_no}\n\nPayment link sent to your phone via SMS.\n\nClick the link to pay with MoMo.\n\nThank you!`)
+          if (pStatus === 'send_otp') {
+            // OTP was sent — customer needs to check phone for STK push / approval
+            return ussdEnd(`GHS ${total} for ${order.order_no}\n\nApprove the payment on your phone.\n\nDial *170# > My Wallet > Approvals to approve.\n\nThank you!`)
           }
 
-          return ussdEnd(`Payment failed. Call 024 531 5581`)
-        } catch (e) { console.error('Pay error:', e); return ussdEnd(`Payment error. Call 024 531 5581`) }
+          if (pStatus === 'pay_offline' || pStatus === 'pending') {
+            return ussdEnd(`GHS ${total} for ${order.order_no}\n\nApprove the payment on your phone.\n\nDial *170# > My Wallet > Approvals.\n\nThank you!`)
+          }
+
+          if (pStatus === 'success') {
+            return ussdEnd(`Payment of GHS ${total} successful!\n\nOrder: ${order.order_no}\nThank you for shopping with ${SHOP}!`)
+          }
+
+          if (pStatus === 'failed') {
+            return ussdEnd(`Payment failed: ${cd.data?.gateway_response || 'Unknown error'}\n\nTry again or call 024 531 5581`)
+          }
+
+          // Any other status
+          if (cd.status) {
+            return ussdEnd(`GHS ${total} for ${order.order_no}\n\nCheck your phone to approve.\nDial *170# > Approvals.\n\nThank you!`)
+          }
+
+          return ussdEnd(`Payment error: ${cd.message || 'Failed'}\nCall 024 531 5581`)
+        } catch (e) {
+          console.error('Pay error:', e)
+          return ussdEnd(`Payment error. Call 024 531 5581`)
+        }
       }
 
       // === CANCEL ===
@@ -196,7 +185,7 @@ serve(async (req) => {
       const r = await fetch('https://api.paystack.co/charge', { method: 'POST', headers: { 'Authorization': 'Bearer ' + PAYSTACK_SECRET, 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: em, amount: Math.round(amount * 100), currency: 'GHS', mobile_money: { phone: fp, provider: 'mtn' }, reference: ref, metadata: { source: 'everytinroom-pos', phone } }) })
       const d = await r.json()
-      if (!d.status) return new Response(JSON.stringify({ success: false, error: d.message || 'Failed' }), { headers: CORS })
+      if (!d.status) return new Response(JSON.stringify({ success: false, error: d.message || 'Charge failed' }), { headers: CORS })
       return new Response(JSON.stringify({ success: true, reference: d.data?.reference || ref, status: d.data?.status, displayText: d.data?.display_text || 'Check your phone' }), { headers: CORS })
     }
 
