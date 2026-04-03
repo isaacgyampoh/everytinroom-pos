@@ -113,42 +113,69 @@ serve(async (req) => {
 
         // Auto-detect MoMo provider from phone prefix
         const num = fp.replace('233', '')
-        let provider = 'mtn' // default
+        let provider = 'mtn'
         if (/^(20|50|24|25|53|54|55|59)/.test(num)) provider = 'mtn'
         else if (/^(27|57|26|56)/.test(num)) provider = 'vod'
         else if (/^(23|28|58)/.test(num)) provider = 'atl'
         console.log(`Phone: ${fp}, prefix: ${num.slice(0,2)}, provider: ${provider}`)
 
         try {
-          const cr = await fetch('https://api.paystack.co/charge', {
+          // Step 1: Initialize transaction to get access_code
+          const initRes = await fetch('https://api.paystack.co/transaction/initialize', {
             method: 'POST', headers: { 'Authorization': 'Bearer ' + PAYSTACK_SECRET, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              email: fp + '@everytinroom.shop', amount: Math.round(Number(order.total) * 100), currency: 'GHS',
-              mobile_money: { phone: fp, provider }, reference: ref,
+              email: fp + '@everytinroom.shop',
+              amount: Math.round(Number(order.total) * 100),
+              currency: 'GHS',
+              reference: ref,
+              channels: ['mobile_money'],
               metadata: { source: 'ussd', order_id: order.id, order_no: order.order_no, ussd_code: order.ussd_code, customer_phone: phone,
                 custom_fields: [{ display_name: 'Order', variable_name: 'order_no', value: order.order_no }] },
             }),
           })
-          const cd = await cr.json()
-          console.log('Paystack charge response:', JSON.stringify(cd))
+          const initData = await initRes.json()
+          console.log('Paystack init:', JSON.stringify(initData).slice(0, 300))
 
-          await supabase.from('whatsapp_orders').update({ paystack_ref: ref, customer_phone: phone }).eq('id', order.id)
-          if (sessionId) await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
+          if (initData.status && initData.data?.access_code) {
+            // Step 2: Use the access_code to charge with mobile money directly
+            const chargeRes = await fetch('https://api.paystack.co/charge', {
+              method: 'POST', headers: { 'Authorization': 'Bearer ' + PAYSTACK_SECRET, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                access_code: initData.data.access_code,
+                mobile_money: { phone: fp, provider },
+              }),
+            })
+            const cd = await chargeRes.json()
+            console.log('Paystack charge with access_code:', JSON.stringify(cd))
 
-          // Check Paystack response status
-          const pStatus = cd.data?.status || ''
-          if (cd.status && (pStatus === 'pay_offline' || pStatus === 'send_otp' || pStatus === 'pending')) {
-            return ussdEnd(`Payment of GHS ${total} initiated!\n\nYou will receive a MoMo prompt shortly. If not, dial *170# > My Wallet > Approvals.\n\nOrder: ${order.order_no}\nThank you!`)
+            await supabase.from('whatsapp_orders').update({ paystack_ref: initData.data.reference || ref, customer_phone: phone }).eq('id', order.id)
+            if (sessionId) await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
+
+            const pStatus = cd.data?.status || ''
+            if (pStatus === 'pay_offline' || pStatus === 'send_otp' || pStatus === 'pending' || cd.status) {
+              return ussdEnd(`Payment of GHS ${total} initiated!\n\nApprove on your phone.\nIf no prompt, dial *170# > My Wallet > Approvals.\n\nOrder: ${order.order_no}`)
+            }
           }
 
-          // Fallback
-          const ir = await fetch('https://api.paystack.co/transaction/initialize', {
-            method: 'POST', headers: { 'Authorization': 'Bearer ' + PAYSTACK_SECRET, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: fp + '@everytinroom.shop', amount: Math.round(Number(order.total) * 100), currency: 'GHS', reference: ref, channels: ['mobile_money'],
-              metadata: { source: 'ussd', order_id: order.id, order_no: order.order_no, ussd_code: order.ussd_code, customer_phone: phone } }),
-          })
-          const id = await ir.json()
-          if (id.status) return ussdEnd(`GHS ${total} for ${order.order_no}\nPayment link sent.\nThank you!`)
+          // Fallback: just save reference and show payment link message
+          await supabase.from('whatsapp_orders').update({ paystack_ref: initData.data?.reference || ref, customer_phone: phone }).eq('id', order.id)
+          if (sessionId) await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
+
+          if (initData.status && initData.data?.authorization_url) {
+            // Send payment link via SMS using mNotify
+            const smsKey = Deno.env.get('MNOTIFY_API_KEY') || ''
+            if (smsKey) {
+              try {
+                await fetch(`https://api.mnotify.com/api/sms/quick?key=${smsKey}`, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ recipient: [fp], sender: 'EverytinRM', message: `Pay GHS ${total} for order ${order.order_no}: ${initData.data.authorization_url}`, is_schedule: false, schedule_date: '' })
+                })
+                console.log('Payment link SMS sent to', fp)
+              } catch (e) { console.error('SMS failed:', e) }
+            }
+            return ussdEnd(`GHS ${total} for ${order.order_no}\n\nA payment link has been sent to your phone via SMS.\n\nOr visit:\n${initData.data.authorization_url}`)
+          }
+
           return ussdEnd(`Payment failed. Call 024 531 5581`)
         } catch (e) { console.error('Pay error:', e); return ussdEnd(`Payment error. Call 024 531 5581`) }
       }
