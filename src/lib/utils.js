@@ -10,7 +10,7 @@ export const monthStart = () => format(startOfMonth(new Date()), 'yyyy-MM-dd')
 export const weekStartDate = () => format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
 
 export const SHOP = {
-  name: 'EVERYTINROOM&BEDTIME',
+  name: 'EVERYTINROOM',
   tagline: 'Your One Stop Shop',
   phone: '024 531 5581 / 024 936 5339',
   address: 'Adenta Aviation Road',

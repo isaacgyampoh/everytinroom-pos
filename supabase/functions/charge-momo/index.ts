@@ -6,7 +6,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://noiiuwkovoojkcwzup
 const SUPABASE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 const MNOTIFY_API_KEY = Deno.env.get('MNOTIFY_API_KEY') || 'WjANNXLuG7PTy8WsK6Wuwa2AG'
 const MNOTIFY_SENDER_ID = Deno.env.get('MNOTIFY_SENDER_ID') || 'EverytinRM'
-const SHOP = 'EVERYTINROOM&BEDTIME'
+const SHOP = 'EVERYTINROOM'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
