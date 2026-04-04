@@ -135,7 +135,7 @@ serve(async (req) => {
         const num = fp.replace('233', '')
         let provider = 'mtn'
         if (/^(20|50|24|25|53|54|55|59)/.test(num)) provider = 'mtn'
-        else if (/^(27|57|26|56)/.test(num)) provider = 'vod'
+        else if (/^(27|57|26|56)/.test(num)) provider = 'tgo'
         else if (/^(23|28|58)/.test(num)) provider = 'atl'
 
         try {

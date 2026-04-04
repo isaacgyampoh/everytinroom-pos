@@ -55,12 +55,13 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     const paymentData = body.data
     const metadata = paymentData.metadata || {}
+    const paystackRef = paymentData.reference || ''
 
     // --- USSD PAYMENT: If this payment came from USSD, update the existing order ---
     if (metadata.source === 'ussd' && metadata.order_id) {
       const { error: updateErr } = await supabase.from('whatsapp_orders').update({
         status: 'Paid',
-        paystack_ref: paymentData.reference,
+        paystack_ref: paystackRef,
         paid_at: paymentData.paid_at || new Date().toISOString(),
         customer_phone: metadata.customer_phone || paymentData.customer?.phone || ''
       }).eq('id', metadata.order_id)
@@ -68,7 +69,6 @@ serve(async (req) => {
       if (updateErr) console.error('USSD order update error:', updateErr)
       else console.log('USSD payment confirmed for order:', metadata.order_no)
 
-      // Send SMS notification
       try {
         await sendSMS(
           '0533547740,0203600855,0554808341',
@@ -79,6 +79,32 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: true, type: 'ussd', orderNo: metadata.order_no }), {
         headers: { 'Content-Type': 'application/json' }
       })
+    }
+
+    // --- FALLBACK: Match any order by paystack reference (covers USSD + invoice payments) ---
+    if (paystackRef && paystackRef.startsWith('USSD-')) {
+      const { data: existingOrder } = await supabase.from('whatsapp_orders')
+        .select('id,order_no').eq('paystack_ref', paystackRef).single()
+
+      if (existingOrder) {
+        await supabase.from('whatsapp_orders').update({
+          status: 'Paid',
+          paid_at: paymentData.paid_at || new Date().toISOString(),
+        }).eq('id', existingOrder.id)
+
+        console.log('USSD payment confirmed via ref match:', existingOrder.order_no)
+
+        try {
+          await sendSMS(
+            '0533547740,0203600855,0554808341',
+            `📱 USSD Payment!\n${existingOrder.order_no}\nAmount: GHS ${(paymentData.amount / 100).toFixed(2)}\n💳 Paid via MoMo\n\nPlease process ASAP!`
+          )
+        } catch (smsErr) { console.error('SMS failed:', smsErr) }
+
+        return new Response(JSON.stringify({ success: true, type: 'ussd-ref', orderNo: existingOrder.order_no }), {
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
     }
 
     // --- REGULAR PAYMENT: Create new whatsapp_order from webhook ---
