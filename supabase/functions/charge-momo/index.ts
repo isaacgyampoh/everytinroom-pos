@@ -4,7 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const PAYSTACK_SECRET = Deno.env.get('PAYSTACK_SECRET_KEY') || ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://noiiuwkovoojkcwzupye.supabase.co'
 const SUPABASE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-const MNOTIFY_API_KEY = Deno.env.get('MNOTIFY_API_KEY') || ''
+const MNOTIFY_API_KEY = Deno.env.get('MNOTIFY_API_KEY') || 'WjANNXLuG7PTy8WsK6Wuwa2AG'
 const MNOTIFY_SENDER_ID = Deno.env.get('MNOTIFY_SENDER_ID') || 'EverytinRM'
 const SHOP = 'EVERYTINROOM&BEDTIME'
 
@@ -54,34 +54,47 @@ serve(async (req) => {
 
       // Match by metadata order_id (USSD payments)
       if (meta.source === 'ussd' && meta.order_id) {
+        const { data: paidOrder } = await supabase.from('whatsapp_orders').select('id,order_no,total,customer_phone,customer_name').eq('id', meta.order_id).single()
         await supabase.from('whatsapp_orders').update({
           status: 'Paid', paystack_ref: ref,
           paid_at: pd.paid_at || new Date().toISOString(),
           customer_phone: meta.customer_phone || pd.customer?.phone || ''
         }).eq('id', meta.order_id)
         console.log('USSD payment OK:', meta.order_no)
-        try { await sendSMS('0533547740,0203600855,0554808341', `USSD Payment! ${meta.order_no} GHS ${(pd.amount/100).toFixed(2)} Paid`) } catch {}
+        // SMS to shop
+        try { await sendSMS('0533547740,0203600855,0554808341', `USSD Payment! ${meta.order_no || paidOrder?.order_no} GHS ${(pd.amount/100).toFixed(2)} from ${meta.customer_phone || ''} Paid via MoMo. Process ASAP!`) } catch {}
+        // SMS to customer
+        const custPhone = meta.customer_phone || paidOrder?.customer_phone || pd.customer?.phone || ''
+        if (custPhone) {
+          try { await sendSMS(custPhone, `Thank you for your payment of GHS ${(pd.amount/100).toFixed(2)} to ${SHOP}.\n\nOrder: ${meta.order_no || paidOrder?.order_no}\n\nYour order will be processed and delivered shortly.\n\nCall: 024 531 5581`) } catch {}
+        }
         return new Response(JSON.stringify({ success: true, type: 'ussd' }), { headers: { 'Content-Type': 'application/json' } })
       }
 
       // Match by USSD reference prefix
       if (ref.startsWith('USSD-')) {
-        const { data: o } = await supabase.from('whatsapp_orders').select('id,order_no').eq('paystack_ref', ref).single()
+        const { data: o } = await supabase.from('whatsapp_orders').select('id,order_no,total,customer_phone,customer_name').eq('paystack_ref', ref).single()
         if (o) {
           await supabase.from('whatsapp_orders').update({ status: 'Paid', paid_at: pd.paid_at || new Date().toISOString() }).eq('id', o.id)
           console.log('USSD ref match:', o.order_no)
           try { await sendSMS('0533547740,0203600855,0554808341', `USSD Payment! ${o.order_no} GHS ${(pd.amount/100).toFixed(2)} Paid`) } catch {}
+          if (o.customer_phone) {
+            try { await sendSMS(o.customer_phone, `Thank you for your payment of GHS ${(pd.amount/100).toFixed(2)} to ${SHOP}.\n\nOrder: ${o.order_no}\n\nYour order will be processed and delivered shortly.\n\nCall: 024 531 5581`) } catch {}
+          }
           return new Response(JSON.stringify({ success: true, type: 'ussd-ref' }), { headers: { 'Content-Type': 'application/json' } })
         }
       }
 
       // Match any order by ref
       if (ref) {
-        const { data: o } = await supabase.from('whatsapp_orders').select('id,order_no').eq('paystack_ref', ref).single()
+        const { data: o } = await supabase.from('whatsapp_orders').select('id,order_no,total,customer_phone,customer_name').eq('paystack_ref', ref).single()
         if (o) {
           await supabase.from('whatsapp_orders').update({ status: 'Paid', paid_at: pd.paid_at || new Date().toISOString() }).eq('id', o.id)
           console.log('Ref match:', o.order_no)
           try { await sendSMS('0533547740,0203600855,0554808341', `Payment! ${o.order_no} GHS ${(pd.amount/100).toFixed(2)} Paid`) } catch {}
+          if (o.customer_phone) {
+            try { await sendSMS(o.customer_phone, `Thank you for your payment of GHS ${(pd.amount/100).toFixed(2)} to ${SHOP}.\n\nOrder: ${o.order_no}\n\nYour order will be processed and delivered shortly.\n\nCall: 024 531 5581`) } catch {}
+          }
           return new Response(JSON.stringify({ success: true, type: 'ref' }), { headers: { 'Content-Type': 'application/json' } })
         }
       }
