@@ -282,6 +282,43 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             className="w-full h-12 bg-[#25d366] hover:bg-[#1ebe5d] rounded-xl text-white text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm mt-2 flex items-center justify-center gap-2">
             Send Invoice via WhatsApp — {money(total)}
           </button>
+
+          {/* Generate USSD Button */}
+          <button onClick={async () => {
+            if (!phoneValid) { toast.error('Enter phone number first!'); return }
+            if (cnt === 0) return
+            setProcessing(true)
+            try {
+              const sb = getSupabase()
+              const orderNo = 'WA-' + Date.now().toString(36).toUpperCase()
+              const orderItems = cart.map(c => ({ name: c.name, qty: c.qty, price: c.price, lineTotal: c.lineTotal }))
+              const { data, error } = await sb.from('whatsapp_orders').insert({
+                order_no: orderNo,
+                date: new Date().toISOString(),
+                customer_name: '',
+                customer_phone: phone.trim(),
+                items: orderItems,
+                subtotal: sub,
+                delivery_fee: 0,
+                total: total,
+                status: 'Pending',
+                notes: 'USSD order'
+              }).select('id,ussd_code').single()
+              if (error) { toast.error('Failed to generate USSD'); setProcessing(false); return }
+
+              const ussdCode = `*920*141*${data.ussd_code}#`
+              try { await navigator.clipboard.writeText(ussdCode) } catch {}
+
+              toast.success(`USSD Code: ${ussdCode}\n\nCopied to clipboard! Send to customer.`, { duration: 8000 })
+              clearCart(); setPhone(''); setDiscount(''); onClose()
+              const store = useStore.getState()
+              store.refreshWAOrders()
+            } catch (e) { toast.error('Error generating USSD') }
+            setProcessing(false)
+          }} disabled={cnt === 0 || !phoneValid || processing}
+            className="w-full h-12 bg-amber-500 hover:bg-amber-600 rounded-xl text-white text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm mt-2 flex items-center justify-center gap-2">
+            Generate USSD Code — {money(total)}
+          </button>
         </div>
       </div>
 
