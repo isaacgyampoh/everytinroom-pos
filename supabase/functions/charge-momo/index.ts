@@ -40,28 +40,79 @@ serve(async (req) => {
       const phone = allParams.MSISDN || allParams.msisdn || ''
       const userData = allParams.USERDATA || allParams.userdata || ''
 
+      // Get session from DB
+      let sess: any = null
+      if (sessionId) {
+        const { data } = await supabase.from('ussd_sessions').select('*').eq('session_id', sessionId).single()
+        sess = data
+      }
+
+      const step = sess?.step || ''
       const isMenuChoice = userData === '1' || userData === '2'
 
-      // Extract order code from dial string *920*141*23#
+      // === STEP: WAITING FOR OTP ===
+      // If session step is 'otp', the user is entering the OTP code
+      if (step === 'otp' && userData && sess?.order_code && sess?.paystack_ref) {
+        const otp = userData.trim()
+        console.log('Submitting OTP:', otp, 'for ref:', sess.paystack_ref)
+
+        try {
+          const otpRes = await fetch('https://api.paystack.co/charge/submit_otp', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + PAYSTACK_SECRET, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ otp, reference: sess.paystack_ref }),
+          })
+          const otpData = await otpRes.json()
+          console.log('OTP result:', JSON.stringify(otpData))
+
+          // Clean up session
+          await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
+
+          const pStatus = otpData.data?.status || ''
+          if (pStatus === 'success') {
+            // Update order as paid
+            await supabase.from('whatsapp_orders').update({
+              status: 'Paid', paid_at: new Date().toISOString()
+            }).eq('paystack_ref', sess.paystack_ref)
+            return ussdEnd(`Payment successful!\n\nOrder: ${sess.order_no || ''}\nThank you for shopping with ${SHOP}!`)
+          }
+
+          if (pStatus === 'pending' || pStatus === 'pay_offline') {
+            return ussdEnd(`Payment processing.\n\nYou will receive confirmation shortly.\n\nOrder: ${sess.order_no || ''}\nThank you!`)
+          }
+
+          if (pStatus === 'failed') {
+            return ussdEnd(`Payment failed: ${otpData.data?.gateway_response || 'Invalid OTP'}\n\nDial *920*141*${sess.order_code}# to try again.`)
+          }
+
+          return ussdEnd(`Payment processing.\nYou will receive confirmation shortly.\nThank you!`)
+        } catch (e) {
+          console.error('OTP error:', e)
+          return ussdEnd(`Error submitting OTP.\nDial *920*141*${sess.order_code}# to try again.`)
+        }
+      }
+
+      // === EXTRACT ORDER CODE ===
       let orderCode = ''
-      if (!isMenuChoice && userData) {
+      if (!isMenuChoice && userData && step !== 'otp') {
         const parts = userData.replace(/#/g, '').split('*').filter(Boolean)
         const idx = parts.indexOf('141')
         if (idx >= 0 && parts[idx + 1] && /^\d+$/.test(parts[idx + 1])) orderCode = parts[idx + 1]
         if (!orderCode && /^\d{1,6}$/.test(userData.trim())) orderCode = userData.trim()
       }
 
-      // Get order from session if menu choice
-      if ((isMenuChoice || !orderCode) && sessionId) {
-        const { data: sess } = await supabase.from('ussd_sessions').select('order_code').eq('session_id', sessionId).single()
-        if (sess?.order_code && sess.order_code !== 'LOG') orderCode = String(sess.order_code)
+      // Get from session
+      if ((isMenuChoice || !orderCode) && sess?.order_code && sess.order_code !== 'LOG') {
+        orderCode = String(sess.order_code)
       }
 
       if (!orderCode) return ussdCon(`Welcome to ${SHOP}\nPlease enter your Order Code:`)
 
       // Save session
       if (sessionId) {
-        await supabase.from('ussd_sessions').upsert({ session_id: sessionId, order_code: orderCode, phone, updated_at: new Date().toISOString() }, { onConflict: 'session_id' })
+        await supabase.from('ussd_sessions').upsert({
+          session_id: sessionId, order_code: orderCode, phone, step: 'menu', updated_at: new Date().toISOString()
+        }, { onConflict: 'session_id' })
       }
 
       // Look up order
@@ -75,13 +126,12 @@ serve(async (req) => {
 
       const total = Number(order.total).toFixed(2)
 
-      // === PAY NOW (direct MoMo charge — no internet needed) ===
+      // === PAY NOW ===
       if (userData === '1') {
         let fp = phone.replace(/\s+/g, '').replace(/^0/, '233').replace(/^\+/, '')
         if (!fp.startsWith('233')) fp = '233' + fp
         const ref = `USSD-${order.ussd_code}-${Date.now().toString(36).toUpperCase()}`
 
-        // Detect provider
         const num = fp.replace('233', '')
         let provider = 'mtn'
         if (/^(20|50|24|25|53|54|55|59)/.test(num)) provider = 'mtn'
@@ -89,7 +139,6 @@ serve(async (req) => {
         else if (/^(23|28|58)/.test(num)) provider = 'atl'
 
         try {
-          // Direct charge — sends MoMo prompt to phone, no internet needed
           const cr = await fetch('https://api.paystack.co/charge', {
             method: 'POST',
             headers: { 'Authorization': 'Bearer ' + PAYSTACK_SECRET, 'Content-Type': 'application/json' },
@@ -100,11 +149,8 @@ serve(async (req) => {
               mobile_money: { phone: fp, provider },
               reference: ref,
               metadata: {
-                source: 'ussd',
-                order_id: order.id,
-                order_no: order.order_no,
-                ussd_code: order.ussd_code,
-                customer_phone: phone,
+                source: 'ussd', order_id: order.id, order_no: order.order_no,
+                ussd_code: order.ussd_code, customer_phone: phone,
                 custom_fields: [{ display_name: 'Order', variable_name: 'order_no', value: order.order_no }]
               },
             }),
@@ -113,36 +159,46 @@ serve(async (req) => {
           console.log('Paystack charge:', JSON.stringify(cd))
 
           await supabase.from('whatsapp_orders').update({ paystack_ref: ref, customer_phone: phone }).eq('id', order.id)
-          if (sessionId) await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
 
-          // Handle different Paystack responses
           const pStatus = cd.data?.status || ''
 
+          // OTP required — save ref to session and ask for OTP
           if (pStatus === 'send_otp') {
-            // OTP was sent — customer needs to check phone for STK push / approval
-            return ussdEnd(`GHS ${total} for ${order.order_no}\n\nApprove the payment on your phone.\n\nDial *170# > My Wallet > Approvals to approve.\n\nThank you!`)
-          }
+            // Update session: step=otp, save paystack ref and order_no
+            await supabase.from('ussd_sessions').upsert({
+              session_id: sessionId, order_code: orderCode, phone,
+              step: 'otp', paystack_ref: ref, order_no: order.order_no,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'session_id' })
 
-          if (pStatus === 'pay_offline' || pStatus === 'pending') {
-            return ussdEnd(`GHS ${total} for ${order.order_no}\n\nApprove the payment on your phone.\n\nDial *170# > My Wallet > Approvals.\n\nThank you!`)
+            return ussdCon(`An OTP code has been sent to your phone via SMS.\n\nPlease enter the code:`)
           }
 
           if (pStatus === 'success') {
-            return ussdEnd(`Payment of GHS ${total} successful!\n\nOrder: ${order.order_no}\nThank you for shopping with ${SHOP}!`)
+            if (sessionId) await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
+            return ussdEnd(`Payment of GHS ${total} successful!\n\nOrder: ${order.order_no}\nThank you!`)
+          }
+
+          if (pStatus === 'pay_offline' || pStatus === 'pending') {
+            if (sessionId) await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
+            return ussdEnd(`GHS ${total} for ${order.order_no}\n\nPayment processing.\nYou will receive confirmation shortly.\n\nThank you!`)
           }
 
           if (pStatus === 'failed') {
-            return ussdEnd(`Payment failed: ${cd.data?.gateway_response || 'Unknown error'}\n\nTry again or call 024 531 5581`)
+            if (sessionId) await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
+            return ussdEnd(`Payment failed: ${cd.data?.gateway_response || 'Error'}\n\nTry again or call 024 531 5581`)
           }
 
-          // Any other status
           if (cd.status) {
-            return ussdEnd(`GHS ${total} for ${order.order_no}\n\nCheck your phone to approve.\nDial *170# > Approvals.\n\nThank you!`)
+            if (sessionId) await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
+            return ussdEnd(`GHS ${total} for ${order.order_no}\n\nPayment processing.\nThank you!`)
           }
 
+          if (sessionId) await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
           return ussdEnd(`Payment error: ${cd.message || 'Failed'}\nCall 024 531 5581`)
         } catch (e) {
           console.error('Pay error:', e)
+          if (sessionId) await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
           return ussdEnd(`Payment error. Call 024 531 5581`)
         }
       }
