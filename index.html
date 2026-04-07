@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <link rel="icon" type="image/png" href="/logo.png">
   <link rel="apple-touch-icon" href="/logo.png">
+  <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1a3d30">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="EVERYTINROOM">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;500;600;700;800&family=Outfit:wght@500;600;700;800;900&display=swap" rel="stylesheet">
@@ -14,5 +18,12 @@
 <body>
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {})
+      })
+    }
+  </script>
 </body>
 </html>
