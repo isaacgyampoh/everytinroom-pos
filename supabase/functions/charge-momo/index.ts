@@ -309,6 +309,175 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: d.status || false, paymentStatus: d.data?.status || 'unknown', amount: (d.data?.amount || 0) / 100, reference: d.data?.reference, paidAt: d.data?.paid_at, message: d.message }), { headers: CORS })
     }
 
+    // ==================== SMS REPORTS ====================
+    if (action === 'report') {
+      const reportUrl = new URL(req.url)
+      const type = reportUrl.searchParams.get('type') || ''
+      const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+      const ADMIN_PHONES = ['0533547740', '0548124978', '0554808341']
+      const fmt = (n: number) => 'GHS ' + Number(n || 0).toFixed(2)
+      const dateStr = (d: Date) => d.toISOString().slice(0, 10)
+
+      const getSales = async (from: string, to: string) => {
+        const { data } = await supabase.from('sales').select('*').gte('date', from + 'T00:00:00').lte('date', to + 'T23:59:59').eq('voided', false)
+        const s = data || []
+        return {
+          revenue: s.reduce((a: number, x: any) => a + Number(x.total || 0), 0),
+          profit: s.reduce((a: number, x: any) => a + Number(x.profit || 0), 0),
+          cash: s.filter((x: any) => x.payment === 'Cash').reduce((a: number, x: any) => a + Number(x.total || 0), 0),
+          momo: s.filter((x: any) => x.payment === 'Momo' || x.payment === 'Paystack').reduce((a: number, x: any) => a + Number(x.total || 0), 0),
+          split: s.filter((x: any) => x.payment === 'Split').reduce((a: number, x: any) => a + Number(x.total || 0), 0),
+          count: s.length, sales: s
+        }
+      }
+
+      const getExpenses = async (from: string, to: string) => {
+        const { data } = await supabase.from('expenses').select('*').gte('date', from + 'T00:00:00').lte('date', to + 'T23:59:59')
+        const e = data || []
+        return { total: e.reduce((a: number, x: any) => a + Number(x.amount || 0), 0), count: e.length }
+      }
+
+      const getWAOrders = async (from: string, to: string) => {
+        const { data } = await supabase.from('whatsapp_orders').select('status,total').gte('date', from + 'T00:00:00').lte('date', to + 'T23:59:59')
+        const o = data || []
+        return {
+          total: o.length,
+          pending: o.filter((x: any) => x.status === 'Pending').length,
+          paid: o.filter((x: any) => x.status === 'Paid').length,
+          completed: o.filter((x: any) => x.status === 'Completed').length,
+          cancelled: o.filter((x: any) => x.status === 'Cancelled').length,
+          revenue: o.filter((x: any) => x.status === 'Paid' || x.status === 'Completed').reduce((a: number, x: any) => a + Number(x.total || 0), 0),
+        }
+      }
+
+      const getLowStock = async () => {
+        const { data } = await supabase.from('products').select('name,quantity').lte('quantity', 5).order('quantity', { ascending: true }).limit(10)
+        return data || []
+      }
+
+      const getTopSellers = (sales: any[]) => {
+        const map: Record<string, { qty: number, rev: number }> = {}
+        for (const s of sales) {
+          const items = typeof s.items === 'string' ? JSON.parse(s.items) : (s.items || [])
+          for (const it of items) {
+            const n = it.name || 'Unknown'
+            if (!map[n]) map[n] = { qty: 0, rev: 0 }
+            map[n].qty += Number(it.qty || 1)
+            map[n].rev += Number(it.price || 0) * Number(it.qty || 1)
+          }
+        }
+        return Object.entries(map).sort((a, b) => b[1].qty - a[1].qty).slice(0, 5)
+      }
+
+      let message = ''
+      const today = dateStr(new Date())
+
+      if (type === 'daily' || type === 'morning') {
+        const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1)
+        const yd = dateStr(yesterday)
+        const dayName = yesterday.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })
+        const sales = await getSales(yd, yd)
+        const expenses = await getExpenses(yd, yd)
+        const wa = await getWAOrders(yd, yd)
+        const topSellers = getTopSellers(sales.sales)
+        const lowStock = await getLowStock()
+
+        message = `EVERYTINROOM\nDaily Report (${dayName})\n\n`
+        message += `SALES\nRevenue: ${fmt(sales.revenue)}\nTotal Sales: ${sales.count}\nProfit: ${fmt(sales.profit)}\nNet: ${fmt(sales.profit - expenses.total)}\n\n`
+        message += `PAYMENT\nCash: ${fmt(sales.cash)}\nMoMo: ${fmt(sales.momo)}\n`
+        if (sales.split > 0) message += `Split: ${fmt(sales.split)}\n`
+        message += `\nWHATSAPP ORDERS\nTotal: ${wa.total}\nPaid: ${wa.paid}\nPending: ${wa.pending}\nCompleted: ${wa.completed}\nOnline Revenue: ${fmt(wa.revenue)}\n`
+        message += `\nEXPENSES: ${fmt(expenses.total)} (${expenses.count})\n`
+        if (topSellers.length > 0) { message += `\nTOP SELLERS:\n`; topSellers.forEach(([n, d]: any, i: number) => { message += `${i+1}. ${n} (${d.qty})\n` }) }
+        if (lowStock.length > 0) { message += `\nLOW STOCK:\n`; lowStock.forEach((p: any) => { message += `- ${p.name}: ${p.quantity} left\n` }) }
+        message += `\n- EVERYTINROOM POS`
+      }
+
+      else if (type === 'afternoon' || type === 'today') {
+        const sales = await getSales(today, today)
+        const expenses = await getExpenses(today, today)
+        const wa = await getWAOrders(today, today)
+
+        message = `EVERYTINROOM\nToday So Far\n\n`
+        message += `Revenue: ${fmt(sales.revenue)}\nSales: ${sales.count}\nProfit: ${fmt(sales.profit)}\n\n`
+        message += `Cash: ${fmt(sales.cash)}\nMoMo: ${fmt(sales.momo)}\n`
+        message += `\nWhatsApp Orders: ${wa.total}\nPaid: ${wa.paid} | Pending: ${wa.pending}\nOnline Revenue: ${fmt(wa.revenue)}\n`
+        message += `\nExpenses: ${fmt(expenses.total)}\nNet: ${fmt(sales.profit - expenses.total)}\n`
+        if (sales.count === 0) message += `\nNo sales yet. Let's push!\n`
+        message += `\n- EVERYTINROOM POS`
+      }
+
+      else if (type === 'evening' || type === 'endofday') {
+        const sales = await getSales(today, today)
+        const expenses = await getExpenses(today, today)
+        const wa = await getWAOrders(today, today)
+        const topSellers = getTopSellers(sales.sales)
+        const lowStock = await getLowStock()
+
+        message = `EVERYTINROOM\nEnd of Day Report\n${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}\n\n`
+        message += `SALES\nRevenue: ${fmt(sales.revenue)}\nTotal Sales: ${sales.count}\nProfit: ${fmt(sales.profit)}\nExpenses: ${fmt(expenses.total)} (${expenses.count})\nNet Profit: ${fmt(sales.profit - expenses.total)}\n\n`
+        message += `PAYMENT\nCash: ${fmt(sales.cash)}\nMoMo: ${fmt(sales.momo)}\n`
+        if (sales.split > 0) message += `Split: ${fmt(sales.split)}\n`
+        message += `\nWHATSAPP/USSD ORDERS\nTotal: ${wa.total}\nPaid: ${wa.paid} (${fmt(wa.revenue)})\nPending: ${wa.pending}\nCompleted: ${wa.completed}\n`
+        if (topSellers.length > 0) { message += `\nBEST SELLERS:\n`; topSellers.forEach(([n, d]: any, i: number) => { message += `${i+1}. ${n} x${d.qty}\n` }) }
+        if (lowStock.length > 0) { message += `\nLOW STOCK:\n`; lowStock.forEach((p: any) => { message += `- ${p.name}: ${p.quantity}\n` }) }
+        message += `\nDay closed. Well done!\n- EVERYTINROOM POS`
+      }
+
+      else if (type === 'weekly') {
+        const now = new Date()
+        const mon = new Date(now); mon.setDate(now.getDate() - 7 - ((now.getDay() + 6) % 7))
+        const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
+        const from = dateStr(mon), to = dateStr(sun)
+        const sales = await getSales(from, to)
+        const expenses = await getExpenses(from, to)
+        const wa = await getWAOrders(from, to)
+        const topSellers = getTopSellers(sales.sales)
+        const lowStock = await getLowStock()
+
+        message = `EVERYTINROOM\nWEEKLY REPORT\n${mon.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} - ${sun.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}\n\n`
+        message += `Revenue: ${fmt(sales.revenue)}\nSales: ${sales.count}\nProfit: ${fmt(sales.profit)}\nExpenses: ${fmt(expenses.total)}\nNet: ${fmt(sales.profit - expenses.total)}\nAvg/Day: ${fmt(sales.revenue / 7)}\n\n`
+        message += `Cash: ${fmt(sales.cash)}\nMoMo: ${fmt(sales.momo)}\n`
+        message += `\nWhatsApp/USSD: ${wa.total} orders\nPaid: ${wa.paid} | Pending: ${wa.pending}\nOnline Revenue: ${fmt(wa.revenue)}\n`
+        if (topSellers.length > 0) { message += `\nTOP 5:\n`; topSellers.forEach(([n, d]: any, i: number) => { message += `${i+1}. ${n} x${d.qty}\n` }) }
+        if (lowStock.length > 0) { message += `\nRESTOCK:\n`; lowStock.forEach((p: any) => { message += `- ${p.name}: ${p.quantity}\n` }) }
+        message += `\nNew week, new targets!\n- EVERYTINROOM POS`
+      }
+
+      else if (type === 'monthly') {
+        const now = new Date()
+        const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+        const lastDay = new Date(now.getFullYear(), now.getMonth(), 0)
+        const from = dateStr(firstDay), to = dateStr(lastDay)
+        const monthName = firstDay.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+        const sales = await getSales(from, to)
+        const expenses = await getExpenses(from, to)
+        const wa = await getWAOrders(from, to)
+        const topSellers = getTopSellers(sales.sales)
+        const lowStock = await getLowStock()
+        const days = lastDay.getDate()
+
+        message = `EVERYTINROOM\nMONTHLY REPORT\n${monthName}\n\n`
+        message += `SALES\nRevenue: ${fmt(sales.revenue)}\nTotal Sales: ${sales.count}\nProfit: ${fmt(sales.profit)}\nExpenses: ${fmt(expenses.total)}\nNet Profit: ${fmt(sales.profit - expenses.total)}\nAvg/Day: ${fmt(sales.revenue / days)}\n\n`
+        message += `PAYMENT\nCash: ${fmt(sales.cash)}\nMoMo: ${fmt(sales.momo)}\n`
+        message += `\nONLINE ORDERS\nTotal: ${wa.total}\nPaid: ${wa.paid}\nPending: ${wa.pending}\nCompleted: ${wa.completed}\nCancelled: ${wa.cancelled}\nOnline Revenue: ${fmt(wa.revenue)}\n`
+        if (topSellers.length > 0) { message += `\nTOP SELLERS:\n`; topSellers.forEach(([n, d]: any, i: number) => { message += `${i+1}. ${n} x${d.qty} (${fmt(d.rev)})\n` }) }
+        if (lowStock.length > 0) { message += `\nLOW STOCK:\n`; lowStock.forEach((p: any) => { message += `- ${p.name}: ${p.quantity}\n` }) }
+        message += `\n- EVERYTINROOM POS`
+      }
+
+      else if (type === 'test') {
+        message = `EVERYTINROOM SMS Reports Active!\n\nReports available:\n- daily (yesterday)\n- today (so far)\n- evening (end of day)\n- weekly (last week)\n- monthly (last month)\n\nSent to: ${ADMIN_PHONES.join(', ')}\n\n- EVERYTINROOM POS`
+      }
+
+      else {
+        return new Response(JSON.stringify({ status: 'ok', usage: '?action=report&type=daily|today|evening|weekly|monthly|test' }), { headers: CORS })
+      }
+
+      await sendSMS(ADMIN_PHONES.join(','), message)
+      return new Response(JSON.stringify({ status: 'sent', type, recipients: ADMIN_PHONES, messageLength: message.length }), { headers: CORS })
+    }
+
     return new Response(JSON.stringify({ error: 'Use ?action=initialize, charge, verify, ussd, or webhook' }), { headers: CORS })
   } catch (e) {
     console.error('Error:', e)
