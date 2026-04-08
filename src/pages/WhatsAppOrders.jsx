@@ -84,26 +84,14 @@ export default function WhatsAppOrders() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-5">
         <div className="bg-amber-400 rounded-2xl p-4 text-black relative overflow-hidden">
-          <div className="absolute -right-3 -top-3 w-14 h-14 rounded-full border border-black/5" />
-          <div className="absolute -right-1 -top-1 w-8 h-8 rounded-full border border-black/5" />
           <div className="relative z-10"><div className="text-xs font-medium opacity-60">Pending</div><div className="text-2xl font-extrabold mt-0.5">{pending}</div></div>
         </div>
         <div className="bg-emerald-500 rounded-2xl p-4 text-white relative overflow-hidden">
-          <div className="absolute -right-3 -top-3 w-14 h-14 rounded-full border border-white/10" />
-          <div className="absolute -right-1 -top-1 w-8 h-8 rounded-full border border-white/10" />
           <div className="relative z-10"><div className="text-xs font-medium opacity-70">Paid</div><div className="text-2xl font-extrabold mt-0.5">{paid}</div></div>
         </div>
         <div className="bg-brand-600 rounded-2xl p-4 text-white relative overflow-hidden">
-          <div className="absolute -right-3 -top-3 w-14 h-14 rounded-full border border-white/10" />
-          <div className="absolute -right-1 -top-1 w-8 h-8 rounded-full border border-white/10" />
           <div className="relative z-10"><div className="text-xs font-medium opacity-70">Completed</div><div className="text-2xl font-extrabold mt-0.5">{completed}</div></div>
         </div>
-      </div>
-
-      {/* How it works */}
-      <div className="bg-brand-50 rounded-2xl p-4 mb-5 border border-brand-100">
-        <p className="text-sm font-semibold text-brand-700 mb-1">How to send a WhatsApp Invoice</p>
-        <p className="text-xs text-brand-600 leading-relaxed">Go to <b>POS</b> → Add products to cart → Enter phone number → Click <b>"Send Invoice via WhatsApp"</b></p>
       </div>
 
       {/* Search + Filters */}

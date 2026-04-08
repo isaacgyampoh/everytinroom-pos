@@ -149,8 +149,6 @@ export default function Navigation({ onOpenCart }) {
       </div>
       <div className="flex-1 overflow-y-auto px-3 pb-3">
         <div className="bg-brand-700 rounded-2xl p-5 text-center text-white mb-4 relative overflow-hidden">
-          <div className="absolute -right-4 -top-4 w-16 h-16 rounded-full border-[2px] border-white/10" />
-          <div className="absolute -right-1 -top-1 w-9 h-9 rounded-full border-[2px] border-white/10" />
           <div className="relative z-10">
             <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center text-lg font-bold mx-auto mb-2">{user?.name?.charAt(0)}</div>
             <div className="text-sm font-bold">{user?.name}</div>

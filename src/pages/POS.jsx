@@ -73,8 +73,6 @@ export default function POS() {
 
       {promoCount > 0 && (
         <div className="bg-brand-600 rounded-2xl px-5 py-3 mt-4 flex items-center gap-3 text-white relative overflow-hidden">
-          <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full border-[2px] border-white/10" />
-          <div className="absolute -right-1 -top-1 w-10 h-10 rounded-full border-[2px] border-white/10" />
           <span className="text-xl relative z-10"></span>
           <span className="text-sm font-bold relative z-10">{promoCount} product{promoCount > 1 ? 's' : ''} on promo!</span>
         </div>

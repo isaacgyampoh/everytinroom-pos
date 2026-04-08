@@ -151,7 +151,6 @@ export default function InvoicePay() {
   if (isCancelled) return (
     <div className="min-h-screen bg-[#f6f4ef]">
       <div className="bg-[#1a3d30] text-white relative overflow-hidden">
-        <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full border border-white/5" />
         <div className="max-w-lg mx-auto px-6 py-8 relative z-10">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center text-white text-sm font-extrabold">ER</div>
@@ -184,9 +183,6 @@ export default function InvoicePay() {
     <div className="min-h-screen bg-[#f6f4ef]">
       {/* Header */}
       <div className="bg-[#1a3d30] text-white relative overflow-hidden">
-        <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full border border-white/5" />
-        <div className="absolute -right-3 -top-3 w-20 h-20 rounded-full border border-white/5" />
-        <div className="absolute -left-6 -bottom-6 w-24 h-24 rounded-full border border-white/5" />
 
         <div className="max-w-lg mx-auto px-6 py-8 relative z-10">
           <div className="flex items-center gap-3 mb-6">

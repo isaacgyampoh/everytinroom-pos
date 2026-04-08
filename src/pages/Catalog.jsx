@@ -96,8 +96,6 @@ export default function Catalog() {
 
       {/* Hero */}
       <div className="bg-green-900 relative overflow-hidden cat-hero">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,rgba(34,197,94,0.15),transparent_60%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(74,222,128,0.1),transparent_50%)]" />
         <div className="max-w-6xl mx-auto px-4 py-12 md:py-16 relative z-10">
           <p className="text-green-400 text-xs font-semibold tracking-[0.2em] uppercase mb-3">{SHOP.address}</p>
           <h1 className="text-white text-3xl md:text-5xl font-bold leading-tight mb-3" style={{ fontFamily: "'Playfair Display', serif" }}>Home essentials,<br />delivered to you.</h1>

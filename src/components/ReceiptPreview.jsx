@@ -45,7 +45,7 @@ export default function ReceiptPreview({ sale, onClose }) {
           {/* Header */}
           <div className="hdr text-center pb-4 border-b-2 border-dashed border-gray-800">
             <div className="shop-name text-xl font-black tracking-wide uppercase">{SHOP.name}</div>
-            <div className="shop-info text-xs font-bold text-gray-700 mt-1">{SHOP.tagline}</div>
+            {SHOP.tagline && <div className="shop-info text-xs font-bold text-gray-700 mt-1">{SHOP.tagline}</div>}
             <div className="shop-info text-xs font-bold text-gray-700">{SHOP.address}</div>
             <div className="shop-info text-xs font-bold text-gray-700">Tel: {SHOP.phone}</div>
             <div className="shop-info text-xs font-bold text-gray-700">{SHOP.website}</div>

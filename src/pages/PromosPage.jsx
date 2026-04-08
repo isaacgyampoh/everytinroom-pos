@@ -66,13 +66,9 @@ export default function PromosPage() {
       {/* Hero stat */}
       <div className="grid grid-cols-2 gap-3 mb-5">
         <div className="bg-brand-600 rounded-2xl p-5 text-white relative overflow-hidden">
-          <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full border-[2px] border-white/10" />
-          <div className="absolute -right-1 -top-1 w-10 h-10 rounded-full border-[2px] border-white/10" />
           <div className="relative z-10"><div className="text-xs opacity-70">Active Promos</div><div className="text-3xl font-extrabold mt-1">{activeCount}</div></div>
         </div>
         <div className="bg-brand-700 rounded-2xl p-5 text-white relative overflow-hidden">
-          <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full border-[2px] border-white/10" />
-          <div className="absolute -right-1 -top-1 w-10 h-10 rounded-full border-[2px] border-white/10" />
           <div className="relative z-10"><div className="text-xs opacity-70">Active Bundles</div><div className="text-3xl font-extrabold mt-1">{bundles.filter(b => b.active).length}</div></div>
         </div>
       </div>

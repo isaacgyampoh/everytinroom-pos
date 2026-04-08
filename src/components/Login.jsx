@@ -39,30 +39,8 @@ export default function Login() {
   return (
     <div className="fixed inset-0 bg-[#122c23] flex items-center justify-center p-6 z-[1000] overflow-hidden">
 
-      {/* Large colorful decorative circles */}
-      <div className="absolute -left-20 -top-20 w-80 h-80 rounded-full bg-[#f97316] opacity-80" />
-      <div className="absolute left-16 -top-10 w-48 h-48 rounded-full bg-[#3d8b6a] opacity-70" />
-      <div className="absolute -left-10 top-32 w-36 h-36 rounded-full bg-[#fbbf24]" />
-      <div className="absolute left-40 top-8 w-24 h-24 rounded-full bg-white opacity-20" />
-
-      <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-[#5fa886] opacity-60" />
-      <div className="absolute right-10 top-20 w-40 h-40 rounded-full bg-[#f97316] opacity-40" />
-      <div className="absolute right-32 -top-8 w-20 h-20 rounded-full bg-[#fbbf24] opacity-70" />
-
-      <div className="absolute -left-24 bottom-20 w-56 h-56 rounded-full bg-[#5fa886] opacity-50" />
-      <div className="absolute left-20 -bottom-12 w-44 h-44 rounded-full bg-[#fbbf24] opacity-60" />
-      <div className="absolute left-48 bottom-16 w-20 h-20 rounded-full bg-white opacity-15" />
-
-      <div className="absolute -right-20 -bottom-20 w-72 h-72 rounded-full bg-[#f97316] opacity-60" />
-      <div className="absolute right-12 bottom-8 w-40 h-40 rounded-full bg-[#3d8b6a] opacity-50" />
-      <div className="absolute right-36 -bottom-6 w-28 h-28 rounded-full bg-[#fbbf24] opacity-40" />
-
-      {/* Scattered mid circles */}
-      <div className="absolute left-[15%] top-[45%] w-16 h-16 rounded-full bg-white opacity-10" />
-      <div className="absolute right-[20%] top-[35%] w-12 h-12 rounded-full bg-[#5fa886] opacity-30" />
-      <div className="absolute left-[40%] top-[15%] w-10 h-10 rounded-full bg-[#f97316] opacity-25" />
-      <div className="absolute right-[40%] bottom-[15%] w-14 h-14 rounded-full bg-[#fbbf24] opacity-20" />
-      <div className="absolute left-[60%] bottom-[25%] w-8 h-8 rounded-full bg-white opacity-10" />
+      {/* Subtle background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#122c23] via-[#1a3d30] to-[#0f241c]" />
 
       {/* Content */}
       <div className="text-center w-full max-w-[360px] relative z-10">

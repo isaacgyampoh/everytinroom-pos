@@ -81,9 +81,6 @@ export default function Dashboard() {
           { label: "All Time", value: money(allRev), sub: allSales.length + ' total', color: 'bg-brand-800' },
         ].map((c, i) => (
           <div key={i} className={`${c.color} rounded-2xl p-4 md:p-5 text-white relative overflow-hidden`}>
-            {/* Decorative circles */}
-            <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full border-[3px] border-white/10" />
-            <div className="absolute -right-1 -top-1 w-12 h-12 rounded-full border-[3px] border-white/10" />
             <div className="absolute right-8 -bottom-6 w-16 h-16 rounded-full bg-white/5" />
             <div className="relative z-10">
               <div className="text-[11px] md:text-xs font-medium opacity-70">{c.label}</div>
@@ -103,8 +100,6 @@ export default function Dashboard() {
           { label: 'Stock Value', value: money(stockValue), color: 'text-amber-600', bg: 'bg-amber-500' },
         ].map((s, i) => (
           <div key={i} className="bg-white rounded-2xl p-3.5 md:p-4 text-center border border-gray-100 relative overflow-hidden">
-            <div className={`absolute -left-3 -bottom-3 w-14 h-14 rounded-full ${s.bg} opacity-[0.06]`} />
-            <div className={`absolute -left-1 -bottom-1 w-8 h-8 rounded-full ${s.bg} opacity-[0.08]`} />
             <div className="relative z-10">
               <div className="text-[10px] md:text-xs text-gray-400 font-medium">{s.label}</div>
             <div className={`text-lg md:text-xl font-extrabold mt-0.5 ${s.color}`}>{s.value}</div>
@@ -116,8 +111,6 @@ export default function Dashboard() {
       <div className="grid md:grid-cols-2 gap-4 mb-5">
         {/* 7-Day Sales Trend Chart */}
         <div className="bg-white rounded-2xl p-5 border border-gray-100 relative overflow-hidden">
-          <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full border-[2px] border-amber-400/[0.06]" />
-          <div className="absolute -right-3 -top-3 w-14 h-14 rounded-full border-[2px] border-amber-400/[0.06]" />
           <h3 className="text-sm font-bold text-gray-800 mb-4 relative z-10">Last 7 Days Revenue</h3>
           <div className="flex items-end gap-2 h-32">
             {last7.map((d, i) => (
@@ -184,7 +177,7 @@ export default function Dashboard() {
 
         {/* Quick Actions */}
         <div className="bg-white rounded-2xl p-5 border border-gray-100">
-          <h3 className="text-sm font-bold text-gray-800 mb-3">⚡ Quick Actions</h3>
+          <h3 className="text-sm font-bold text-gray-800 mb-3">Quick Actions</h3>
           <div className="grid grid-cols-3 gap-2">
             {[
               { icon: '', label: 'New Sale', page: 'pos' },

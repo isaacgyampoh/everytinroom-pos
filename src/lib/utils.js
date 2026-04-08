@@ -11,7 +11,7 @@ export const weekStartDate = () => format(startOfWeek(new Date(), { weekStartsOn
 
 export const SHOP = {
   name: 'EVERYTINROOM&BEDTIME',
-  tagline: 'Your One Stop Shop',
+  tagline: '',
   phone: '024 531 5581 / 024 936 5339',
   address: 'Adenta Aviation Road',
   website: 'www.Erbliving.shop',
