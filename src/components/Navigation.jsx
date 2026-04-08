@@ -56,7 +56,7 @@ export default function Navigation({ onOpenCart }) {
   const [expanded, setExpanded] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const { page, setPage, user, isAdmin, logout, waOrders, cart, darkMode, toggleDark } = useStore()
-  const wa = waOrders.filter(o => o.status === 'Pending').length
+  const wa = waOrders.filter(o => o.status === 'Pending' || o.status === 'Paid').length
   const cc = cart.reduce((a, c) => a + c.qty, 0)
   const go = (p) => { if (!isAdmin && AP.includes(p)) return; setPage(p); setMobileOpen(false) }
 

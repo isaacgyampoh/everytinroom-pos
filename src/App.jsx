@@ -92,7 +92,15 @@ export default function App() {
     const sb = getSupabase(); if (!sb) return
     const store = useStore.getState()
     sb.channel('pos-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_orders' }, () => store.refreshWAOrders())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_orders' }, () => {
+        store.refreshWAOrders()
+        // Update PWA badge with pending + paid (unprocessed) count
+        setTimeout(() => {
+          const s = useStore.getState()
+          const badge = s.waOrders.filter(o => o.status === 'Pending' || o.status === 'Paid').length
+          updateBadge(badge)
+        }, 1000)
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => store.refreshProducts())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sales' }, (payload) => {
         store.refreshSales()
@@ -105,6 +113,23 @@ export default function App() {
       })
       .subscribe()
   }
+
+  // Update PWA app icon badge (shows number on app icon)
+  const updateBadge = (count) => {
+    try {
+      if ('setAppBadge' in navigator) {
+        if (count > 0) navigator.setAppBadge(count)
+        else navigator.clearAppBadge()
+      }
+    } catch {}
+  }
+
+  // Set badge on initial load
+  useEffect(() => {
+    const s = useStore.getState()
+    const badge = s.waOrders.filter(o => o.status === 'Pending' || o.status === 'Paid').length
+    updateBadge(badge)
+  })
 
   // Public pages - no login required
   if (window.location.hash.includes('/pay/')) return <Suspense fallback={<Loader />}><InvoicePay /></Suspense>
