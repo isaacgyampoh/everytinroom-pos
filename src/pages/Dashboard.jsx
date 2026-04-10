@@ -56,53 +56,50 @@ export default function Dashboard() {
   const greet = greetHour < 12 ? 'Good Morning' : greetHour < 17 ? 'Good Afternoon' : 'Good Evening'
 
   return (
-    <div className="animate-fade">
+    <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">{greet}, {user?.name || 'Boss'} </h1>
-          <p className="text-gray-400 text-sm mt-0.5">{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+          <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight text-gray-900">{greet}, {user?.name || 'Boss'}</h1>
+          <p className="text-gray-400 text-[13px] mt-0.5">{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
         </div>
       </div>
 
       {/* Alerts */}
       {outOfStock.length > 0 && (
-        <div onClick={() => setPage('stocktakes')} className="bg-red-50 border border-red-200 rounded-xl p-3.5 mb-4 flex items-center gap-3 cursor-pointer hover:bg-red-100 transition">
-          <span className="text-sm opacity-30">□</span>
-          <div className="flex-1"><span className="text-sm font-bold text-red-600">{outOfStock.length} products out of stock!</span> <span className="text-xs text-red-400">Tap to view</span></div>
+        <div onClick={() => setPage('stocktakes')} className="bg-red-50 border border-red-100 rounded-xl p-3 mb-4 flex items-center gap-3 cursor-pointer hover:bg-red-100 transition">
+          <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center text-red-500 text-xs font-bold">{outOfStock.length}</div>
+          <div className="flex-1 text-sm text-red-600 font-medium">Products out of stock</div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
         </div>
       )}
 
       {/* Revenue Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {[
-          { label: "Today", value: money(todayRev), sub: todaySales.length + ' sales', color: 'bg-brand-700' },
-          { label: "This Week", value: money(weekRev), sub: weekSales.length + ' sales', color: 'bg-brand-500' },
-          { label: "This Month", value: money(monthRev), sub: monthSales.length + ' sales', color: 'bg-brand-600' },
-          { label: "All Time", value: money(allRev), sub: allSales.length + ' total', color: 'bg-brand-800' },
+          { label: "Today", value: money(todayRev), sub: todaySales.length + ' sales', color: 'bg-[#1a3d30]' },
+          { label: "This Week", value: money(weekRev), sub: weekSales.length + ' sales', color: 'bg-[#265a44]' },
+          { label: "This Month", value: money(monthRev), sub: monthSales.length + ' sales', color: 'bg-[#2d6f53]' },
+          { label: "All Time", value: money(allRev), sub: allSales.length + ' total', color: 'bg-[#162f26]' },
         ].map((c, i) => (
           <div key={i} className={`${c.color} rounded-2xl p-4 md:p-5 text-white`}>
-            <div>
-              <div className="text-[11px] md:text-xs font-medium opacity-70">{c.label}</div>
-              <div className="text-xl md:text-2xl font-extrabold mt-1">{c.value}</div>
-              <div className="text-[10px] md:text-xs font-medium opacity-50 mt-0.5">{c.sub}</div>
-            </div>
+              <div className="text-[11px] md:text-xs font-medium text-white/60">{c.label}</div>
+              <div className="text-[20px] md:text-[22px] font-bold mt-1 tracking-tight">{c.value}</div>
+              <div className="text-[10px] md:text-[11px] font-medium text-white/40 mt-0.5">{c.sub}</div>
           </div>
         ))}
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {[
           { label: "Today's Profit", value: money(todayProfit), color: 'text-green-600', bg: 'bg-green-500' },
           { label: 'Net Today', value: money(todayProfit - todayExp), color: todayProfit - todayExp >= 0 ? 'text-green-600' : 'text-red-500', bg: 'bg-amber-400' },
           { label: 'Profit Margin', value: profitMargin + '%', color: Number(profitMargin) >= 30 ? 'text-green-600' : Number(profitMargin) >= 15 ? 'text-amber-500' : 'text-red-500', bg: 'bg-gray-400' },
           { label: 'Stock Value', value: money(stockValue), color: 'text-amber-600', bg: 'bg-amber-500' },
         ].map((s, i) => (
-          <div key={i} className="bg-white rounded-2xl p-3.5 md:p-4 text-center border border-gray-100">
-            <div>
-              <div className="text-[10px] md:text-xs text-gray-400 font-medium">{s.label}</div>
-            <div className={`text-lg md:text-xl font-extrabold mt-0.5 ${s.color}`}>{s.value}</div>
-            </div>
+          <div key={i} className="bg-white rounded-2xl p-3.5 md:p-4 border border-gray-100/80">
+              <div className="text-[10px] md:text-[11px] text-gray-400 font-medium">{s.label}</div>
+              <div className={`text-[18px] md:text-[20px] font-bold mt-0.5 tracking-tight ${s.color}`}>{s.value}</div>
           </div>
         ))}
       </div>

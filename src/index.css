@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-body { font-family: 'DM Sans', system-ui, sans-serif; font-size: 15px; background: #f6f4ef; color: #1a1a1a; letter-spacing: -0.01em; transition: background .3s, color .3s; }
-h1, h2, h3, h4, h5, h6 { font-family: 'Outfit', 'DM Sans', system-ui, sans-serif; letter-spacing: -0.04em; }
+body { font-family: 'DM Sans', system-ui, sans-serif; font-size: 15px; background: #F5F5F0; color: #1a1a1a; letter-spacing: -0.01em; transition: background .3s, color .3s; }
+h1, h2, h3, h4, h5, h6 { font-family: 'Outfit', 'DM Sans', system-ui, sans-serif; letter-spacing: -0.03em; }
 @media (min-width: 768px) { body { font-size: 16px; } }
 
 /* ===== DARK MODE — Deep sage green ===== */
