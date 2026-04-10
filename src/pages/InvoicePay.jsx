@@ -153,7 +153,7 @@ export default function InvoicePay() {
       <div className="bg-[#1a3d30] text-white relative overflow-hidden">
         <div className="max-w-lg mx-auto px-6 py-8 relative z-10">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center text-white text-sm font-extrabold">ER</div>
+            <img src="/logo.png" alt="" className="w-10 h-10 rounded-xl" />
             <div>
               <h1 className="font-bold text-lg tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>{SHOP.name}</h1>
               <p className="text-white/50 text-xs">{SHOP.tagline}</p>
@@ -162,7 +162,7 @@ export default function InvoicePay() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-white/50 text-xs uppercase tracking-wider">Invoice</p>
-              <p className="text-xl font-extrabold mt-0.5">{order?.order_no}</p>
+              <p className="text-xl font-bold mt-0.5">{order?.order_no}</p>
             </div>
             <div className="bg-red-500 text-white px-4 py-2 rounded-full text-sm font-bold">Cancelled</div>
           </div>
@@ -186,7 +186,7 @@ export default function InvoicePay() {
 
         <div className="max-w-lg mx-auto px-6 py-8 relative z-10">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center text-white text-sm font-extrabold">ER</div>
+            <img src="/logo.png" alt="" className="w-10 h-10 rounded-xl" />
             <div>
               <h1 className="font-bold text-lg tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>{SHOP.name}</h1>
               <p className="text-white/50 text-xs">{SHOP.tagline}</p>
@@ -195,7 +195,7 @@ export default function InvoicePay() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-white/50 text-xs uppercase tracking-wider">Invoice</p>
-              <p className="text-xl font-extrabold mt-0.5">{order?.order_no}</p>
+              <p className="text-xl font-bold mt-0.5">{order?.order_no}</p>
             </div>
             {isPaid ? (
               <div className="bg-emerald-500 text-white px-4 py-2 rounded-full text-sm font-bold">Paid</div>
@@ -223,7 +223,7 @@ export default function InvoicePay() {
           ))}
           <div className="flex justify-between items-center px-4 py-4 bg-gray-50">
             <span className="text-base font-bold text-gray-900">Total</span>
-            <span className="text-xl font-extrabold text-[#1a3d30]">{money(orderTotal)}</span>
+            <span className="text-xl font-bold text-[#1a3d30]">{money(orderTotal)}</span>
           </div>
         </div>
 
@@ -306,7 +306,7 @@ export default function InvoicePay() {
             {order?.ussd_code && (
               <div className="mt-4 bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center">
                 <p className="text-xs text-amber-600 font-semibold mb-1">Or pay via USSD (no internet needed)</p>
-                <p className="text-lg font-extrabold text-amber-900 font-mono tracking-wider">*920*141*{order.ussd_code}#</p>
+                <p className="text-lg font-bold text-amber-900 font-mono tracking-wider">*920*141*{order.ussd_code}#</p>
                 <p className="text-[11px] text-amber-500 mt-1">Dial this code on your phone → confirm → pay with MoMo</p>
               </div>
             )}

@@ -17,7 +17,7 @@ const ProductCard = memo(({ item, price, hasPromo, onAdd }) => {
         <div className="flex items-end justify-between mt-1.5">
           <div>
             {hasPromo && <div className="text-[10px] text-stone-400 line-through">{money(item.price)}</div>}
-            <div className={`text-base font-extrabold leading-none ${hasPromo ? 'text-brand-600' : 'text-gray-900'}`}>{money(price)}</div>
+            <div className={`text-base font-bold leading-none ${hasPromo ? 'text-brand-600' : 'text-gray-900'}`}>{money(price)}</div>
           </div>
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${qty === 0 ? 'bg-red-100 text-red-600' : qty <= 5 ? 'bg-amber-100 text-amber-700' : 'bg-brand-50 text-brand-700'}`}>
             {qty === 0 ? 'OUT' : qty}
@@ -68,20 +68,20 @@ export default function POS() {
   const promoCount = Object.keys(promoPriceMap).length
 
   return (
-    <div className="animate-fade">
-      <h1 className="text-3xl md:text-[40px] font-extrabold tracking-tight leading-none">Point of Sale</h1>
+    <div >
+      <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight">Point of Sale</h1>
 
       {promoCount > 0 && (
-        <div className="bg-brand-600 rounded-2xl px-5 py-3 mt-4 flex items-center gap-3 text-white relative overflow-hidden">
-          <span className="text-xl relative z-10"></span>
-          <span className="text-sm font-bold relative z-10">{promoCount} product{promoCount > 1 ? 's' : ''} on promo!</span>
+        <div className="bg-brand-600 rounded-2xl px-5 py-3 mt-4 flex items-center gap-3 text-white ">
+          
+          <span className="text-sm font-bold ">{promoCount} product{promoCount > 1 ? 's' : ''} on promo!</span>
         </div>
       )}
 
       {/* Search */}
       <div className="relative mt-5 mb-4">
-        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 text-lg">⌕</span>
-        <input className="w-full h-12 md:h-13 pl-12 pr-4 bg-white rounded-2xl text-sm font-medium placeholder:text-stone-300 focus:outline-none focus:ring-2 focus:ring-brand-400/30" placeholder="Search or scan barcode..." value={query}
+        
+        <input className="w-full h-12 md:h-13 pl-4 pr-4 bg-white rounded-2xl text-sm font-medium placeholder:text-stone-300 focus:outline-none focus:ring-2 focus:ring-[#3d8b6a]/30" placeholder="Search or scan barcode..." value={query}
           onChange={e => { setQuery(e.target.value); const v = e.target.value.trim(); if (v.length > 3) { const ex = products.find(p => p.name.toLowerCase() === v.toLowerCase()); if (ex && searchAdd(ex)) setQuery('') } }}
           onKeyDown={e => { if (e.key === 'Enter' && query.trim() && filtered[0] && mode !== 'bundle') { if (searchAdd(filtered[0])) setQuery('') } }}
         />
@@ -115,7 +115,7 @@ export default function POS() {
           if (mode === 'bundle') return (
             <button key={item.id} onClick={() => doAdd(item)} className="bg-white rounded-2xl p-4 text-left active:scale-[.97] transition-transform">
               <div className="text-sm font-semibold">{item.name}</div>
-              <div className="text-lg font-extrabold mt-1">{money(item.bundlePrice)}</div>
+              <div className="text-lg font-bold mt-1">{money(item.bundlePrice)}</div>
             </button>
           )
           return <ProductCard key={item.id} item={item} price={getPrice(item)} hasPromo={!!promoPriceMap[item.id]} onAdd={() => doAdd(item)} />

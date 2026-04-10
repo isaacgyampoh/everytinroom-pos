@@ -154,11 +154,11 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2.5">
             <h3 className="text-lg font-bold text-gray-900">Cart</h3>
-            {cnt > 0 && <span className="bg-brand-500 text-white h-6 min-w-[24px] px-1.5 rounded-full text-xs font-bold flex items-center justify-center">{cnt}</span>}
+            {cnt > 0 && <span className="bg-[#f2f7f5]0 text-white h-6 min-w-[24px] px-1.5 rounded-full text-xs font-bold flex items-center justify-center">{cnt}</span>}
           </div>
           <div className="flex gap-1.5">
             <button onClick={() => setShowHeld(true)} className="h-9 px-3 rounded-lg text-xs font-semibold bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100 transition relative">
-              Held{heldCarts.length > 0 && <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-brand-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{heldCarts.length}</span>}
+              Held{heldCarts.length > 0 && <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-[#f2f7f5]0 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{heldCarts.length}</span>}
             </button>
             <button onClick={holdCart} disabled={!cart.length} className="h-9 px-3 rounded-lg text-xs font-semibold bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100 transition disabled:opacity-30">Hold</button>
             <button onClick={() => { if (cart.length && confirm('Clear cart?')) clearCart() }} className="h-9 px-3 rounded-lg text-xs font-semibold bg-red-50 text-red-500 border border-red-100 hover:bg-red-100 transition">Clear</button>
@@ -208,7 +208,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             </div>
             <div className="flex justify-between items-baseline pt-2 border-t border-dashed border-gray-200">
               <span className="text-base font-bold text-gray-900">Total</span>
-              <span className="text-xl font-extrabold text-brand-600">{money(total)}</span>
+              <span className="text-xl font-bold text-[#2d6f53]">{money(total)}</span>
             </div>
           </div>
 
@@ -221,7 +221,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
           {!phoneValid && phone.length > 0 && <p className="text-red-500 text-xs font-medium mb-2 -mt-1">Enter at least 9 digits</p>}
 
           <button onClick={handleOpenPayment} disabled={cnt === 0 || !phoneValid}
-            className="w-full h-12 bg-brand-700 hover:bg-brand-600 rounded-xl text-white text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm shadow-brand-700/20">
+            className="w-full h-12 bg-[#1a3d30] hover:bg-[#265a44] rounded-xl text-white text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all ">
             Complete Sale — {money(total)}
           </button>
 
@@ -328,7 +328,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
           {(momoStep === 'idle' || momoStep === 'failed') && (<>
             <div className="bg-gray-50 rounded-xl p-5 text-center border border-gray-100">
               <div className="text-xs text-gray-400 font-medium">Amount Due</div>
-              <div className="text-3xl font-extrabold text-gray-900 mt-1">{money(total)}</div>
+              <div className="text-3xl font-bold text-gray-900 mt-1">{money(total)}</div>
               <div className="text-xs text-gray-400 mt-1">{phone}</div>
             </div>
 
@@ -338,7 +338,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
               <div className="grid grid-cols-2 gap-2.5">
                 {[
                   { id: 'Cash', icon: '💵', label: 'Cash', sub: 'Manual', color: 'bg-green-500', border: 'border-green-500' },
-                  { id: 'Momo', icon: '', label: 'Momo', sub: 'Manual', color: 'bg-brand-500', border: 'border-amber-500' },
+                  { id: 'Momo', icon: '', label: 'Momo', sub: 'Manual', color: 'bg-[#f2f7f5]0', border: 'border-amber-500' },
                   { id: 'Paystack', icon: '', label: 'Paystack', sub: 'Online', color: 'bg-blue-500', border: 'border-blue-500' },
                   { id: 'Split', icon: '✂️', label: 'Split', sub: 'Cash + Paystack', color: 'bg-violet-500', border: 'border-violet-500' },
                 ].map(m => {
@@ -357,9 +357,9 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
 
             {/* Momo Manual Info */}
             {!splitMode && payMethod === 'Momo' && (
-              <div className="bg-brand-50 rounded-xl p-3.5 border border-amber-100">
+              <div className="bg-[#f2f7f5] rounded-xl p-3.5 border border-[#e8ece6]">
                 <div className="text-sm font-bold text-amber-700 mb-1">Manual Momo</div>
-                <div className="text-xs text-brand-600">Confirm you've received {money(total)} via Mobile Money from {phone}, then click to complete.</div>
+                <div className="text-xs text-[#2d6f53]">Confirm you've received {money(total)} via Mobile Money from {phone}, then click to complete.</div>
               </div>
             )}
 
@@ -381,7 +381,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-violet-200">
                   <span className="text-sm font-semibold text-blue-600">Paystack Portion</span>
-                  <span className="text-lg font-extrabold text-blue-600">{money(Math.max(0, splitRemainder))}</span>
+                  <span className="text-lg font-bold text-blue-600">{money(Math.max(0, splitRemainder))}</span>
                 </div>
                 <div className="text-xs text-violet-500">Cash collected manually. Paystack handles the rest online.</div>
               </div>
@@ -390,7 +390,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             {momoStep === 'failed' && <div className="bg-red-50 rounded-xl p-3.5 text-red-600 text-sm font-medium border border-red-100"> {momoMessage}</div>}
 
             <button onClick={handleCompleteSale} disabled={processing}
-              className="w-full h-12 bg-brand-700 hover:bg-brand-600 text-white rounded-xl text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm">
+              className="w-full h-12 bg-[#1a3d30] hover:bg-[#265a44] text-white rounded-xl text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm">
               {processing ? 'Processing...' : splitMode ? '✂️ Confirm Split' : payMethod === 'Cash' ? '💵 Confirm Cash' : payMethod === 'Momo' ? 'Confirm Momo Received' : 'Open Paystack'}
             </button>
           </>)}
@@ -402,7 +402,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
               <h3 className="text-lg font-bold mb-1">Waiting for Paystack</h3>
               <p className="text-gray-400 text-sm mb-4">Customer is completing payment</p>
               <div className="bg-blue-50 rounded-xl p-4 mb-4 border border-blue-100">
-                <div className="text-lg font-extrabold text-blue-700">{money(splitMode ? splitRemainder : total)}</div>
+                <div className="text-lg font-bold text-blue-700">{money(splitMode ? splitRemainder : total)}</div>
                 <div className="text-sm text-blue-600 mt-0.5">{phone}</div>
               </div>
               <div className="flex items-center justify-center gap-1.5 text-blue-500 mb-4">
@@ -431,12 +431,12 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                     <span className="text-xs text-gray-400">{h.time}</span>
                     {h.phone && <span className="text-xs text-gray-400">{h.phone}</span>}
                   </div>
-                  <span className="text-base font-extrabold text-brand-600">{money(h.items.reduce((a, c) => a + c.lineTotal, 0))}</span>
+                  <span className="text-base font-bold text-[#2d6f53]">{money(h.items.reduce((a, c) => a + c.lineTotal, 0))}</span>
                 </div>
                 <div className="text-xs text-gray-400 leading-relaxed">{h.items.map(i => i.name).join(', ')}</div>
               </div>
               <div className="flex border-t border-gray-100">
-                <button onClick={() => recallCart(h)} className="flex-1 h-10 text-sm font-semibold text-brand-600 hover:bg-brand-50 transition">↩ Recall</button>
+                <button onClick={() => recallCart(h)} className="flex-1 h-10 text-sm font-semibold text-[#2d6f53] hover:bg-[#f2f7f5] transition">↩ Recall</button>
                 <button onClick={() => deleteHeld(h.id)} className="h-10 px-4 text-sm font-semibold text-red-400 hover:bg-red-50 border-l border-gray-100 transition">🗑</button>
               </div>
             </div>

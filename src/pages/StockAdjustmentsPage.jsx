@@ -71,10 +71,10 @@ export default function StockAdjustmentsPage() {
   )
 
   return (
-    <div className="animate-fade">
+    <div >
       <div className="flex justify-between items-start flex-wrap gap-4 mb-5">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Stock Adjustments</h1>
+          <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight">Stock Adjustments</h1>
           <p className="text-gray-400 text-sm mt-0.5">Record damaged, broken, or missing items</p>
         </div>
         <button onClick={() => { setForm({ productId: '', qty: '', reason: 'Damaged', notes: '' }); setSearch(''); setModal(true) }}
@@ -87,15 +87,15 @@ export default function StockAdjustmentsPage() {
       <div className="grid grid-cols-3 gap-3 mb-6">
         <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-100 text-center">
           <div className="text-xs md:text-sm text-gray-400 font-medium">Total Adjustments</div>
-          <div className="text-2xl md:text-3xl font-extrabold mt-1">{stockAdjustments.length}</div>
+          <div className="text-[22px] md:text-[26px] font-bold mt-1">{stockAdjustments.length}</div>
         </div>
         <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-100 text-center">
           <div className="text-xs md:text-sm text-gray-400 font-medium">Items Lost</div>
-          <div className="text-2xl md:text-3xl font-extrabold text-red-500 mt-1">{totalLost}</div>
+          <div className="text-[22px] md:text-[26px] font-bold text-red-500 mt-1">{totalLost}</div>
         </div>
         <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-100 text-center">
           <div className="text-xs md:text-sm text-gray-400 font-medium">Value Lost (Cost)</div>
-          <div className="text-xl md:text-2xl font-extrabold text-red-500 mt-1">{money(valueLost)}</div>
+          <div className="text-xl md:text-2xl font-bold text-red-500 mt-1">{money(valueLost)}</div>
         </div>
       </div>
 

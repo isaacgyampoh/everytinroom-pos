@@ -8,8 +8,8 @@ export default function Receipts({ onPrintReceipt }) {
   const filtered = sales.filter(s => s.receiptNo.toLowerCase().includes(query.toLowerCase()) || s.customer.toLowerCase().includes(query.toLowerCase()) || s.cashier.toLowerCase().includes(query.toLowerCase())).slice(0, 50)
 
   return (
-    <div className="animate-fade">
-      <h1 className="text-3xl font-extrabold mb-6">Receipts</h1>
+    <div >
+      <h1 className="text-[22px] md:text-[26px] font-bold mb-6">Receipts</h1>
       <div className="bg-white rounded-2xl p-6 shadow-md">
         <input className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base mb-5" placeholder="Search receipt, customer, staff..." value={query} onChange={e => setQuery(e.target.value)} />
         <div className="overflow-x-auto">

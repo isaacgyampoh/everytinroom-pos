@@ -71,10 +71,10 @@ export default function StockTakesPage() {
   }
 
   return (
-    <div className="animate-fade">
+    <div >
       <div className="flex justify-between items-start flex-wrap gap-4 mb-5">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Stock Stock & Adjustments Adjustments</h1>
+          <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight">Stock Stock & Adjustments Adjustments</h1>
           <p className="text-gray-400 text-sm mt-0.5">Count inventory, track variances & adjustments</p>
         </div>
         <div className="flex gap-2">
@@ -88,20 +88,20 @@ export default function StockTakesPage() {
         <div className="bg-white rounded-2xl p-4 border border-gray-100 text-center relative overflow-hidden">
           <div className="absolute -right-3 -top-3 w-14 h-14 rounded-full border border-brand-400/10" />
           <div className="text-xs text-gray-400 font-medium">Total Products</div>
-          <div className="text-2xl font-extrabold mt-1">{products.length}</div>
+          <div className="text-2xl font-bold mt-1">{products.length}</div>
         </div>
         <div className="bg-white rounded-2xl p-4 border border-gray-100 text-center relative overflow-hidden">
           <div className="absolute -right-3 -top-3 w-14 h-14 rounded-full border border-brand-400/10" />
           <div className="text-xs text-gray-400 font-medium">Stock Value</div>
-          <div className="text-xl font-extrabold text-brand-600 mt-1">{money(totalStockValue)}</div>
+          <div className="text-xl font-bold text-brand-600 mt-1">{money(totalStockValue)}</div>
         </div>
         <button onClick={() => setLowStockOpen(true)} className="bg-amber-50 rounded-2xl p-4 border-2 border-amber-200 text-center hover:bg-amber-100 transition">
           <div className="text-xs text-amber-600 font-medium">Low Stock</div>
-          <div className="text-2xl font-extrabold text-amber-500 mt-1">{lowStockProducts.length}</div>
+          <div className="text-2xl font-bold text-amber-500 mt-1">{lowStockProducts.length}</div>
         </button>
         <div className="bg-red-50 rounded-2xl p-4 border border-red-100 text-center">
           <div className="text-xs text-red-500 font-medium">Out of Stock</div>
-          <div className="text-2xl font-extrabold text-red-500 mt-1">{outOfStock.length}</div>
+          <div className="text-2xl font-bold text-red-500 mt-1">{outOfStock.length}</div>
         </div>
       </div>
 
@@ -173,7 +173,7 @@ export default function StockTakesPage() {
           {lowStockProducts.map(p => (
             <div key={p.id} className={`flex items-center gap-3 p-3 rounded-xl ${p.quantity === 0 ? 'bg-red-50 border border-red-200' : 'bg-amber-50 border border-amber-200'}`}>
               <div className="flex-1"><div className="text-sm font-bold">{p.name}</div><div className="text-xs text-gray-400">{p.category || '-'}</div></div>
-              <div className={`text-xl font-extrabold ${p.quantity === 0 ? 'text-red-500' : 'text-amber-500'}`}>{p.quantity === 0 ? 'OUT' : p.quantity}</div>
+              <div className={`text-xl font-bold ${p.quantity === 0 ? 'text-red-500' : 'text-amber-500'}`}>{p.quantity === 0 ? 'OUT' : p.quantity}</div>
             </div>
           ))}
         </div>

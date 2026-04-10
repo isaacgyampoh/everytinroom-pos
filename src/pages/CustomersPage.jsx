@@ -8,9 +8,9 @@ export default function CustomersPage() {
   const filtered = customers.filter(c => c.phone.includes(query))
 
   return (
-    <div className="animate-fade">
-      <h1 className="text-3xl font-extrabold mb-6">Customers</h1>
-      <div className="bg-green-500 rounded-2xl p-7 text-white mb-6"><small className="text-sm opacity-80">Total Customers</small><strong className="block text-3xl font-bold mt-2">{customers.length}</strong></div>
+    <div >
+      <h1 className="text-[22px] md:text-[26px] font-bold mb-6">Customers</h1>
+      <div className="bg-green-500 rounded-2xl p-7 text-white mb-6"><small className="text-sm opacity-80">Total Customers</small><strong className="block text-[22px] md:text-[26px] font-bold mt-2">{customers.length}</strong></div>
       <div className="bg-white rounded-2xl p-6 shadow-md">
         <input className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base mb-5" placeholder="Search..." value={query} onChange={e => setQuery(e.target.value)} />
         <div className="overflow-x-auto">

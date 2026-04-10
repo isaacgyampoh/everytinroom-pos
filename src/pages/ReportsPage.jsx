@@ -12,7 +12,7 @@ const Section = ({ title, children, icon }) => (
 const Stat = ({ label, value, sub, color = 'text-gray-900' }) => (
   <div className="text-center p-3 md:p-4 bg-gray-50 rounded-xl">
     <div className="text-xs md:text-sm text-gray-400 font-medium">{label}</div>
-    <div className={`text-lg md:text-2xl font-extrabold mt-1 ${color}`}>{value}</div>
+    <div className={`text-lg md:text-2xl font-bold mt-1 ${color}`}>{value}</div>
     {sub && <div className="text-[11px] md:text-xs text-gray-400 mt-0.5">{sub}</div>}
   </div>
 )
@@ -110,10 +110,10 @@ export default function ReportsPage() {
   ]
 
   return (
-    <div className="animate-fade">
+    <div >
       <div className="flex justify-between items-start flex-wrap gap-3 mb-5">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Reports</h1>
+          <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight">Reports</h1>
           <p className="text-gray-400 text-sm mt-0.5">Business analytics & insights</p>
         </div>
         <button onClick={() => {
@@ -237,7 +237,7 @@ export default function ReportsPage() {
               ))}
               <div className="flex justify-between p-3 bg-red-50 rounded-xl border border-red-100">
                 <span className="text-sm font-bold text-red-600">Total Expenses</span>
-                <span className="text-sm font-extrabold text-red-600">{money(totalExp)}</span>
+                <span className="text-sm font-bold text-red-600">{money(totalExp)}</span>
               </div>
             </div>
           )}
@@ -280,7 +280,7 @@ export default function ReportsPage() {
               ))}
               <div className="flex justify-between p-3 bg-violet-50 rounded-xl border border-violet-100">
                 <span className="text-sm font-bold text-violet-600">Total Refunds</span>
-                <span className="text-sm font-extrabold text-violet-600">{money(totalRefAmt)}</span>
+                <span className="text-sm font-bold text-violet-600">{money(totalRefAmt)}</span>
               </div>
             </div>
           )}

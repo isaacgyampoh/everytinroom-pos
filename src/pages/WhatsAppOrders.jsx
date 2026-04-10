@@ -72,10 +72,10 @@ export default function WhatsAppOrders() {
   const o = selected // shorthand for modal
 
   return (
-    <div className="animate-fade">
+    <div >
       <div className="flex justify-between items-start flex-wrap gap-4 mb-5">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">WhatsApp Invoices</h1>
+          <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight">WhatsApp Invoices</h1>
           <p className="text-gray-400 text-sm mt-0.5">Send invoices, track payments</p>
         </div>
         <button onClick={refreshWAOrders} className="h-10 px-4 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">Refresh</button>
@@ -83,19 +83,19 @@ export default function WhatsAppOrders() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-5">
-        <div className="bg-amber-400 rounded-2xl p-4 text-black relative overflow-hidden">
-          <div className="relative z-10"><div className="text-xs font-medium opacity-60">Pending</div><div className="text-2xl font-extrabold mt-0.5">{pending}</div></div>
+        <div className="bg-amber-400 rounded-2xl p-4 text-black">
+          <div className="text-xs font-medium opacity-60">Pending</div><div className="text-[22px] font-bold mt-0.5">{pending}</div>
         </div>
-        <div className="bg-emerald-500 rounded-2xl p-4 text-white relative overflow-hidden">
-          <div className="relative z-10"><div className="text-xs font-medium opacity-70">Paid</div><div className="text-2xl font-extrabold mt-0.5">{paid}</div></div>
+        <div className="bg-emerald-500 rounded-2xl p-4 text-white">
+          <div className="text-xs font-medium opacity-70">Paid</div><div className="text-[22px] font-bold mt-0.5">{paid}</div>
         </div>
-        <div className="bg-brand-600 rounded-2xl p-4 text-white relative overflow-hidden">
-          <div className="relative z-10"><div className="text-xs font-medium opacity-70">Completed</div><div className="text-2xl font-extrabold mt-0.5">{completed}</div></div>
+        <div className="bg-brand-600 rounded-2xl p-4 text-white">
+          <div className="text-xs font-medium opacity-70">Completed</div><div className="text-[22px] font-bold mt-0.5">{completed}</div>
         </div>
       </div>
 
       {/* Search + Filters */}
-      <input className="w-full h-10 px-4 bg-white rounded-xl text-sm placeholder:text-stone-300 border border-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-400/30 mb-4" placeholder="Search by name, phone, or order #..." value={search} onChange={e => setSearch(e.target.value)} />
+      <input className="w-full h-10 px-4 bg-white rounded-xl text-sm placeholder:text-stone-300 border border-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3d8b6a]/30 mb-4" placeholder="Search by name, phone, or order #..." value={search} onChange={e => setSearch(e.target.value)} />
 
       <div className="flex gap-1.5 mb-5 overflow-x-auto scrollbar-hide">
         {['Pending', 'Paid', 'Completed', 'Cancelled', 'all'].map(f => (
@@ -126,8 +126,8 @@ export default function WhatsAppOrders() {
               </div>
               <div className="text-xs text-stone-400 mb-2">{order.items.length} item{order.items.length !== 1 ? 's' : ''}{order.address ? ' · Delivery filled' : ' · No delivery details'}{order.ussdCode ? ` · USSD: *920*141*${order.ussdCode}#` : ''}</div>
               <div className="flex items-center justify-between pt-2.5 border-t border-stone-100">
-                <div className="text-lg font-extrabold">{money(order.total)}</div>
-                <span className="text-xs font-medium text-brand-600">View details →</span>
+                <div className="text-lg font-bold">{money(order.total)}</div>
+                <span className="text-xs font-medium text-brand-600">View details</span>
               </div>
             </div>
           </div>
@@ -141,7 +141,7 @@ export default function WhatsAppOrders() {
             {/* Status + Order No */}
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-lg font-extrabold">{o.orderNo}</div>
+                <div className="text-lg font-bold">{o.orderNo}</div>
                 <div className="text-xs text-gray-400">{fmtDateTime(o.date)}</div>
               </div>
               <span className={`px-4 py-1.5 rounded-full text-xs font-bold ${statusColor(o.status)}`}>{o.status}</span>
@@ -183,7 +183,7 @@ export default function WhatsAppOrders() {
               ))}
               <div className="flex justify-between px-4 py-3 bg-gray-100/50">
                 <span className="text-sm font-bold">Total</span>
-                <span className="text-lg font-extrabold">{money(o.total)}</span>
+                <span className="text-lg font-bold">{money(o.total)}</span>
               </div>
             </div>
 
@@ -192,7 +192,7 @@ export default function WhatsAppOrders() {
               <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
                 <div className="text-xs text-amber-600 uppercase tracking-wider mb-2 font-semibold">USSD Payment Code</div>
                 <div className="flex items-center justify-between">
-                  <div className="text-lg font-extrabold text-amber-900 font-mono tracking-wider">*920*141*{o.ussdCode}#</div>
+                  <div className="text-lg font-bold text-amber-900 font-mono tracking-wider">*920*141*{o.ussdCode}#</div>
                   <button onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(`*920*141*${o.ussdCode}#`); toast.success('USSD code copied!') }}
                     className="h-9 px-4 bg-amber-500 text-white rounded-lg text-xs font-bold active:scale-95 transition">Copy</button>
                 </div>

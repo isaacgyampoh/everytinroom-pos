@@ -54,7 +54,7 @@ export default function ReceiptPreview({ sale, onClose }) {
           {/* Seasonal Message */}
           {SHOP.promoMsg && (
             <div className="text-center py-2.5 my-2 border-2 border-dashed border-gray-800 rounded-lg bg-gray-50">
-              <p className="text-xs font-extrabold text-gray-800 leading-snug px-2">{SHOP.promoMsg}</p>
+              <p className="text-xs font-bold text-gray-800 leading-snug px-2">{SHOP.promoMsg}</p>
             </div>
           )}
 
@@ -63,12 +63,12 @@ export default function ReceiptPreview({ sale, onClose }) {
 
           {/* Meta */}
           <div className="meta border-b-2 border-dashed border-gray-800 pb-3 mb-3 space-y-1">
-            <div className="meta-row flex justify-between text-sm"><span className="font-bold text-gray-600">Receipt:</span><span className="font-extrabold">{sale.receiptNo}</span></div>
-            <div className="meta-row flex justify-between text-sm"><span className="font-bold text-gray-600">Date:</span><span className="font-extrabold">{fmtDateTime(sale.date)}</span></div>
-            <div className="meta-row flex justify-between text-sm"><span className="font-bold text-gray-600">Customer:</span><span className="font-extrabold">{sale.customer}</span></div>
-            <div className="meta-row flex justify-between text-sm"><span className="font-bold text-gray-600">Cashier:</span><span className="font-extrabold">{sale.cashier}</span></div>
-            <div className="meta-row flex justify-between text-sm"><span className="font-bold text-gray-600">Payment:</span><span className="font-extrabold">{sale.payment === 'Paystack' ? 'Momo' : sale.payment}</span></div>
-            <div className="meta-row flex justify-between text-sm"><span className="font-bold text-gray-600">Type:</span><span className="font-extrabold">{sale.type || 'Retail'}</span></div>
+            <div className="meta-row flex justify-between text-sm"><span className="font-bold text-gray-600">Receipt:</span><span className="font-bold">{sale.receiptNo}</span></div>
+            <div className="meta-row flex justify-between text-sm"><span className="font-bold text-gray-600">Date:</span><span className="font-bold">{fmtDateTime(sale.date)}</span></div>
+            <div className="meta-row flex justify-between text-sm"><span className="font-bold text-gray-600">Customer:</span><span className="font-bold">{sale.customer}</span></div>
+            <div className="meta-row flex justify-between text-sm"><span className="font-bold text-gray-600">Cashier:</span><span className="font-bold">{sale.cashier}</span></div>
+            <div className="meta-row flex justify-between text-sm"><span className="font-bold text-gray-600">Payment:</span><span className="font-bold">{sale.payment === 'Paystack' ? 'Momo' : sale.payment}</span></div>
+            <div className="meta-row flex justify-between text-sm"><span className="font-bold text-gray-600">Type:</span><span className="font-bold">{sale.type || 'Retail'}</span></div>
           </div>
 
           {/* Items */}
@@ -78,10 +78,10 @@ export default function ReceiptPreview({ sale, onClose }) {
             </div>
             {items.map((it, i) => (
               <div key={i} className="item mb-2.5">
-                <div className="item-name text-sm font-extrabold">{it.name}</div>
+                <div className="item-name text-sm font-bold">{it.name}</div>
                 <div className="item-detail flex justify-between text-sm pl-2 mt-0.5">
                   <span className="font-bold text-gray-600">{it.qty} × {money(it.price)}</span>
-                  <span className="font-extrabold">{money(it.lineTotal)}</span>
+                  <span className="font-bold">{money(it.lineTotal)}</span>
                 </div>
               </div>
             ))}
@@ -89,10 +89,10 @@ export default function ReceiptPreview({ sale, onClose }) {
 
           {/* Totals */}
           <div className="totals space-y-1.5">
-            <div className="total-row flex justify-between text-sm"><span className="font-bold text-gray-600">Subtotal</span><span className="font-extrabold">{money((sale.total || 0) + (sale.discount || 0))}</span></div>
-            {(sale.discount || 0) > 0 && <div className="total-row flex justify-between text-sm"><span className="font-bold text-gray-600">Discount</span><span className="font-extrabold text-red-600">-{money(sale.discount)}</span></div>}
-            {sale.payment === 'Split' && sale.splitCash > 0 && <div className="total-row flex justify-between text-sm"><span className="font-bold text-gray-600">Cash</span><span className="font-extrabold">{money(sale.splitCash)}</span></div>}
-            {sale.payment === 'Split' && sale.splitMomo > 0 && <div className="total-row flex justify-between text-sm"><span className="font-bold text-gray-600">Momo</span><span className="font-extrabold">{money(sale.splitMomo)}</span></div>}
+            <div className="total-row flex justify-between text-sm"><span className="font-bold text-gray-600">Subtotal</span><span className="font-bold">{money((sale.total || 0) + (sale.discount || 0))}</span></div>
+            {(sale.discount || 0) > 0 && <div className="total-row flex justify-between text-sm"><span className="font-bold text-gray-600">Discount</span><span className="font-bold text-red-600">-{money(sale.discount)}</span></div>}
+            {sale.payment === 'Split' && sale.splitCash > 0 && <div className="total-row flex justify-between text-sm"><span className="font-bold text-gray-600">Cash</span><span className="font-bold">{money(sale.splitCash)}</span></div>}
+            {sale.payment === 'Split' && sale.splitMomo > 0 && <div className="total-row flex justify-between text-sm"><span className="font-bold text-gray-600">Momo</span><span className="font-bold">{money(sale.splitMomo)}</span></div>}
             <div className="grand-total flex justify-between text-xl border-t-2 border-dashed border-gray-800 pt-3 mt-3">
               <span className="font-black">TOTAL</span>
               <span className="font-black">{money(sale.total)}</span>

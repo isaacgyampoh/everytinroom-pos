@@ -33,12 +33,12 @@ export default function InvoicesPage() {
   }
 
   return (
-    <div className="animate-fade">
+    <div >
       <div className="flex justify-between items-start flex-wrap gap-4 mb-6">
-        <div><h1 className="text-3xl font-extrabold">Invoices</h1><p className="text-gray-500">Supplier invoices & receipts</p></div>
+        <div><h1 className="text-[22px] md:text-[26px] font-bold">Invoices</h1><p className="text-gray-500">Supplier invoices & receipts</p></div>
         <button onClick={() => { setForm({ invoiceId: '', date: today(), supplier: '', amount: '', notes: '', file: null }); setModal(true) }} className="h-12 px-5 bg-brand-500 text-white rounded-xl text-sm font-semibold">Add Invoice</button>
       </div>
-      <div className="bg-brand-600 rounded-2xl p-7 text-white mb-6"><small className="text-sm opacity-80">Total Invoices Value</small><strong className="block text-3xl font-bold mt-2">{money(totalAmount)}</strong></div>
+      <div className="bg-brand-600 rounded-2xl p-7 text-white mb-6"><small className="text-sm opacity-80">Total Invoices Value</small><strong className="block text-[22px] md:text-[26px] font-bold mt-2">{money(totalAmount)}</strong></div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {invoices.length === 0 && <div className="col-span-full text-center py-12 text-gray-400"><span className="text-xl opacity-15">—</span>No invoices</div>}
@@ -51,7 +51,7 @@ export default function InvoicesPage() {
             )}
             <div className="flex justify-between items-start mb-3">
               <div><div className="font-bold text-base">{inv.supplier}</div><div className="text-xs text-gray-400">{inv.invoiceId}</div></div>
-              <span className="text-lg font-extrabold text-indigo-500">{money(inv.amount)}</span>
+              <span className="text-lg font-bold text-indigo-500">{money(inv.amount)}</span>
             </div>
             <div className="text-sm text-gray-500 mb-3">{fmtDate(inv.date)}</div>
             {inv.notes && <div className="text-sm text-gray-500 bg-gray-50 p-2.5 rounded-lg mb-3">{inv.notes}</div>}

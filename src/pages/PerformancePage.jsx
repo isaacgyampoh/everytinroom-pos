@@ -36,8 +36,8 @@ export default function PerformancePage() {
   const totalRevAll = staffData.reduce((a, s) => a + s.revenue, 0)
 
   return (
-    <div className="animate-fade">
-      <h1 className="text-2xl md:text-3xl font-extrabold mb-1 tracking-tight">Staff Sales</h1>
+    <div >
+      <h1 className="text-[22px] md:text-[26px] font-bold mb-1 tracking-tight">Staff Sales</h1>
       <p className="text-gray-400 text-sm mb-5">Performance & sales breakdown per staff member</p>
 
       {/* Period Tabs */}
@@ -54,15 +54,15 @@ export default function PerformancePage() {
       <div className="grid grid-cols-3 gap-3 mb-6">
         <div className="bg-white rounded-2xl p-4 md:p-5 text-center border border-gray-100">
           <div className="text-xs md:text-sm text-gray-400 font-medium">Total Staff</div>
-          <div className="text-2xl md:text-3xl font-extrabold mt-1">{staffData.length}</div>
+          <div className="text-[22px] md:text-[26px] font-bold mt-1">{staffData.length}</div>
         </div>
         <div className="bg-white rounded-2xl p-4 md:p-5 text-center border border-gray-100">
           <div className="text-xs md:text-sm text-gray-400 font-medium">Total Sales</div>
-          <div className="text-2xl md:text-3xl font-extrabold mt-1">{staffData.reduce((a, s) => a + s.count, 0)}</div>
+          <div className="text-[22px] md:text-[26px] font-bold mt-1">{staffData.reduce((a, s) => a + s.count, 0)}</div>
         </div>
         <div className="bg-white rounded-2xl p-4 md:p-5 text-center border border-gray-100">
           <div className="text-xs md:text-sm text-gray-400 font-medium">Total Revenue</div>
-          <div className="text-xl md:text-2xl font-extrabold text-brand-500 mt-1">{money(totalRevAll)}</div>
+          <div className="text-xl md:text-2xl font-bold text-brand-500 mt-1">{money(totalRevAll)}</div>
         </div>
       </div>
 
@@ -90,7 +90,7 @@ export default function PerformancePage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-lg md:text-xl font-extrabold text-brand-500">{money(s.revenue)}</div>
+                    <div className="text-lg md:text-xl font-bold text-brand-500">{money(s.revenue)}</div>
                   </div>
                 </div>
 

@@ -29,9 +29,9 @@ export default function StaffPage() {
   }
 
   return (
-    <div className="animate-fade">
+    <div >
       <div className="flex justify-between items-start flex-wrap gap-4 mb-6">
-        <h1 className="text-3xl font-extrabold">Staff</h1>
+        <h1 className="text-[22px] md:text-[26px] font-bold">Staff</h1>
         <button onClick={openNew} className="h-12 px-5 bg-brand-500 text-white rounded-xl text-sm font-semibold">Add</button>
       </div>
       <div className="bg-white rounded-2xl p-6 shadow-md overflow-x-auto">

@@ -24,12 +24,12 @@ export default function ExpensesPage() {
   }
 
   return (
-    <div className="animate-fade">
+    <div >
       <div className="flex justify-between items-start flex-wrap gap-4 mb-6">
-        <h1 className="text-3xl font-extrabold">Expenses</h1>
+        <h1 className="text-[22px] md:text-[26px] font-bold">Expenses</h1>
         <button onClick={() => { setForm({ date: today(), category: 'Utilities', description: '', amount: '' }); setModal(true) }} className="h-12 px-5 bg-red-500 text-white rounded-xl text-sm font-semibold">Add</button>
       </div>
-      <div className="bg-red-500 rounded-2xl p-7 text-white mb-6"><small className="text-sm opacity-80">This Month</small><strong className="block text-3xl font-bold mt-2">{money(moTotal)}</strong></div>
+      <div className="bg-red-500 rounded-2xl p-7 text-white mb-6"><small className="text-sm opacity-80">This Month</small><strong className="block text-[22px] md:text-[26px] font-bold mt-2">{money(moTotal)}</strong></div>
       <div className="bg-white rounded-2xl p-6 shadow-md overflow-x-auto">
         <table className="w-full min-w-[400px]">
           <thead><tr><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Date</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Category</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Description</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Amount</th><th className="p-3 bg-gray-50"></th></tr></thead>

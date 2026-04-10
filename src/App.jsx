@@ -164,15 +164,14 @@ export default function App() {
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} onReceipt={setReceipt} />
       {receipt && <ReceiptPreview sale={receipt} onClose={() => setReceipt(null)} />}
 
-      {/* Sale Notification Popup */}
+      {/* Sale Notification */}
       {salePopup && (
         <div className="fixed top-20 md:top-5 left-1/2 -translate-x-1/2 z-[300] animate-fade">
-          <div className="bg-brand-800 text-white rounded-2xl px-6 py-4 shadow-lg flex items-center gap-4 min-w-[280px]">
-            
+          <div className="bg-[#1a3d30] text-white rounded-xl px-5 py-3 shadow-lg flex items-center gap-3 min-w-[240px]">
+            <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center text-[13px]">+</div>
             <div>
-              <div className="text-xs text-gray-400">New Sale!</div>
-              <div className="text-lg font-extrabold">GHS {Number(salePopup.total || 0).toFixed(2)}</div>
-              <div className="text-xs text-gray-400">{salePopup.cashier} • {salePopup.payment}</div>
+              <div className="text-[13px] font-semibold">GHS {Number(salePopup.total || 0).toFixed(2)}</div>
+              <div className="text-[11px] text-white/50">{salePopup.cashier} · {salePopup.payment}</div>
             </div>
           </div>
         </div>

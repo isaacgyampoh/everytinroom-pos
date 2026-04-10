@@ -72,10 +72,9 @@ export default function Navigation({ onOpenCart }) {
 
       {/* Logo */}
       <div className="relative z-10 flex items-center gap-3 px-4 h-16 flex-shrink-0">
-        <div className="w-8 h-8 bg-brand-600 rounded-xl flex items-center justify-center text-white text-[10px] font-extrabold flex-shrink-0">ER</div>
+        <img src="/logo.png" alt="" className="w-8 h-8 rounded-lg flex-shrink-0" />
         <div className={`overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'}`}>
-          <div className="font-heading text-sm font-extrabold tracking-tight whitespace-nowrap">Everytin Room</div>
-          <div className="text-[10px] text-stone-400 whitespace-nowrap">POS System</div>
+          <div className="font-heading text-[13px] font-bold tracking-tight whitespace-nowrap">EVERYTINROOM</div>
         </div>
       </div>
 
@@ -115,12 +114,12 @@ export default function Navigation({ onOpenCart }) {
     </aside>
 
     {/* Cart FAB */}
-    {page === 'pos' && <button onClick={onOpenCart} className="fixed bottom-[calc(90px+env(safe-area-inset-bottom))] md:bottom-6 right-4 md:right-6 w-14 h-14 bg-[#f97316] rounded-2xl flex items-center justify-center text-white z-[99] shadow-lg shadow-orange-500/30 active:scale-90 transition hover:bg-[#ea580c]"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>{cc>0&&<span className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] bg-white text-[#f97316] rounded-full text-[11px] font-extrabold flex items-center justify-center shadow-md">{cc}</span>}</button>}
+    {page === 'pos' && <button onClick={onOpenCart} className="fixed bottom-[calc(90px+env(safe-area-inset-bottom))] md:bottom-6 right-4 md:right-6 w-14 h-14 bg-[#f97316] rounded-2xl flex items-center justify-center text-white z-[99] shadow-lg shadow-orange-500/30 active:scale-90 transition hover:bg-[#ea580c]"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>{cc>0&&<span className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] bg-white text-[#f97316] rounded-full text-[11px] font-bold flex items-center justify-center shadow-md">{cc}</span>}</button>}
 
     {/* Mobile Header */}
     <header className="flex md:hidden fixed top-0 left-0 right-0 h-14 safe-top glass px-4 items-center gap-2 z-[100] border-b border-stone-200/30">
-      <div className="flex items-center gap-2 font-heading text-base font-extrabold tracking-tight flex-1">
-        <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white text-[10px] font-extrabold flex-shrink-0">ER</div>Everytin Room
+      <div className="flex items-center gap-2 font-heading text-base font-bold tracking-tight flex-1">
+        <img src="/logo.png" alt="" className="w-7 h-7 rounded-md" /><span className="font-heading text-[13px] font-bold">EVERYTINROOM</span>
       </div>
       <button onClick={() => setMobileOpen(true)} className="w-9 h-9 rounded-xl bg-brand-700 flex items-center justify-center text-white">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>

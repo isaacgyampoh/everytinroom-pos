@@ -51,10 +51,10 @@ export default function PromosPage() {
   const delBundle = async (id) => { if (!confirm('Delete?')) return; setLoading(true); await getSupabase().from('bundles').delete().eq('id', id); await refreshBundles(); setLoading(false); toast.success('Deleted') }
 
   return (
-    <div className="animate-fade">
+    <div >
       <div className="flex justify-between items-start flex-wrap gap-4 mb-5">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Promos Promos & Bundles Bundles</h1>
+          <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight">Promos Promos & Bundles Bundles</h1>
           <p className="text-gray-400 text-sm mt-0.5">Manage promotions and product bundles</p>
         </div>
         <div className="flex gap-2">
@@ -66,10 +66,10 @@ export default function PromosPage() {
       {/* Hero stat */}
       <div className="grid grid-cols-2 gap-3 mb-5">
         <div className="bg-brand-600 rounded-2xl p-5 text-white relative overflow-hidden">
-          <div className="relative z-10"><div className="text-xs opacity-70">Active Promos</div><div className="text-3xl font-extrabold mt-1">{activeCount}</div></div>
+          <div className="relative z-10"><div className="text-xs opacity-70">Active Promos</div><div className="text-[22px] md:text-[26px] font-bold mt-1">{activeCount}</div></div>
         </div>
         <div className="bg-brand-700 rounded-2xl p-5 text-white relative overflow-hidden">
-          <div className="relative z-10"><div className="text-xs opacity-70">Active Bundles</div><div className="text-3xl font-extrabold mt-1">{bundles.filter(b => b.active).length}</div></div>
+          <div className="relative z-10"><div className="text-xs opacity-70">Active Bundles</div><div className="text-[22px] md:text-[26px] font-bold mt-1">{bundles.filter(b => b.active).length}</div></div>
         </div>
       </div>
 
