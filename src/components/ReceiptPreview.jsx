@@ -38,7 +38,7 @@ export default function ReceiptPreview({ sale, onClose }) {
   return (
     <>
       <div className="fixed inset-0 bg-black/70 z-[499]" onClick={onClose} />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl z-[500]">
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-lg z-[500]">
         <button onClick={onClose} className="absolute top-3 right-3 w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm flex items-center justify-center transition z-10">✕</button>
 
         <div id="receipt-content" className="p-5 text-black">

@@ -80,9 +80,8 @@ export default function Dashboard() {
           { label: "This Month", value: money(monthRev), sub: monthSales.length + ' sales', color: 'bg-brand-600' },
           { label: "All Time", value: money(allRev), sub: allSales.length + ' total', color: 'bg-brand-800' },
         ].map((c, i) => (
-          <div key={i} className={`${c.color} rounded-2xl p-4 md:p-5 text-white relative overflow-hidden`}>
-            <div className="absolute right-8 -bottom-6 w-16 h-16 rounded-full bg-white/5" />
-            <div className="relative z-10">
+          <div key={i} className={`${c.color} rounded-2xl p-4 md:p-5 text-white`}>
+            <div>
               <div className="text-[11px] md:text-xs font-medium opacity-70">{c.label}</div>
               <div className="text-xl md:text-2xl font-extrabold mt-1">{c.value}</div>
               <div className="text-[10px] md:text-xs font-medium opacity-50 mt-0.5">{c.sub}</div>
@@ -99,8 +98,8 @@ export default function Dashboard() {
           { label: 'Profit Margin', value: profitMargin + '%', color: Number(profitMargin) >= 30 ? 'text-green-600' : Number(profitMargin) >= 15 ? 'text-amber-500' : 'text-red-500', bg: 'bg-gray-400' },
           { label: 'Stock Value', value: money(stockValue), color: 'text-amber-600', bg: 'bg-amber-500' },
         ].map((s, i) => (
-          <div key={i} className="bg-white rounded-2xl p-3.5 md:p-4 text-center border border-gray-100 relative overflow-hidden">
-            <div className="relative z-10">
+          <div key={i} className="bg-white rounded-2xl p-3.5 md:p-4 text-center border border-gray-100">
+            <div>
               <div className="text-[10px] md:text-xs text-gray-400 font-medium">{s.label}</div>
             <div className={`text-lg md:text-xl font-extrabold mt-0.5 ${s.color}`}>{s.value}</div>
             </div>
@@ -111,7 +110,7 @@ export default function Dashboard() {
       <div className="grid md:grid-cols-2 gap-4 mb-5">
         {/* 7-Day Sales Trend Chart */}
         <div className="bg-white rounded-2xl p-5 border border-gray-100 relative overflow-hidden">
-          <h3 className="text-sm font-bold text-gray-800 mb-4 relative z-10">Last 7 Days Revenue</h3>
+          <h3 className="text-sm font-bold text-gray-800 mb-4">Last 7 Days Revenue</h3>
           <div className="flex items-end gap-2 h-32">
             {last7.map((d, i) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-1">

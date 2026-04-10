@@ -50,8 +50,8 @@ export default function RefundsPage() {
         <h1 className="text-3xl font-extrabold">↩️ Refunds</h1>
         <button onClick={() => { setReceiptNo(''); setSale(null); setSaleItems([]); setReason(''); setModal(true) }} className="h-12 px-5 bg-violet-500 text-white rounded-xl text-sm font-semibold">New Refund</button>
       </div>
-      <div className="bg-violet-500 rounded-3xl p-7 text-white mb-6"><small className="text-sm opacity-80">Total Refunds Today</small><strong className="block text-4xl font-extrabold mt-2">{money(todayTotal)}</strong></div>
-      <div className="bg-white rounded-3xl p-6 shadow-md overflow-x-auto">
+      <div className="bg-violet-500 rounded-2xl p-7 text-white mb-6"><small className="text-sm opacity-80">Total Refunds Today</small><strong className="block text-3xl font-bold mt-2">{money(todayTotal)}</strong></div>
+      <div className="bg-white rounded-2xl p-6 shadow-md overflow-x-auto">
         <table className="w-full min-w-[500px]">
           <thead><tr><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Refund #</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Date</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Receipt</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Customer</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Amount</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Reason</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">By</th></tr></thead>
           <tbody>{refunds.length === 0 ? <tr><td colSpan={7} className="text-center py-12 text-gray-400">No refunds</td></tr> : refunds.map(r => (
@@ -78,7 +78,7 @@ export default function RefundsPage() {
               </div>
             ))}
             <div><label className="block text-xs font-semibold text-gray-500 mb-2">Reason</label><textarea className="w-full h-24 px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl text-base resize-none" value={reason} onChange={e => setReason(e.target.value)} /></div>
-            <div className="bg-violet-500 rounded-2xl p-6 text-white"><small className="text-sm opacity-80">Refund Amount</small><strong className="block text-4xl font-extrabold mt-2">{money(refundAmount)}</strong></div>
+            <div className="bg-violet-500 rounded-2xl p-6 text-white"><small className="text-sm opacity-80">Refund Amount</small><strong className="block text-3xl font-bold mt-2">{money(refundAmount)}</strong></div>
           </>)}
         </div>
       </Modal>

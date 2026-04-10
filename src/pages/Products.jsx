@@ -77,7 +77,7 @@ export default function Products() {
   return (
     <div className="animate-fade">
       <div className="flex justify-between items-start flex-wrap gap-4 mb-6"><h1 className="text-3xl font-extrabold">Products</h1><div className="flex gap-2">{products.some(p => p.image && p.image.includes('supabase')) && <button onClick={migrateImages} disabled={migrating} className="h-12 px-4 border border-stone-300 rounded-xl text-xs font-semibold text-stone-600 disabled:opacity-50">{migrating ? 'Migrating...' : 'Move images to Cloudinary'}</button>}<button onClick={openNew} className="h-12 px-5 bg-brand-500 text-white rounded-xl text-sm font-semibold">Add</button></div></div>
-      <div className="bg-white rounded-3xl p-6 shadow-md">
+      <div className="bg-white rounded-2xl p-6 shadow-md">
         <input className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base mb-5" placeholder="Search..." value={query} onChange={e => setQuery(e.target.value)} />
         <div className="overflow-x-auto"><table className="w-full min-w-[600px]"><thead><tr><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Product</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Price</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Margin</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Stock</th><th className="p-3 bg-gray-50 text-[11px] font-bold text-gray-500 uppercase">Actions</th></tr></thead>
           <tbody>{filtered.map(p => (

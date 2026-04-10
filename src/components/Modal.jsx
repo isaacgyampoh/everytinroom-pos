@@ -3,7 +3,7 @@ export default function Modal({ open, onClose, title, children, footer }) {
   return (
     <div className="fixed inset-0 z-[400] flex items-end md:items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative bg-white rounded-t-3xl md:rounded-3xl w-full md:max-w-[560px] max-h-[90vh] flex flex-col animate-slide-up md:animate-fade">
+      <div className="relative bg-white rounded-t-2xl md:rounded-2xl w-full md:max-w-[560px] max-h-[90vh] flex flex-col animate-slide-up md:animate-fade">
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <h3 className="text-xl font-bold">{title}</h3>
           <button onClick={onClose} className="w-11 h-11 bg-gray-100 rounded-xl text-xl flex items-center justify-center">✕</button>

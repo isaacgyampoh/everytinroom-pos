@@ -34,7 +34,7 @@ export default function StaffPage() {
         <h1 className="text-3xl font-extrabold">Staff</h1>
         <button onClick={openNew} className="h-12 px-5 bg-brand-500 text-white rounded-xl text-sm font-semibold">Add</button>
       </div>
-      <div className="bg-white rounded-3xl p-6 shadow-md overflow-x-auto">
+      <div className="bg-white rounded-2xl p-6 shadow-md overflow-x-auto">
         <table className="w-full min-w-[300px]">
           <thead><tr><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Name</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Role</th><th className="p-3 bg-gray-50 text-[11px] font-bold text-gray-500 uppercase">Actions</th></tr></thead>
           <tbody>{staff.map(s => (

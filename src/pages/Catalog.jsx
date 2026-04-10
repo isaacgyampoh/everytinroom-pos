@@ -200,7 +200,7 @@ export default function Catalog() {
 
       {/* Cart drawer */}
       {showCart && <div onClick={() => setShowCart(false)} className="fixed inset-0 bg-black/40 z-[200]" />}
-      <div className={`fixed bottom-0 left-0 right-0 md:right-0 md:left-auto md:top-0 md:w-[400px] bg-white z-[201] flex flex-col rounded-t-3xl md:rounded-none max-h-[85vh] md:max-h-full shadow-2xl transition-transform duration-300 ${showCart ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:translate-x-full'}`}>
+      <div className={`fixed bottom-0 left-0 right-0 md:right-0 md:left-auto md:top-0 md:w-[400px] bg-white z-[201] flex flex-col rounded-t-2xl md:rounded-none max-h-[85vh] md:max-h-full shadow-2xl transition-transform duration-300 ${showCart ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:translate-x-full'}`}>
         <div className="md:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 bg-stone-200 rounded-full" /></div>
         <div className="flex items-center justify-between px-5 py-3 border-b border-stone-100">
           <h3 className="text-base font-bold">Your Order <span className="text-stone-400 font-normal text-sm">({cc})</span></h3>
@@ -239,7 +239,7 @@ export default function Catalog() {
         const pr = promoMap[view.id], dp = pr ? pr.price : view.price
         return <>
           <div onClick={close} className="fixed inset-0 bg-black/50 z-[300]" />
-          <div className="fixed inset-3 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[460px] md:max-h-[85vh] bg-white rounded-3xl z-[301] overflow-hidden flex flex-col shadow-2xl">
+          <div className="fixed inset-3 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[460px] md:max-h-[85vh] bg-white rounded-2xl z-[301] overflow-hidden flex flex-col shadow-2xl">
             <div className="flex-1 overflow-y-auto">
               <div className="w-full aspect-square bg-stone-100 relative">
                 {view.image ? <img src={thumb(view.image, 800)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-stone-50" />}

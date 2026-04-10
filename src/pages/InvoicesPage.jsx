@@ -38,12 +38,12 @@ export default function InvoicesPage() {
         <div><h1 className="text-3xl font-extrabold">Invoices</h1><p className="text-gray-500">Supplier invoices & receipts</p></div>
         <button onClick={() => { setForm({ invoiceId: '', date: today(), supplier: '', amount: '', notes: '', file: null }); setModal(true) }} className="h-12 px-5 bg-brand-500 text-white rounded-xl text-sm font-semibold">Add Invoice</button>
       </div>
-      <div className="bg-brand-600 rounded-3xl p-7 text-white mb-6"><small className="text-sm opacity-80">Total Invoices Value</small><strong className="block text-4xl font-extrabold mt-2">{money(totalAmount)}</strong></div>
+      <div className="bg-brand-600 rounded-2xl p-7 text-white mb-6"><small className="text-sm opacity-80">Total Invoices Value</small><strong className="block text-3xl font-bold mt-2">{money(totalAmount)}</strong></div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {invoices.length === 0 && <div className="col-span-full text-center py-12 text-gray-400"><span className="text-xl opacity-15">—</span>No invoices</div>}
         {invoices.map(inv => (
-          <div key={inv.id} className="bg-white rounded-3xl p-5 shadow-md">
+          <div key={inv.id} className="bg-white rounded-2xl p-5 shadow-md">
             {inv.image && (
               <div className="w-full h-40 bg-gray-100 rounded-xl mb-4 overflow-hidden cursor-pointer" onClick={() => setViewImg(inv.image)}>
                 <img src={inv.image} alt="" className="w-full h-full object-cover" />
