@@ -32,7 +32,7 @@ export default function StaffPage() {
     <div >
       <div className="flex justify-between items-start flex-wrap gap-4 mb-6">
         <h1 className="text-[22px] md:text-[26px] font-bold">Staff</h1>
-        <button onClick={openNew} className="h-12 px-5 bg-brand-500 text-white rounded-xl text-sm font-semibold">Add</button>
+        <button onClick={openNew} className="h-12 px-5 bg-gray-700 text-white rounded-xl text-sm font-semibold">Add</button>
       </div>
       <div className="bg-white rounded-2xl p-6 shadow-md overflow-x-auto">
         <table className="w-full min-w-[300px]">
@@ -47,7 +47,7 @@ export default function StaffPage() {
         </table>
       </div>
       <Modal open={modal} onClose={() => setModal(false)} title={form.id ? 'Edit Staff' : 'Add Staff'}
-        footer={<><button onClick={() => setModal(false)} className="h-12 px-5 border border-stone-300 rounded-xl text-sm font-semibold text-stone-600">Cancel</button><button onClick={save} className="flex-1 h-12 bg-brand-500 text-white rounded-xl text-sm font-bold">Save</button></>}>
+        footer={<><button onClick={() => setModal(false)} className="h-12 px-5 border border-stone-300 rounded-xl text-sm font-semibold text-stone-600">Cancel</button><button onClick={save} className="flex-1 h-12 bg-gray-700 text-white rounded-xl text-sm font-bold">Save</button></>}>
         <div className="space-y-4">
           <div><label className="block text-xs font-semibold text-gray-500 mb-2">Name</label><input className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base" value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
           <div><label className="block text-xs font-semibold text-gray-500 mb-2">Role</label><select className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base" value={form.role} onChange={e => setForm({...form, role: e.target.value})}><option>Cashier</option><option>Admin</option></select></div>

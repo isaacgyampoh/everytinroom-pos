@@ -44,7 +44,7 @@ export default function PerformancePage() {
       <div className="flex gap-2 overflow-x-auto mb-6 pb-1 scrollbar-hide">
         {[['today', '📅 Today'], ['week', '📆 This Week'], ['month', '🗓️ This Month'], ['overall', 'Overall']].map(([p, l]) => (
           <button key={p} onClick={() => setPerfPeriod(p)}
-            className={`h-10 md:h-11 px-4 md:px-5 rounded-xl text-[13px] md:text-sm font-semibold whitespace-nowrap transition-all ${perfPeriod === p ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20' : 'bg-white border border-gray-200 text-gray-500 hover:border-brand-200'}`}>
+            className={`h-10 md:h-11 px-4 md:px-5 rounded-xl text-[13px] md:text-sm font-semibold whitespace-nowrap transition-all ${perfPeriod === p ? 'bg-gray-700 text-white shadow-md shadow-gray-500/20' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-200'}`}>
             {l}
           </button>
         ))}
@@ -62,7 +62,7 @@ export default function PerformancePage() {
         </div>
         <div className="bg-white rounded-2xl p-4 md:p-5 text-center border border-gray-100">
           <div className="text-xs md:text-sm text-gray-400 font-medium">Total Revenue</div>
-          <div className="text-xl md:text-2xl font-bold text-brand-500 mt-1">{money(totalRevAll)}</div>
+          <div className="text-xl md:text-2xl font-bold text-gray-600 mt-1">{money(totalRevAll)}</div>
         </div>
       </div>
 
@@ -81,7 +81,7 @@ export default function PerformancePage() {
               <div className="p-4 md:p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className={`w-11 h-11 md:w-12 md:h-12 rounded-xl flex items-center justify-center text-lg md:text-xl font-bold text-white ${idx === 0 ? 'bg-brand-500' : idx === 1 ? 'bg-amber-500' : 'bg-gray-400'}`}>
+                    <div className={`w-11 h-11 md:w-12 md:h-12 rounded-xl flex items-center justify-center text-lg md:text-xl font-bold text-white ${idx === 0 ? 'bg-gray-700' : idx === 1 ? 'bg-amber-500' : 'bg-gray-400'}`}>
                       {s.name.charAt(0)}
                     </div>
                     <div>
@@ -90,14 +90,14 @@ export default function PerformancePage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-lg md:text-xl font-bold text-brand-500">{money(s.revenue)}</div>
+                    <div className="text-lg md:text-xl font-bold text-gray-600">{money(s.revenue)}</div>
                   </div>
                 </div>
 
                 {/* Stats Grid */}
                 <div className="grid grid-cols-4 gap-2 md:gap-3">
                   {[
-                    { label: 'Revenue', value: money(s.revenue), color: 'text-brand-500' },
+                    { label: 'Revenue', value: money(s.revenue), color: 'text-gray-600' },
                     { label: 'Profit', value: money(s.profit), color: 'text-green-600' },
                     { label: 'Cash', value: money(s.cash), color: 'text-gray-700' },
                     { label: 'Momo', value: money(s.momo), color: 'text-amber-600' },
@@ -112,7 +112,7 @@ export default function PerformancePage() {
                 {/* Revenue Bar */}
                 <div className="mt-3">
                   <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: Math.max(1, revPct) + '%' }} />
+                    <div className="h-full bg-gray-700 rounded-full transition-all" style={{ width: Math.max(1, revPct) + '%' }} />
                   </div>
                 </div>
               </div>
@@ -144,7 +144,7 @@ export default function PerformancePage() {
                             <tr key={i} className="border-b border-gray-50">
                               <td className="p-3 text-sm text-gray-400">{i + 1}</td>
                               <td className="p-3 text-sm font-semibold text-gray-700">{p.name}</td>
-                              <td className="p-3 text-center"><span className="px-2.5 py-1 bg-brand-50 text-brand-600 rounded-lg text-xs font-bold">{p.qty}</span></td>
+                              <td className="p-3 text-center"><span className="px-2.5 py-1 bg-gray-50 text-gray-700 rounded-lg text-xs font-bold">{p.qty}</span></td>
                               <td className="p-3 text-right text-sm font-bold text-gray-800">{money(p.revenue)}</td>
                             </tr>
                           ))}
@@ -152,8 +152,8 @@ export default function PerformancePage() {
                         <tfoot>
                           <tr className="bg-gray-50">
                             <td colSpan={2} className="p-3 text-sm font-bold text-gray-600">Total</td>
-                            <td className="p-3 text-center text-sm font-bold text-brand-600">{productsSold.reduce((a, p) => a + p.qty, 0)}</td>
-                            <td className="p-3 text-right text-sm font-bold text-brand-600">{money(productsSold.reduce((a, p) => a + p.revenue, 0))}</td>
+                            <td className="p-3 text-center text-sm font-bold text-gray-700">{productsSold.reduce((a, p) => a + p.qty, 0)}</td>
+                            <td className="p-3 text-right text-sm font-bold text-gray-700">{money(productsSold.reduce((a, p) => a + p.revenue, 0))}</td>
                           </tr>
                         </tfoot>
                       </table>

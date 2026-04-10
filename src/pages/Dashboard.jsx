@@ -76,10 +76,10 @@ export default function Dashboard() {
       {/* Revenue Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {[
-          { label: "Today", value: money(todayRev), sub: todaySales.length + ' sales', color: 'bg-[#1a3d30]' },
-          { label: "This Week", value: money(weekRev), sub: weekSales.length + ' sales', color: 'bg-[#265a44]' },
-          { label: "This Month", value: money(monthRev), sub: monthSales.length + ' sales', color: 'bg-[#2d6f53]' },
-          { label: "All Time", value: money(allRev), sub: allSales.length + ' total', color: 'bg-[#162f26]' },
+          { label: "Today", value: money(todayRev), sub: todaySales.length + ' sales', color: 'bg-gray-900' },
+          { label: "This Week", value: money(weekRev), sub: weekSales.length + ' sales', color: 'bg-gray-800' },
+          { label: "This Month", value: money(monthRev), sub: monthSales.length + ' sales', color: 'bg-gray-700' },
+          { label: "All Time", value: money(allRev), sub: allSales.length + ' total', color: 'bg-[#111]' },
         ].map((c, i) => (
           <div key={i} className={`${c.color} rounded-2xl p-4 md:p-5 text-white`}>
               <div className="text-[11px] md:text-xs font-medium text-white/60">{c.label}</div>
@@ -95,7 +95,7 @@ export default function Dashboard() {
           { label: "Today's Profit", value: money(todayProfit), color: 'text-green-600', bg: 'bg-green-500' },
           { label: 'Net Today', value: money(todayProfit - todayExp), color: todayProfit - todayExp >= 0 ? 'text-green-600' : 'text-red-500', bg: 'bg-amber-400' },
           { label: 'Profit Margin', value: profitMargin + '%', color: Number(profitMargin) >= 30 ? 'text-green-600' : Number(profitMargin) >= 15 ? 'text-amber-500' : 'text-red-500', bg: 'bg-gray-400' },
-          { label: 'Stock Value', value: money(stockValue), color: 'text-amber-600', bg: 'bg-amber-500' },
+          { label: 'Stock Value', value: money(stockValue), color: 'text-gray-900', bg: 'bg-amber-500' },
         ].map((s, i) => (
           <div key={i} className="bg-white rounded-2xl p-3.5 md:p-4 border border-gray-100/80">
               <div className="text-[10px] md:text-[11px] text-gray-400 font-medium">{s.label}</div>
@@ -112,10 +112,10 @@ export default function Dashboard() {
             {last7.map((d, i) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-1">
                 <div className="text-[10px] font-bold text-gray-500">{d.revenue > 0 ? money(d.revenue).replace('GHS ', '') : ''}</div>
-                <div className="w-full rounded-t-lg bg-gray-900/20 relative overflow-hidden" style={{ height: Math.max(4, (d.revenue / maxRev) * 100) + '%' }}>
-                  <div className="absolute inset-0 bg-gray-900 rounded-t-lg" style={{ opacity: d.date === t ? 1 : 0.5 }} />
+                <div className="w-full rounded-t-lg bg-gray-200 relative overflow-hidden" style={{ height: Math.max(4, (d.revenue / maxRev) * 100) + '%' }}>
+                  <div className="absolute inset-0 bg-gray-800 rounded-t-lg" style={{ opacity: d.date === t ? 1 : 0.5 }} />
                 </div>
-                <div className={`text-[10px] font-bold ${d.date === t ? 'text-amber-600' : 'text-gray-400'}`}>{d.label}</div>
+                <div className={`text-[10px] font-bold ${d.date === t ? 'text-gray-900' : 'text-gray-400'}`}>{d.label}</div>
               </div>
             ))}
           </div>
@@ -183,7 +183,7 @@ export default function Dashboard() {
               { icon: '', label: 'Stock Take', page: 'stocktakes' },
               { icon: '', label: 'Receipts', page: 'receipts' },
             ].map((a, i) => (
-              <button key={i} onClick={() => setPage(a.page)} className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100 hover:shadow-md hover:border-brand-200 active:scale-95 transition-all">
+              <button key={i} onClick={() => setPage(a.page)} className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100 hover:shadow-md hover:border-gray-200 active:scale-95 transition-all">
                 <span className="text-xl block mb-0.5">{a.icon}</span>
                 <span className="text-[10px] md:text-xs font-semibold text-gray-600">{a.label}</span>
               </button>
@@ -197,7 +197,7 @@ export default function Dashboard() {
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <div className="flex justify-between items-center p-4 border-b border-gray-50">
             <h3 className="text-sm font-bold text-gray-800">Recent Sales</h3>
-            <button onClick={() => setPage('receipts')} className="text-xs font-semibold text-amber-600">View all →</button>
+            <button onClick={() => setPage('receipts')} className="text-xs font-semibold text-gray-900">View all →</button>
           </div>
           <div className="divide-y divide-gray-50">
             {recentSales.length === 0 && <div className="p-8 text-center text-gray-300 text-sm">No sales yet</div>}
@@ -220,7 +220,7 @@ export default function Dashboard() {
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <div className="flex justify-between items-center p-4 border-b border-gray-50">
             <h3 className="text-sm font-bold text-gray-800">Low Stock</h3>
-            <span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-bold">{lowStock.length}</span>
+            <span className="px-2 py-0.5 bg-amber-50 text-gray-900 rounded-lg text-[10px] font-bold">{lowStock.length}</span>
           </div>
           <div className="divide-y divide-gray-50">
             {lowStock.length === 0 && <div className="p-8 text-center text-gray-300 text-sm">All stocked up! </div>}
@@ -233,7 +233,7 @@ export default function Dashboard() {
                   <div className="text-xs font-semibold text-gray-800">{p.name}</div>
                   <div className="text-[10px] text-gray-400">{p.category || '-'}</div>
                 </div>
-                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${p.quantity === 0 ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-amber-600'}`}>
+                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${p.quantity === 0 ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-gray-900'}`}>
                   {p.quantity === 0 ? 'OUT' : p.quantity}
                 </span>
               </div>

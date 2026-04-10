@@ -7,8 +7,8 @@ const ProductCard = memo(({ item, price, hasPromo, onAdd }) => {
   const qty = item.quantity
   return (
     <button onClick={onAdd} disabled={qty === 0}
-      className={`bg-white rounded-2xl overflow-hidden text-left transition-transform active:scale-[.97] ${hasPromo ? 'ring-2 ring-brand-300' : ''} ${qty === 0 ? 'opacity-30 pointer-events-none' : ''}`}>
-      {hasPromo && <div className="bg-brand-600 text-white text-[10px] font-bold text-center py-1 tracking-wider uppercase">Promo</div>}
+      className={`bg-white rounded-2xl overflow-hidden text-left transition-transform active:scale-[.97] ${hasPromo ? 'ring-2 ring-gray-400' : ''} ${qty === 0 ? 'opacity-30 pointer-events-none' : ''}`}>
+      {hasPromo && <div className="bg-gray-900 text-white text-[10px] font-bold text-center py-1 tracking-wider uppercase">Promo</div>}
       <div className="w-full aspect-[4/3] bg-stone-100 overflow-hidden">
         {item.image ? <img src={thumb(item.image, 300)} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" fetchPriority="low" /> : <div className="w-full h-full flex items-center justify-center text-stone-200 text-xl">□</div>}
       </div>
@@ -17,9 +17,9 @@ const ProductCard = memo(({ item, price, hasPromo, onAdd }) => {
         <div className="flex items-end justify-between mt-1.5">
           <div>
             {hasPromo && <div className="text-[10px] text-stone-400 line-through">{money(item.price)}</div>}
-            <div className={`text-base font-bold leading-none ${hasPromo ? 'text-brand-600' : 'text-gray-900'}`}>{money(price)}</div>
+            <div className={`text-base font-bold leading-none ${hasPromo ? 'text-gray-900' : 'text-gray-900'}`}>{money(price)}</div>
           </div>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${qty === 0 ? 'bg-red-100 text-red-600' : qty <= 5 ? 'bg-amber-100 text-amber-700' : 'bg-brand-50 text-brand-700'}`}>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${qty === 0 ? 'bg-red-100 text-red-600' : qty <= 5 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-700'}`}>
             {qty === 0 ? 'OUT' : qty}
           </span>
         </div>
@@ -72,7 +72,7 @@ export default function POS() {
       <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight">Point of Sale</h1>
 
       {promoCount > 0 && (
-        <div className="bg-brand-600 rounded-2xl px-5 py-3 mt-4 flex items-center gap-3 text-white ">
+        <div className="bg-gray-900 rounded-2xl px-5 py-3 mt-4 flex items-center gap-3 text-white ">
           
           <span className="text-sm font-bold ">{promoCount} product{promoCount > 1 ? 's' : ''} on promo!</span>
         </div>
@@ -81,7 +81,7 @@ export default function POS() {
       {/* Search */}
       <div className="relative mt-5 mb-4">
         
-        <input className="w-full h-12 md:h-13 pl-4 pr-4 bg-white rounded-2xl text-sm font-medium placeholder:text-stone-300 focus:outline-none focus:ring-2 focus:ring-[#3d8b6a]/30" placeholder="Search or scan barcode..." value={query}
+        <input className="w-full h-12 md:h-13 pl-4 pr-4 bg-white rounded-2xl text-sm font-medium placeholder:text-stone-300 focus:outline-none focus:ring-2 focus:ring-gray-400/30" placeholder="Search or scan barcode..." value={query}
           onChange={e => { setQuery(e.target.value); const v = e.target.value.trim(); if (v.length > 3) { const ex = products.find(p => p.name.toLowerCase() === v.toLowerCase()); if (ex && searchAdd(ex)) setQuery('') } }}
           onKeyDown={e => { if (e.key === 'Enter' && query.trim() && filtered[0] && mode !== 'bundle') { if (searchAdd(filtered[0])) setQuery('') } }}
         />
@@ -91,7 +91,7 @@ export default function POS() {
       <div className="flex gap-2 mb-3">
         {[{ id: 'retail', l: 'Retail' }, { id: 'wholesale', l: 'Wholesale' }, { id: 'bundle', l: 'Bundles' }].map(m => (
           <button key={m.id} onClick={() => setMode(m.id)}
-            className={`h-9 px-4 rounded-full text-xs font-bold transition ${mode === m.id ? 'bg-brand-700 text-white' : 'bg-white text-stone-500 hover:text-stone-700'}`}>
+            className={`h-9 px-4 rounded-full text-xs font-bold transition ${mode === m.id ? 'bg-gray-900 text-white' : 'bg-white text-stone-500 hover:text-stone-700'}`}>
             {m.l}
           </button>
         ))}
@@ -101,7 +101,7 @@ export default function POS() {
         <div className="flex gap-1.5 overflow-x-auto mb-5 scrollbar-hide">
           {categories.map(c => (
             <button key={c} onClick={() => setCat(c)}
-              className={`h-8 px-3.5 rounded-full text-xs font-semibold whitespace-nowrap transition ${selectedCat === c ? 'bg-brand-500 text-white' : 'bg-white text-stone-400 hover:text-stone-600'}`}>
+              className={`h-8 px-3.5 rounded-full text-xs font-semibold whitespace-nowrap transition ${selectedCat === c ? 'bg-gray-800 text-white' : 'bg-white text-stone-400 hover:text-stone-600'}`}>
               {c === 'all' ? 'All' : c}
             </button>
           ))}

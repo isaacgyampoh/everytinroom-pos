@@ -110,7 +110,7 @@ export default function ReceiptPreview({ sale, onClose }) {
 
         {/* Actions */}
         <div className="flex gap-2 px-5 pb-5">
-          <button onClick={doPrint} className="flex-1 h-12 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-bold active:scale-95 transition">Print Receipt</button>
+          <button onClick={doPrint} className="flex-1 h-12 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-sm font-bold active:scale-95 transition">Print Receipt</button>
           <button onClick={onClose} className="h-12 px-5 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-semibold text-gray-600 transition">Close</button>
         </div>
       </div>

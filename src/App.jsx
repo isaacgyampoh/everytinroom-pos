@@ -167,7 +167,7 @@ export default function App() {
       {/* Sale Notification */}
       {salePopup && (
         <div className="fixed top-20 md:top-5 left-1/2 -translate-x-1/2 z-[300] animate-fade">
-          <div className="bg-[#1a3d30] text-white rounded-xl px-5 py-3 shadow-lg flex items-center gap-3 min-w-[240px]">
+          <div className="bg-gray-900 text-white rounded-xl px-5 py-3 shadow-lg flex items-center gap-3 min-w-[240px]">
             <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center text-[13px]">+</div>
             <div>
               <div className="text-[13px] font-semibold">GHS {Number(salePopup.total || 0).toFixed(2)}</div>
@@ -179,7 +179,7 @@ export default function App() {
 
       <main className="pt-14 md:pt-0 md:ml-16 pb-24 md:pb-10 min-h-screen">
         <div className="px-4 md:px-8 lg:px-10 py-5 md:py-6">
-          <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-7 h-7 border-[2.5px] border-stone-200 border-t-brand-600 rounded-full animate-spin" /></div>}>
+          <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-7 h-7 border-[2.5px] border-stone-200 border-t-gray-800 rounded-full animate-spin" /></div>}>
             {pages[page] || <POS />}
           </Suspense>
         </div>

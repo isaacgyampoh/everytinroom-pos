@@ -3,78 +3,18 @@
 @tailwind utilities;
 
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-body { font-family: 'DM Sans', system-ui, sans-serif; font-size: 15px; background: #F5F5F0; color: #1a1a1a; letter-spacing: -0.01em; transition: background .3s, color .3s; }
+body { font-family: 'DM Sans', system-ui, sans-serif; font-size: 15px; background: #F5F5F3; color: #1a1a1a; letter-spacing: -0.01em; }
 h1, h2, h3, h4, h5, h6 { font-family: 'Outfit', 'DM Sans', system-ui, sans-serif; letter-spacing: -0.03em; }
 @media (min-width: 768px) { body { font-size: 16px; } }
 
-/* ===== DARK MODE — Deep sage green ===== */
-body.dark { background: #0f1a15; color: #e8ece6; }
-body.dark .glass { background: rgba(15,26,21,.95); border-color: rgba(255,255,255,.05) !important; }
-body.dark input, body.dark select, body.dark textarea { background: #162520; color: #e8ece6; border-color: #1f3a30 !important; }
-body.dark input::placeholder, body.dark textarea::placeholder { color: #4a6355 !important; }
-body.dark input:focus, body.dark select:focus { border-color: #3d8b6a !important; }
-body.dark .bg-white { background: #142420 !important; }
-body.dark .bg-stone-100, body.dark .bg-gray-50, body.dark .bg-gray-100, body.dark .bg-stone-50 { background: #1a2e27 !important; }
-body.dark .text-gray-900, body.dark .text-stone-900, body.dark .text-black { color: #e8ece6 !important; }
-body.dark .text-gray-800, body.dark .text-stone-700 { color: #c8d4cc !important; }
-body.dark .text-stone-400, body.dark .text-stone-500, body.dark .text-gray-400, body.dark .text-gray-500, body.dark .text-stone-600, body.dark .text-gray-600 { color: #6b8a7a !important; }
-body.dark .text-stone-300 { color: #3d5a4c !important; }
-body.dark .border-stone-200\/50, body.dark .border-stone-200\/30, body.dark .border-gray-100, body.dark .border-gray-50 { border-color: #1f3a30 !important; }
-body.dark .bg-brand-500 { background: #3d8b6a !important; }
-body.dark .bg-brand-600 { background: #2d6f53 !important; }
-body.dark .bg-brand-700 { background: #265a44 !important; }
-body.dark .bg-gray-900 { background: #e8ece6 !important; color: #0f1a15 !important; }
-body.dark .bg-amber-400 { background: #c5d45a !important; color: #1a1a1a !important; }
-body.dark .bg-amber-500 { background: #3d8b6a !important; }
-body.dark .bg-green-600 { background: #265a44 !important; }
-body.dark .bg-gray-800 { background: #1a2e27 !important; }
-body.dark .bg-amber-100, body.dark .bg-amber-50 { background: rgba(61,139,106,.12) !important; }
-body.dark .text-amber-600, body.dark .text-amber-700 { color: #5fa886 !important; }
-body.dark .bg-emerald-100, body.dark .bg-emerald-50 { background: rgba(61,139,106,.12) !important; }
-body.dark .bg-red-100, body.dark .bg-red-50 { background: rgba(239,68,68,.08) !important; }
-body.dark .shadow-lg, body.dark .shadow-md, body.dark .shadow-sm { box-shadow: 0 2px 8px rgba(0,0,0,.3) !important; }
-body.dark .ring-2 { --tw-ring-color: rgba(61,139,106,.3) !important; }
-body.dark ::-webkit-scrollbar-thumb { background: #2d4a3c; }
-body.dark ::selection { background: #3d8b6a; color: #fff; }
-body.dark .dark-sidebar { background: #0f1a15 !important; border-color: #1a2e27 !important; }
-body.dark .dark-sidebar + * .bg-stone-100 { background: #1a2e27 !important; }
-body.dark aside .bg-white { background: #0f1a15 !important; }
-body.dark aside .bg-stone-100 { background: #1a2e27 !important; }
-body.dark aside .text-stone-500 { color: #4a6a58 !important; }
-body.dark aside .text-stone-400 { color: #3d5a4c !important; }
-body.dark aside .hover\:bg-stone-100:hover { background: #1a2e27 !important; }
-body.dark aside .bg-stone-200\/60 { background: #1a2e27 !important; }
-body.dark aside .hover\:text-stone-800:hover { color: #e8ece6 !important; }
-body.dark aside .bg-gray-900 { background: #e8ece6 !important; color: #0f1a15 !important; }
-
-/* Cart drawer dark mode */
-body.dark .cart-drawer { background: #0f1a15 !important; }
-body.dark .cart-item { background: #1a2e27 !important; border-color: #264035 !important; }
-body.dark .cart-item * { color: #e8ece6; }
-body.dark .cart-item .text-gray-400, body.dark .cart-item .text-stone-400 { color: #6b8a7a !important; }
-
-/* Modal dark mode */
-body.dark .bg-stone-200 { background: #1a2e27 !important; color: #e8ece6 !important; }
-body.dark .text-stone-700 { color: #e8ece6 !important; }
-body.dark .border-stone-200 { border-color: #264035 !important; }
-body.dark .border-stone-100 { border-color: #1a2e27 !important; }
-body.dark .border-brand-200 { border-color: #265a44 !important; }
-body.dark .border-red-200 { border-color: #5c2020 !important; }
-
-/* Action buttons dark mode */
-body.dark .border-stone-300 { border-color: #3d5a4c !important; }
-body.dark .text-stone-600 { color: #adbba5 !important; }
-body.dark .hover\:bg-stone-100:hover { background: #1a2e27 !important; }
-
-/* ===== LIGHT MODE ===== */
-::selection { background: #d4dbd0; color: #1a3d30; }
+::selection { background: #1a1a24; color: #fff; }
 ::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-thumb { background: #d4dbd0; border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: #d1d1d1; border-radius: 10px; }
 
 @layer utilities {
   .safe-top { padding-top: env(safe-area-inset-top); }
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
-  .glass { background: rgba(246,244,239,.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+  .glass { background: rgba(245,245,243,.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
   .scrollbar-hide::-webkit-scrollbar { display: none; }
   .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 }
@@ -86,7 +26,7 @@ body.dark .hover\:bg-stone-100:hover { background: #1a2e27 !important; }
   #print-receipt { position: absolute; left: 0; top: 0; width: 72mm; }
 }
 
-@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-.animate-fade { animation: fadeIn .25s ease-out; }
+.animate-fade { animation: fadeIn .2s ease-out; }
 .animate-slide-up { animation: slideUp .25s ease-out; }

@@ -27,7 +27,7 @@ export default function Receipts({ onPrintReceipt }) {
               {filtered.length === 0 && <tr><td colSpan={7} className="text-center py-12 text-gray-400">No receipts</td></tr>}
               {filtered.map(s => (
                 <tr key={s.id} className={`border-b border-gray-50 ${s.voided ? 'opacity-50' : ''}`}>
-                  <td className="p-3 text-sm"><b className="text-brand-500">{s.receiptNo}</b>{s.voided && <span className="ml-1.5 px-2 py-0.5 bg-red-50 text-red-500 rounded text-[10px] font-bold">VOID</span>}</td>
+                  <td className="p-3 text-sm"><b className="text-gray-600">{s.receiptNo}</b>{s.voided && <span className="ml-1.5 px-2 py-0.5 bg-red-50 text-red-500 rounded text-[10px] font-bold">VOID</span>}</td>
                   <td className="p-3 text-sm">{fmtDate(s.date)}</td>
                   <td className="p-3 text-sm">{s.customer}</td>
                   <td className="p-3 text-sm">
@@ -36,7 +36,7 @@ export default function Receipts({ onPrintReceipt }) {
                   </td>
                   <td className="p-3 text-sm"><span className="px-2.5 py-1 bg-gray-100 rounded-lg text-[11px] font-bold text-gray-600">{s.cashier || 'Unknown'}</span></td>
                   <td className="p-3 text-sm font-bold">{money(s.total)}</td>
-                  <td className="p-3"><button onClick={() => onPrintReceipt(s)} className="h-9 px-3 bg-brand-600 text-white rounded-lg text-xs font-semibold hover:bg-brand-700 transition">View</button></td>
+                  <td className="p-3"><button onClick={() => onPrintReceipt(s)} className="h-9 px-3 bg-gray-800 text-white rounded-lg text-xs font-semibold hover:bg-gray-800 transition">View</button></td>
                 </tr>
               ))}
             </tbody>

@@ -58,25 +58,25 @@ export default function PromosPage() {
           <p className="text-gray-400 text-sm mt-0.5">Manage promotions and product bundles</p>
         </div>
         <div className="flex gap-2">
-          {tab === 'promos' && <button onClick={openNewPromo} className="h-11 px-5 bg-brand-500 text-white rounded-xl text-sm font-semibold hover:bg-brand-600 transition">New Promo</button>}
-          {tab === 'bundles' && <button onClick={openNewBundle} className="h-11 px-5 bg-brand-500 text-white rounded-xl text-sm font-semibold hover:bg-brand-600 transition">New Bundle</button>}
+          {tab === 'promos' && <button onClick={openNewPromo} className="h-11 px-5 bg-gray-700 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition">New Promo</button>}
+          {tab === 'bundles' && <button onClick={openNewBundle} className="h-11 px-5 bg-gray-700 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition">New Bundle</button>}
         </div>
       </div>
 
       {/* Hero stat */}
       <div className="grid grid-cols-2 gap-3 mb-5">
-        <div className="bg-brand-600 rounded-2xl p-5 text-white relative overflow-hidden">
+        <div className="bg-gray-800 rounded-2xl p-5 text-white relative overflow-hidden">
           <div className="relative z-10"><div className="text-xs opacity-70">Active Promos</div><div className="text-[22px] md:text-[26px] font-bold mt-1">{activeCount}</div></div>
         </div>
-        <div className="bg-brand-700 rounded-2xl p-5 text-white relative overflow-hidden">
+        <div className="bg-gray-800 rounded-2xl p-5 text-white relative overflow-hidden">
           <div className="relative z-10"><div className="text-xs opacity-70">Active Bundles</div><div className="text-[22px] md:text-[26px] font-bold mt-1">{bundles.filter(b => b.active).length}</div></div>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-white rounded-2xl p-1 mb-5 border border-gray-100 w-fit">
-        <button onClick={() => setTab('promos')} className={`h-9 px-5 rounded-xl text-sm font-semibold transition ${tab === 'promos' ? 'bg-brand-600 text-white' : 'text-stone-500 hover:text-stone-700'}`}>Promos</button>
-        <button onClick={() => setTab('bundles')} className={`h-9 px-5 rounded-xl text-sm font-semibold transition ${tab === 'bundles' ? 'bg-brand-600 text-white' : 'text-stone-500 hover:text-stone-700'}`}>Bundles</button>
+        <button onClick={() => setTab('promos')} className={`h-9 px-5 rounded-xl text-sm font-semibold transition ${tab === 'promos' ? 'bg-gray-800 text-white' : 'text-stone-500 hover:text-stone-700'}`}>Promos</button>
+        <button onClick={() => setTab('bundles')} className={`h-9 px-5 rounded-xl text-sm font-semibold transition ${tab === 'bundles' ? 'bg-gray-800 text-white' : 'text-stone-500 hover:text-stone-700'}`}>Bundles</button>
       </div>
 
       {/* Promos Tab */}
@@ -86,14 +86,14 @@ export default function PromosPage() {
           {promos.map(p => {
             const active = isActive(p)
             return (
-              <div key={p.id} className={`bg-white rounded-2xl p-5 border-l-4 ${active ? 'border-brand-500' : 'border-gray-300 opacity-60'}`}>
+              <div key={p.id} className={`bg-white rounded-2xl p-5 border-l-4 ${active ? 'border-gray-500' : 'border-gray-300 opacity-60'}`}>
                 <div className="flex justify-between items-start flex-wrap gap-3 mb-3">
                   <div><h3 className="font-bold">{p.name}</h3><p className="text-xs text-gray-400">{fmtDate(p.startDate)} → {fmtDate(p.endDate)}</p></div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${active ? 'bg-brand-50 text-brand-600' : 'bg-gray-100 text-gray-500'}`}>{active ? 'Active' : 'Off'}</span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${active ? 'bg-gray-50 text-gray-700' : 'bg-gray-100 text-gray-500'}`}>{active ? 'Active' : 'Off'}</span>
                 </div>
                 {p.items.map((it, i) => (
                   <div key={i} className="flex justify-between py-1.5 border-b border-dashed border-gray-100 last:border-0 text-sm">
-                    <span>{it.name}</span><span><s className="text-gray-400 mr-2">{money(it.originalPrice)}</s><b className="text-brand-600">{money(it.promoPrice)}</b></span>
+                    <span>{it.name}</span><span><s className="text-gray-400 mr-2">{money(it.originalPrice)}</s><b className="text-gray-700">{money(it.promoPrice)}</b></span>
                   </div>
                 ))}
                 <div className="flex gap-2 mt-3">
@@ -122,7 +122,7 @@ export default function PromosPage() {
 
       {/* Promo Modal */}
       <Modal open={modal} onClose={() => setModal(false)} title={form.id ? 'Edit Promo' : 'New Promo'}
-        footer={<><button onClick={() => setModal(false)} className="h-11 px-5 border border-stone-300 rounded-xl text-sm font-semibold text-stone-600">Cancel</button><button onClick={savePromo} className="flex-1 h-11 bg-brand-500 text-white rounded-xl text-sm font-bold">Save</button></>}>
+        footer={<><button onClick={() => setModal(false)} className="h-11 px-5 border border-stone-300 rounded-xl text-sm font-semibold text-stone-600">Cancel</button><button onClick={savePromo} className="flex-1 h-11 bg-gray-700 text-white rounded-xl text-sm font-bold">Save</button></>}>
         <div className="space-y-4">
           <input className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Promo name" />
           <div className="grid grid-cols-2 gap-3">
@@ -134,7 +134,7 @@ export default function PromosPage() {
             {form.items.length === 0 ? <div className="text-center text-gray-400 py-5 text-sm">No products</div> : form.items.map((it, i) => (
               <div key={i} className="flex items-center gap-2 p-2.5 bg-white rounded-lg mb-2">
                 <div className="flex-1"><div className="text-sm font-semibold">{it.name}</div><div className="text-xs text-gray-400">Was: {money(it.originalPrice)}</div></div>
-                <input type="number" className="w-20 h-8 px-2 text-center border border-brand-300 rounded-lg text-sm font-bold text-brand-600" placeholder="Price" value={it.promoPrice} onChange={e => { const items = [...form.items]; items[i].promoPrice = e.target.value; setForm({ ...form, items }) }} />
+                <input type="number" className="w-20 h-8 px-2 text-center border border-gray-300 rounded-lg text-sm font-bold text-gray-700" placeholder="Price" value={it.promoPrice} onChange={e => { const items = [...form.items]; items[i].promoPrice = e.target.value; setForm({ ...form, items }) }} />
                 <button onClick={() => { const items = [...form.items]; items.splice(i, 1); setForm({ ...form, items }) }} className="w-7 h-7 bg-red-50 text-red-500 rounded-md text-xs flex items-center justify-center">✕</button>
               </div>
             ))}
@@ -144,7 +144,7 @@ export default function PromosPage() {
 
       {/* Bundle Modal */}
       <Modal open={bunModal} onClose={() => setBunModal(false)} title={bunForm.id ? 'Edit Bundle' : 'New Bundle'}
-        footer={<><button onClick={() => setBunModal(false)} className="h-11 px-5 border border-stone-300 rounded-xl text-sm font-semibold text-stone-600">Cancel</button><button onClick={saveBundle} className="flex-1 h-11 bg-brand-500 text-white rounded-xl text-sm font-bold">Save</button></>}>
+        footer={<><button onClick={() => setBunModal(false)} className="h-11 px-5 border border-stone-300 rounded-xl text-sm font-semibold text-stone-600">Cancel</button><button onClick={saveBundle} className="flex-1 h-11 bg-gray-700 text-white rounded-xl text-sm font-bold">Save</button></>}>
         <div className="space-y-4">
           <input className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" value={bunForm.name} onChange={e => setBunForm({...bunForm, name: e.target.value})} placeholder="Bundle name" />
           <input type="number" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" value={bunForm.price} onChange={e => setBunForm({...bunForm, price: e.target.value})} placeholder="Bundle price (GHS)" />

@@ -102,12 +102,12 @@ export default function StockAdjustmentsPage() {
       {/* Filter */}
       <div className="flex gap-2 overflow-x-auto mb-4 pb-1 scrollbar-hide">
         <button onClick={() => setFilterReason('all')}
-          className={`h-9 px-4 rounded-full text-sm font-semibold whitespace-nowrap transition-all ${filterReason === 'all' ? 'bg-brand-500 text-white' : 'bg-white border border-gray-200 text-gray-500'}`}>
+          className={`h-9 px-4 rounded-full text-sm font-semibold whitespace-nowrap transition-all ${filterReason === 'all' ? 'bg-gray-700 text-white' : 'bg-white border border-gray-200 text-gray-500'}`}>
           All
         </button>
         {REASONS.map(r => (
           <button key={r} onClick={() => setFilterReason(r)}
-            className={`h-9 px-4 rounded-full text-sm font-semibold whitespace-nowrap transition-all ${filterReason === r ? 'bg-brand-500 text-white' : 'bg-white border border-gray-200 text-gray-500'}`}>
+            className={`h-9 px-4 rounded-full text-sm font-semibold whitespace-nowrap transition-all ${filterReason === r ? 'bg-gray-700 text-white' : 'bg-white border border-gray-200 text-gray-500'}`}>
             {r}
           </button>
         ))}
@@ -186,7 +186,7 @@ export default function StockAdjustmentsPage() {
             )}
 
             {selectedProduct && (
-              <div className="flex items-center justify-between p-3 bg-brand-50 rounded-xl border border-brand-200">
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
                 <div>
                   <div className="text-sm font-bold text-gray-800">{selectedProduct.name}</div>
                   <div className="text-xs text-gray-500">{selectedProduct.category || '-'} • Current stock: <b>{selectedProduct.quantity}</b></div>
@@ -210,7 +210,7 @@ export default function StockAdjustmentsPage() {
             <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
               {REASONS.map(r => (
                 <button key={r} onClick={() => setForm({ ...form, reason: r })}
-                  className={`h-10 rounded-xl text-xs font-semibold transition-all ${form.reason === r ? 'bg-brand-500 text-white' : 'bg-gray-50 border border-gray-200 text-gray-500'}`}>
+                  className={`h-10 rounded-xl text-xs font-semibold transition-all ${form.reason === r ? 'bg-gray-700 text-white' : 'bg-gray-50 border border-gray-200 text-gray-500'}`}>
                   {r}
                 </button>
               ))}

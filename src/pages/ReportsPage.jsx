@@ -133,7 +133,7 @@ export default function ReportsPage() {
       <div className="flex gap-2 overflow-x-auto mb-6 pb-1 scrollbar-hide">
         {tabs.map(tb => (
           <button key={tb.id} onClick={() => setTab(tb.id)}
-            className={`h-10 md:h-11 px-4 md:px-5 rounded-xl text-[13px] md:text-sm font-semibold whitespace-nowrap transition-all ${tab === tb.id ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20' : 'bg-white border border-gray-200 text-gray-500 hover:border-brand-200'}`}>
+            className={`h-10 md:h-11 px-4 md:px-5 rounded-xl text-[13px] md:text-sm font-semibold whitespace-nowrap transition-all ${tab === tb.id ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'}`}>
             {tb.label}
           </button>
         ))}
@@ -141,7 +141,7 @@ export default function ReportsPage() {
 
       {/* Revenue Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-5">
-        <Stat label="Total Revenue" value={money(totalRev)} sub={fSales.length + ' sales'} color="text-brand-600" />
+        <Stat label="Total Revenue" value={money(totalRev)} sub={fSales.length + ' sales'} color="text-gray-800" />
         <Stat label="Gross Profit" value={money(totalProfit)} color="text-green-600" />
         <Stat label="Expenses" value={money(totalExp)} sub={fExpenses.length + ' entries'} color="text-red-500" />
         <Stat label="Net Cash Flow" value={money(netCashFlow)} color={netCashFlow >= 0 ? 'text-green-600' : 'text-red-500'} />
@@ -180,7 +180,7 @@ export default function ReportsPage() {
         <Section title="Sales Type" icon="">
           <div className="space-y-3">
             {[
-              { label: 'Retail', count: retailSales.length, amount: retailSales.reduce((a, s) => a + s.total, 0), color: 'bg-brand-500' },
+              { label: 'Retail', count: retailSales.length, amount: retailSales.reduce((a, s) => a + s.total, 0), color: 'bg-gray-800' },
               { label: 'Wholesale', count: wholesaleSales.length, amount: wholesaleSales.reduce((a, s) => a + s.total, 0), color: 'bg-amber-500' },
               { label: 'WhatsApp', count: waSales.length, amount: waSales.reduce((a, s) => a + s.total, 0), color: 'bg-green-500' },
             ].map((p, i) => (
@@ -206,14 +206,14 @@ export default function ReportsPage() {
             <div className="space-y-2.5">
               {topProducts.map((p, i) => (
                 <div key={i} className="flex items-center gap-3">
-                  <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${i < 3 ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-500'}`}>{i + 1}</span>
+                  <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${i < 3 ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500'}`}>{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-baseline mb-1">
                       <span className="text-sm font-semibold text-gray-700 truncate pr-2">{p.name}</span>
                       <span className="text-xs text-gray-400 whitespace-nowrap">{p.qty} sold • {money(p.revenue)}</span>
                     </div>
                     <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: (p.qty / maxQty * 100) + '%' }} />
+                      <div className="h-full bg-gray-800 rounded-full transition-all" style={{ width: (p.qty / maxQty * 100) + '%' }} />
                     </div>
                   </div>
                 </div>
@@ -252,13 +252,13 @@ export default function ReportsPage() {
               {staffPerf.map((s, i) => (
                 <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 text-sm font-bold">{s.name.charAt(0)}</div>
+                    <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-800 text-sm font-bold">{s.name.charAt(0)}</div>
                     <div>
                       <div className="text-sm font-semibold text-gray-700">{s.name}</div>
                       <div className="text-xs text-gray-400">{s.sales} sales</div>
                     </div>
                   </div>
-                  <span className="text-sm font-bold text-brand-600">{money(s.revenue)}</span>
+                  <span className="text-sm font-bold text-gray-800">{money(s.revenue)}</span>
                 </div>
               ))}
             </div>
@@ -303,7 +303,7 @@ export default function ReportsPage() {
               {days.map((d, i) => (
                 <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50 transition">
                   <td className="p-3 text-sm font-semibold text-gray-700">{fmtDate(d.date)}</td>
-                  <td className="p-3"><span className="px-2.5 py-1 bg-brand-50 text-brand-600 rounded-lg text-xs font-bold">{d.sales}</span></td>
+                  <td className="p-3"><span className="px-2.5 py-1 bg-gray-50 text-gray-800 rounded-lg text-xs font-bold">{d.sales}</span></td>
                   <td className="p-3 text-sm font-bold text-gray-800">{money(d.revenue)}</td>
                   <td className="p-3 text-sm font-semibold text-green-600">{money(d.cash)}</td>
                   <td className="p-3 text-sm font-semibold text-amber-600">{money(d.momo)}</td>
@@ -316,7 +316,7 @@ export default function ReportsPage() {
         {days.length > 0 && (
           <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-gray-100">
             <div className="text-sm"><span className="text-gray-400">Total Days:</span> <span className="font-bold">{days.length}</span></div>
-            <div className="text-sm"><span className="text-gray-400">Avg Revenue/Day:</span> <span className="font-bold text-brand-600">{money(totalRev / days.length)}</span></div>
+            <div className="text-sm"><span className="text-gray-400">Avg Revenue/Day:</span> <span className="font-bold text-gray-800">{money(totalRev / days.length)}</span></div>
             <div className="text-sm"><span className="text-gray-400">Avg Sales/Day:</span> <span className="font-bold">{(fSales.length / days.length).toFixed(1)}</span></div>
             <div className="text-sm"><span className="text-gray-400">Avg Profit/Day:</span> <span className="font-bold text-green-600">{money(totalProfit / days.length)}</span></div>
           </div>

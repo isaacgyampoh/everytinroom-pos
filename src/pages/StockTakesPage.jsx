@@ -79,21 +79,21 @@ export default function StockTakesPage() {
         </div>
         <div className="flex gap-2">
           <button onClick={() => setAdjModal(true)} className="h-11 px-4 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition">Adjust</button>
-          <button onClick={startStockTake} className="h-11 px-5 bg-brand-500 text-white rounded-xl text-sm font-semibold hover:bg-brand-600 transition">New Stock Take</button>
+          <button onClick={startStockTake} className="h-11 px-5 bg-gray-700 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition">New Stock Take</button>
         </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <div className="bg-white rounded-2xl p-4 border border-gray-100 text-center relative overflow-hidden">
-          <div className="absolute -right-3 -top-3 w-14 h-14 rounded-full border border-brand-400/10" />
+          <div className="absolute -right-3 -top-3 w-14 h-14 rounded-full border border-gray-400/10" />
           <div className="text-xs text-gray-400 font-medium">Total Products</div>
           <div className="text-2xl font-bold mt-1">{products.length}</div>
         </div>
         <div className="bg-white rounded-2xl p-4 border border-gray-100 text-center relative overflow-hidden">
-          <div className="absolute -right-3 -top-3 w-14 h-14 rounded-full border border-brand-400/10" />
+          <div className="absolute -right-3 -top-3 w-14 h-14 rounded-full border border-gray-400/10" />
           <div className="text-xs text-gray-400 font-medium">Stock Value</div>
-          <div className="text-xl font-bold text-brand-600 mt-1">{money(totalStockValue)}</div>
+          <div className="text-xl font-bold text-gray-700 mt-1">{money(totalStockValue)}</div>
         </div>
         <button onClick={() => setLowStockOpen(true)} className="bg-amber-50 rounded-2xl p-4 border-2 border-amber-200 text-center hover:bg-amber-100 transition">
           <div className="text-xs text-amber-600 font-medium">Low Stock</div>
@@ -107,8 +107,8 @@ export default function StockTakesPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-white rounded-2xl p-1 mb-5 border border-gray-100 w-fit">
-        <button onClick={() => setTab('takes')} className={`h-9 px-5 rounded-xl text-sm font-semibold transition ${tab === 'takes' ? 'bg-brand-600 text-white' : 'text-stone-500 hover:text-stone-700'}`}>Stock Takes</button>
-        <button onClick={() => setTab('adjustments')} className={`h-9 px-5 rounded-xl text-sm font-semibold transition ${tab === 'adjustments' ? 'bg-brand-600 text-white' : 'text-stone-500 hover:text-stone-700'}`}>Adjustments</button>
+        <button onClick={() => setTab('takes')} className={`h-9 px-5 rounded-xl text-sm font-semibold transition ${tab === 'takes' ? 'bg-gray-800 text-white' : 'text-stone-500 hover:text-stone-700'}`}>Stock Takes</button>
+        <button onClick={() => setTab('adjustments')} className={`h-9 px-5 rounded-xl text-sm font-semibold transition ${tab === 'adjustments' ? 'bg-gray-800 text-white' : 'text-stone-500 hover:text-stone-700'}`}>Adjustments</button>
       </div>
 
       {/* Stock Takes Tab */}
@@ -145,7 +145,7 @@ export default function StockTakesPage() {
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <div className="p-4 border-b border-gray-100 flex justify-between items-center">
             <h3 className="font-bold text-gray-800">Adjustments ({stockAdjustments.length})</h3>
-            <button onClick={() => setAdjModal(true)} className="h-8 px-3 bg-brand-50 text-brand-600 rounded-lg text-xs font-bold hover:bg-brand-100 transition">+ New</button>
+            <button onClick={() => setAdjModal(true)} className="h-8 px-3 bg-gray-50 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-100 transition">+ New</button>
           </div>
           {stockAdjustments.length === 0 ? <div className="text-center py-16 text-gray-300"><span className="text-xl opacity-15">—</span>No adjustments yet</div> : (
             <div className="divide-y divide-gray-50">
@@ -181,9 +181,9 @@ export default function StockTakesPage() {
 
       {/* New Stock Take Modal */}
       <Modal open={modal} onClose={() => setModal(false)} title="New Stock Take"
-        footer={<><button onClick={() => setModal(false)} className="h-11 px-5 border border-stone-300 rounded-xl text-sm font-semibold text-stone-600">Cancel</button><button onClick={saveTake} className="flex-1 h-11 bg-brand-500 text-white rounded-xl text-sm font-bold">Save</button></>}>
+        footer={<><button onClick={() => setModal(false)} className="h-11 px-5 border border-stone-300 rounded-xl text-sm font-semibold text-stone-600">Cancel</button><button onClick={saveTake} className="flex-1 h-11 bg-gray-700 text-white rounded-xl text-sm font-bold">Save</button></>}>
         <div className="space-y-4">
-          <div className="bg-brand-50 rounded-xl p-3 text-sm text-brand-700">Enter physical count. Leave blank to skip. Variances auto-calculated.</div>
+          <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-800">Enter physical count. Leave blank to skip. Variances auto-calculated.</div>
           <input className="w-full h-11 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" placeholder="Notes..." value={notes} onChange={e => setNotes(e.target.value)} />
           <input className="w-full h-11 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} />
           {filteredCounts.map((c, i) => {
@@ -191,7 +191,7 @@ export default function StockTakesPage() {
             return (
               <div key={ri} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
                 <div className="flex-1 min-w-0"><div className="text-sm font-semibold">{c.name}</div><div className="text-xs text-gray-400">System: <b>{c.systemQty}</b></div></div>
-                <input type="number" className="w-20 h-10 px-2 text-center border border-gray-200 rounded-lg text-sm font-bold focus:border-brand-500 focus:outline-none" placeholder="Count" value={c.countedQty} min={0} onChange={e => updateCount(ri, e.target.value)} />
+                <input type="number" className="w-20 h-10 px-2 text-center border border-gray-200 rounded-lg text-sm font-bold focus:border-gray-500 focus:outline-none" placeholder="Count" value={c.countedQty} min={0} onChange={e => updateCount(ri, e.target.value)} />
                 {v !== null && <span className={`w-10 text-center text-xs font-bold ${v === 0 ? 'text-green-500' : v > 0 ? 'text-blue-500' : 'text-red-500'}`}>{v === 0 ? '✓' : v > 0 ? '+' + v : v}</span>}
               </div>
             )
@@ -201,7 +201,7 @@ export default function StockTakesPage() {
 
       {/* New Adjustment Modal */}
       <Modal open={adjModal} onClose={() => setAdjModal(false)} title="New Adjustment"
-        footer={<><button onClick={() => setAdjModal(false)} className="h-11 px-5 border border-stone-300 rounded-xl text-sm font-semibold text-stone-600">Cancel</button><button onClick={saveAdj} className="flex-1 h-11 bg-brand-500 text-white rounded-xl text-sm font-bold">Save</button></>}>
+        footer={<><button onClick={() => setAdjModal(false)} className="h-11 px-5 border border-stone-300 rounded-xl text-sm font-semibold text-stone-600">Cancel</button><button onClick={saveAdj} className="flex-1 h-11 bg-gray-700 text-white rounded-xl text-sm font-bold">Save</button></>}>
         <div className="space-y-4">
           <div><label className="block text-xs font-semibold text-gray-500 mb-2">Product</label>
             <select className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" value={adjProduct} onChange={e => setAdjProduct(e.target.value)}>

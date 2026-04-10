@@ -17,7 +17,7 @@ export default function CustomersPage() {
           <table className="w-full min-w-[400px]">
             <thead><tr><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Phone</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Visits</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Total Spent</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Last Visit</th></tr></thead>
             <tbody>{filtered.length === 0 ? <tr><td colSpan={4} className="text-center py-12 text-gray-400">No customers</td></tr> : filtered.map(c => (
-              <tr key={c.id} className="border-b border-gray-50"><td className="p-3 text-sm font-semibold">{c.phone}</td><td className="p-3"><span className="px-2.5 py-1 bg-brand-50 text-brand-500 rounded-lg text-[11px] font-bold">{c.visitCount}</span></td><td className="p-3 text-sm font-bold text-green-500">{money(c.totalSpent)}</td><td className="p-3 text-sm">{fmtDate(c.lastVisit)}</td></tr>
+              <tr key={c.id} className="border-b border-gray-50"><td className="p-3 text-sm font-semibold">{c.phone}</td><td className="p-3"><span className="px-2.5 py-1 bg-gray-50 text-gray-600 rounded-lg text-[11px] font-bold">{c.visitCount}</span></td><td className="p-3 text-sm font-bold text-green-500">{money(c.totalSpent)}</td><td className="p-3 text-sm">{fmtDate(c.lastVisit)}</td></tr>
             ))}</tbody>
           </table>
         </div>

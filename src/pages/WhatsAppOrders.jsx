@@ -64,7 +64,7 @@ export default function WhatsAppOrders() {
   const statusColor = (s) => {
     const sc = s?.toLowerCase()
     if (sc === 'paid') return 'bg-emerald-500 text-white'
-    if (sc === 'completed') return 'bg-brand-600 text-white'
+    if (sc === 'completed') return 'bg-gray-800 text-white'
     if (sc === 'cancelled') return 'bg-red-500 text-white'
     return 'bg-amber-400 text-black'
   }
@@ -89,18 +89,18 @@ export default function WhatsAppOrders() {
         <div className="bg-emerald-500 rounded-2xl p-4 text-white">
           <div className="text-xs font-medium opacity-70">Paid</div><div className="text-[22px] font-bold mt-0.5">{paid}</div>
         </div>
-        <div className="bg-brand-600 rounded-2xl p-4 text-white">
+        <div className="bg-gray-800 rounded-2xl p-4 text-white">
           <div className="text-xs font-medium opacity-70">Completed</div><div className="text-[22px] font-bold mt-0.5">{completed}</div>
         </div>
       </div>
 
       {/* Search + Filters */}
-      <input className="w-full h-10 px-4 bg-white rounded-xl text-sm placeholder:text-stone-300 border border-gray-100 focus:outline-none focus:ring-2 focus:ring-[#3d8b6a]/30 mb-4" placeholder="Search by name, phone, or order #..." value={search} onChange={e => setSearch(e.target.value)} />
+      <input className="w-full h-10 px-4 bg-white rounded-xl text-sm placeholder:text-stone-300 border border-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400/30 mb-4" placeholder="Search by name, phone, or order #..." value={search} onChange={e => setSearch(e.target.value)} />
 
       <div className="flex gap-1.5 mb-5 overflow-x-auto scrollbar-hide">
         {['Pending', 'Paid', 'Completed', 'Cancelled', 'all'].map(f => (
           <button key={f} onClick={() => setWAFilter(f)}
-            className={`h-8 px-4 rounded-full text-xs font-semibold whitespace-nowrap transition ${waFilter === f ? (f === 'Pending' ? 'bg-amber-400 text-black' : f === 'Paid' ? 'bg-emerald-500 text-white' : 'bg-brand-600 text-white') : 'bg-white text-stone-400'}`}>
+            className={`h-8 px-4 rounded-full text-xs font-semibold whitespace-nowrap transition ${waFilter === f ? (f === 'Pending' ? 'bg-amber-400 text-black' : f === 'Paid' ? 'bg-emerald-500 text-white' : 'bg-gray-800 text-white') : 'bg-white text-stone-400'}`}>
             {f === 'all' ? 'All' : f}
           </button>
         ))}
@@ -127,7 +127,7 @@ export default function WhatsAppOrders() {
               <div className="text-xs text-stone-400 mb-2">{order.items.length} item{order.items.length !== 1 ? 's' : ''}{order.address ? ' · Delivery filled' : ' · No delivery details'}{order.ussdCode ? ` · USSD: *920*141*${order.ussdCode}#` : ''}</div>
               <div className="flex items-center justify-between pt-2.5 border-t border-stone-100">
                 <div className="text-lg font-bold">{money(order.total)}</div>
-                <span className="text-xs font-medium text-brand-600">View details</span>
+                <span className="text-xs font-medium text-gray-700">View details</span>
               </div>
             </div>
           </div>
@@ -231,13 +231,13 @@ export default function WhatsAppOrders() {
             )}
             {o.status === 'Paid' && (
               <div className="space-y-2 pt-2">
-                <button onClick={() => complete(o.id)} className="w-full h-12 bg-brand-600 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Process Order</button>
+                <button onClick={() => complete(o.id)} className="w-full h-12 bg-gray-800 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Process Order</button>
                 <button onClick={() => copyLink(o)} className="w-full h-11 bg-stone-200 text-stone-700 rounded-xl text-sm font-semibold active:scale-[.98] transition">Copy Link</button>
               </div>
             )}
             {o.status === 'Completed' && (
               <div className="pt-2">
-                <div className="w-full h-11 bg-brand-50 text-brand-700 rounded-xl text-sm font-semibold flex items-center justify-center border border-brand-200">Order completed</div>
+                <div className="w-full h-11 bg-gray-50 text-gray-800 rounded-xl text-sm font-semibold flex items-center justify-center border border-gray-200">Order completed</div>
               </div>
             )}
             {o.status === 'Cancelled' && (

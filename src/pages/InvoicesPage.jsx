@@ -36,9 +36,9 @@ export default function InvoicesPage() {
     <div >
       <div className="flex justify-between items-start flex-wrap gap-4 mb-6">
         <div><h1 className="text-[22px] md:text-[26px] font-bold">Invoices</h1><p className="text-gray-500">Supplier invoices & receipts</p></div>
-        <button onClick={() => { setForm({ invoiceId: '', date: today(), supplier: '', amount: '', notes: '', file: null }); setModal(true) }} className="h-12 px-5 bg-brand-500 text-white rounded-xl text-sm font-semibold">Add Invoice</button>
+        <button onClick={() => { setForm({ invoiceId: '', date: today(), supplier: '', amount: '', notes: '', file: null }); setModal(true) }} className="h-12 px-5 bg-gray-700 text-white rounded-xl text-sm font-semibold">Add Invoice</button>
       </div>
-      <div className="bg-brand-600 rounded-2xl p-7 text-white mb-6"><small className="text-sm opacity-80">Total Invoices Value</small><strong className="block text-[22px] md:text-[26px] font-bold mt-2">{money(totalAmount)}</strong></div>
+      <div className="bg-gray-800 rounded-2xl p-7 text-white mb-6"><small className="text-sm opacity-80">Total Invoices Value</small><strong className="block text-[22px] md:text-[26px] font-bold mt-2">{money(totalAmount)}</strong></div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {invoices.length === 0 && <div className="col-span-full text-center py-12 text-gray-400"><span className="text-xl opacity-15">—</span>No invoices</div>}
@@ -63,7 +63,7 @@ export default function InvoicesPage() {
       {viewImg && (<div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/80" onClick={() => setViewImg(null)}><img src={viewImg} className="max-w-[90vw] max-h-[90vh] rounded-xl" /><button onClick={() => setViewImg(null)} className="absolute top-6 right-6 w-12 h-12 bg-white rounded-full text-xl flex items-center justify-center">✕</button></div>)}
 
       <Modal open={modal} onClose={() => setModal(false)} title="Add Invoice"
-        footer={<><button onClick={() => setModal(false)} className="h-12 px-5 border border-stone-300 rounded-xl text-sm font-semibold text-stone-600">Cancel</button><button onClick={save} className="flex-1 h-12 bg-brand-600 text-white rounded-xl text-sm font-bold">Save</button></>}>
+        footer={<><button onClick={() => setModal(false)} className="h-12 px-5 border border-stone-300 rounded-xl text-sm font-semibold text-stone-600">Cancel</button><button onClick={save} className="flex-1 h-12 bg-gray-800 text-white rounded-xl text-sm font-bold">Save</button></>}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3.5">
             <div><label className="block text-xs font-semibold text-gray-500 mb-2">Invoice ID</label><input className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base" placeholder="Optional" value={form.invoiceId} onChange={e => setForm({ ...form, invoiceId: e.target.value })} /></div>

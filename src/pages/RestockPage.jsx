@@ -117,7 +117,7 @@ export default function RestockPage() {
         <input
           type="text"
           placeholder="Search product to restock..."
-          className="w-full h-14 px-5 pl-12 bg-white border-2 border-gray-200 rounded-2xl text-base font-medium focus:border-brand-500 focus:outline-none transition"
+          className="w-full h-14 px-5 pl-12 bg-white border-2 border-gray-200 rounded-2xl text-base font-medium focus:border-gray-500 focus:outline-none transition"
           value={query}
           onChange={e => setQuery(e.target.value)}
         />
@@ -130,7 +130,7 @@ export default function RestockPage() {
               <button
                 key={p.id}
                 onClick={() => addToRestock(p)}
-                className="flex items-center gap-3 w-full p-3.5 hover:bg-brand-50 transition text-left border-b border-gray-50 last:border-0"
+                className="flex items-center gap-3 w-full p-3.5 hover:bg-gray-50 transition text-left border-b border-gray-50 last:border-0"
               >
                 {p.image ? (
                   <img src={p.image} alt="" className="w-11 h-11 rounded-xl object-cover bg-gray-100" />

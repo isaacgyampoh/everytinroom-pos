@@ -81,13 +81,13 @@ export default function Catalog() {
       `}</style>
 
       {/* Toast */}
-      {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-green-800 text-white px-5 py-2 rounded-full text-sm font-medium z-[500] shadow-lg">{toast}</div>}
+      {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-5 py-2 rounded-full text-sm font-medium z-[500] shadow-lg">{toast}</div>}
 
       {/* Navigation */}
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-stone-100 cat-nav">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <span className="text-base font-bold tracking-tight text-stone-900">EVERYTINROOM</span>
-          <a href={`tel:${SHOP.phone.split('/')[0].trim().replace(/\s/g, '')}`} className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-full px-4 py-2 hover:bg-green-100 transition">
+          <a href={`tel:${SHOP.phone.split('/')[0].trim().replace(/\s/g, '')}`} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-full px-4 py-2 hover:bg-gray-100 transition">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#166534" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
             <span className="text-xs font-semibold text-green-800">{SHOP.phone.split('/')[0].trim()}</span>
           </a>
@@ -111,7 +111,7 @@ export default function Catalog() {
       <div className="max-w-6xl mx-auto px-4 py-6">
         {/* Categories */}
         <div className="flex gap-2 overflow-x-auto pb-3 mb-1 scrollbar-hide -mx-4 px-4">
-          {cats.map(c => <button key={c} onClick={() => setCat(c)} className={`h-8 px-4 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 transition ${cat === c ? 'bg-green-800 text-white' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'}`}>{c === 'all' ? 'All' : c}<span className="ml-1.5 opacity-50">{counts[c] || 0}</span></button>)}
+          {cats.map(c => <button key={c} onClick={() => setCat(c)} className={`h-8 px-4 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 transition ${cat === c ? 'bg-gray-900 text-white' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'}`}>{c === 'all' ? 'All' : c}<span className="ml-1.5 opacity-50">{counts[c] || 0}</span></button>)}
         </div>
 
         {/* Promo row */}
@@ -145,7 +145,7 @@ export default function Catalog() {
                 <span className={`text-sm font-bold ${promo ? 'text-red-600' : 'text-stone-900'}`}>{money(dp)}</span>
               </div>
               {!promo && hw && <p className="text-[10px] text-green-600 font-medium mt-0.5">Buy {p.wholesale_min_qty}+ for {money(p.wholesale_price)} each</p>}
-              <button onClick={e => { e.stopPropagation(); add({ ...p, price: dp }) }} className="w-full h-9 mt-2.5 bg-stone-900 hover:bg-green-800 text-white rounded-xl text-xs font-semibold transition-colors">Add to Order</button>
+              <button onClick={e => { e.stopPropagation(); add({ ...p, price: dp }) }} className="w-full h-9 mt-2.5 bg-stone-900 hover:bg-gray-900 text-white rounded-xl text-xs font-semibold transition-colors">Add to Order</button>
             </div>
           })}
         </div>
@@ -160,7 +160,7 @@ export default function Catalog() {
             ['What payment methods do you accept?', 'We accept Mobile Money (MTN, Vodafone, AirtelTigo) and card payments. You will receive a secure payment link with your invoice.'],
             ['Do you offer delivery?', 'Yes. We deliver nationwide across Ghana. Delivery fees depend on your location and will be communicated after your order is confirmed.'],
             ['Do you have wholesale prices?', 'Yes. Selected products have reduced prices when you buy in bulk. The wholesale price applies automatically when you reach the minimum quantity.'],
-          ].map(([q, a], i) => <div key={i} onClick={() => setFaq(faq === i ? null : i)} className={`mb-2 rounded-2xl cursor-pointer transition-all ${faq === i ? 'bg-green-50 border border-green-100' : 'bg-stone-50 border border-transparent hover:bg-stone-100'}`}>
+          ].map(([q, a], i) => <div key={i} onClick={() => setFaq(faq === i ? null : i)} className={`mb-2 rounded-2xl cursor-pointer transition-all ${faq === i ? 'bg-gray-50 border border-green-100' : 'bg-stone-50 border border-transparent hover:bg-stone-100'}`}>
             <div className="flex justify-between items-center px-5 py-4">
               <span className="text-sm font-semibold text-stone-900 pr-4">{q}</span>
               <span className={`text-lg text-stone-400 transition-transform ${faq === i ? 'rotate-45' : ''}`}>+</span>
@@ -255,7 +255,7 @@ export default function Catalog() {
                 {pr && <p className="text-sm text-stone-400 line-through">{money(view.price)}</p>}
                 <p className={`text-2xl font-bold ${pr ? 'text-red-600' : 'text-stone-900'}`}>{money(dp)}</p>
                 {pr && <div className="mt-2 bg-red-50 rounded-xl px-3 py-2 text-xs text-red-600 font-medium">Save {money(view.price - pr.price)}</div>}
-                {!pr && Number(view.wholesale_price || 0) > 0 && Number(view.wholesale_min_qty || 0) > 0 && <div className="mt-2 bg-green-50 rounded-xl px-3 py-2"><p className="text-xs text-green-700 font-semibold">Wholesale: {money(view.wholesale_price)} each</p><p className="text-[11px] text-green-600">Buy {view.wholesale_min_qty}+ pieces</p></div>}
+                {!pr && Number(view.wholesale_price || 0) > 0 && Number(view.wholesale_min_qty || 0) > 0 && <div className="mt-2 bg-gray-50 rounded-xl px-3 py-2"><p className="text-xs text-green-700 font-semibold">Wholesale: {money(view.wholesale_price)} each</p><p className="text-[11px] text-green-600">Buy {view.wholesale_min_qty}+ pieces</p></div>}
                 <button onClick={() => share(view)} className="flex items-center gap-1.5 mt-3 text-xs text-green-700 font-medium">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>Share
                 </button>
@@ -272,7 +272,7 @@ export default function Catalog() {
               </div>
             </div>
             <div className="p-4 border-t border-stone-100">
-              <button onClick={() => { add({ ...view, price: dp }); close() }} className="w-full h-12 bg-stone-900 hover:bg-green-800 text-white rounded-xl text-sm font-semibold transition-colors">Add to Order</button>
+              <button onClick={() => { add({ ...view, price: dp }); close() }} className="w-full h-12 bg-stone-900 hover:bg-gray-900 text-white rounded-xl text-sm font-semibold transition-colors">Add to Order</button>
             </div>
           </div>
         </>

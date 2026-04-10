@@ -4,8 +4,8 @@
   "description": "Point of Sale System - EVERYTINROOM",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1a3d30",
-  "theme_color": "#1a3d30",
+  "background_color": "#111111",
+  "theme_color": "#111111",
   "orientation": "any",
   "icons": [
     {
