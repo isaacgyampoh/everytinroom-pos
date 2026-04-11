@@ -69,6 +69,20 @@ export default function WhatsAppOrders() {
     toast.success('Dispatched')
   }
 
+  const markPickedUp = async (id, method) => {
+    const sb = getSupabase()
+    const who = method === 'self' ? 'Customer (Self Pickup)' : prompt('Rider/service name (e.g. Yango, Bolt):')
+    if (!who) return
+    await sb.from('whatsapp_orders').update({
+      delivery_status: 'Picked Up',
+      delivery_guy: who,
+      delivered_at: new Date().toISOString(),
+    }).eq('id', id)
+    setSelected(s => s ? { ...s, deliveryStatus: 'Picked Up', deliveryGuy: who, deliveredAt: new Date().toISOString() } : s)
+    refreshWAOrders()
+    toast.success(method === 'self' ? 'Customer picked up' : 'Picked up by ' + who)
+  }
+
   const resendInvoice = (o) => {
     const link = window.location.origin + '/#/pay/' + o.id
     const lines = [`Hi${o.customerName ? ' ' + o.customerName : ''}, just a reminder about your order from EVERYTINROOM.`, '']
@@ -224,6 +238,7 @@ export default function WhatsAppOrders() {
 
   const deliveryColor = (s) => {
     if (s === 'Delivered') return 'bg-green-500 text-white'
+    if (s === 'Picked Up') return 'bg-green-500 text-white'
     if (s === 'Out for Delivery') return 'bg-blue-500 text-white'
     if (s === 'Packaged') return 'bg-amber-500 text-white'
     return 'bg-gray-200 text-gray-500'
@@ -421,20 +436,23 @@ export default function WhatsAppOrders() {
 
                 {/* Pipeline steps */}
                 <div className="flex items-center gap-1 mb-3">
-                  {['Paid', 'Packaged', 'Out for Delivery', 'Delivered'].map((step, i) => {
+                  {(() => {
                     const ds = o.deliveryStatus || ''
-                    const stages = ['', 'Packaged', 'Out for Delivery', 'Delivered']
-                    const currentIdx = stages.indexOf(ds)
-                    const stepIdx = i
-                    const done = stepIdx <= currentIdx
-                    const labels = ['Paid', 'Packaged', 'Dispatched', 'Delivered']
-                    return (
-                      <div key={step} className="flex-1 flex flex-col items-center">
-                        <div className={`w-full h-[4px] rounded-full ${done ? 'bg-gray-900' : 'bg-gray-200'}`} />
-                        <div className={`text-[9px] mt-1 font-semibold ${done ? 'text-gray-900' : 'text-gray-300'}`}>{labels[i]}</div>
+                    const isPickup = ds === 'Picked Up'
+                    const steps = isPickup
+                      ? ['Paid', 'Packaged', 'Picked Up']
+                      : ['Paid', 'Packaged', 'Dispatched', 'Delivered']
+                    const stageMap = isPickup
+                      ? { '': 0, 'Packaged': 1, 'Picked Up': 2 }
+                      : { '': 0, 'Packaged': 1, 'Out for Delivery': 2, 'Delivered': 3 }
+                    const currentIdx = stageMap[ds] ?? 0
+                    return steps.map((label, i) => (
+                      <div key={label} className="flex-1 flex flex-col items-center">
+                        <div className={`w-full h-[4px] rounded-full ${i <= currentIdx ? 'bg-gray-900' : 'bg-gray-200'}`} />
+                        <div className={`text-[9px] mt-1 font-semibold ${i <= currentIdx ? 'text-gray-900' : 'text-gray-300'}`}>{label}</div>
                       </div>
-                    )
-                  })}
+                    ))
+                  })()}
                 </div>
 
                 {/* Current status detail */}
@@ -463,56 +481,67 @@ export default function WhatsAppOrders() {
             )}
             {o.status === 'Paid' && (
               <div className="space-y-2 pt-2">
-                {/* Show next action based on delivery status */}
                 {(!o.deliveryStatus || o.deliveryStatus === '') && (
                   <>
                     <button onClick={() => { markPackaged(o.id); complete(o.id) }} className="w-full h-12 bg-gray-800 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Process & Package</button>
-                    <button onClick={() => printSticker(o)} className="w-full h-11 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold active:scale-[.98] transition border border-gray-200">Print Delivery Sticker</button>
+                    <button onClick={() => printSticker(o)} className="w-full h-10 bg-white text-gray-600 rounded-xl text-xs font-semibold active:scale-[.98] transition border border-gray-200">Print Delivery Sticker</button>
                   </>
                 )}
                 {o.deliveryStatus === 'Packaged' && (
-                  <button onClick={() => {
-                    const guy = prompt('Delivery person name:')
-                    if (guy) markDispatched(o.id, guy)
-                  }} className="w-full h-12 bg-blue-600 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Dispatch (Hand to Delivery Guy)</button>
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-400 font-medium">How is this order leaving?</p>
+                    <button onClick={() => {
+                      const guy = prompt('Delivery person name:')
+                      if (guy) markDispatched(o.id, guy)
+                    }} className="w-full h-11 bg-blue-600 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Our Delivery</button>
+                    <div className="flex gap-2">
+                      <button onClick={() => markPickedUp(o.id, 'self')} className="flex-1 h-11 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold active:scale-[.98] transition border border-gray-200">Customer Pickup</button>
+                      <button onClick={() => markPickedUp(o.id, 'rider')} className="flex-1 h-11 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold active:scale-[.98] transition border border-gray-200">Rider Pickup</button>
+                    </div>
+                    <button onClick={() => printSticker(o)} className="w-full h-10 bg-white text-gray-500 rounded-xl text-xs font-semibold active:scale-[.98] transition border border-gray-100">Print Sticker</button>
+                  </div>
                 )}
                 {o.deliveryStatus === 'Out for Delivery' && (
-                  <div className="w-full h-11 bg-blue-50 text-blue-600 rounded-xl text-sm font-semibold flex items-center justify-center border border-blue-200">
-                    Out for delivery — waiting for QR scan confirmation
+                  <div className="w-full py-3 bg-blue-50 text-blue-600 rounded-xl text-sm font-medium text-center border border-blue-100">
+                    En route — awaiting delivery confirmation
                   </div>
                 )}
-                {o.deliveryStatus === 'Delivered' && (
-                  <div className="w-full h-11 bg-green-50 text-green-600 rounded-xl text-sm font-semibold flex items-center justify-center border border-green-200">
-                    Delivered
+                {(o.deliveryStatus === 'Delivered' || o.deliveryStatus === 'Picked Up') && (
+                  <div className="w-full py-3 bg-green-50 text-green-600 rounded-xl text-sm font-medium text-center border border-green-100">
+                    {o.deliveryStatus === 'Picked Up' ? 'Collected' : 'Delivered'}
                   </div>
                 )}
-                <button onClick={() => printSticker(o)} className="w-full h-10 bg-white text-gray-600 rounded-xl text-xs font-semibold active:scale-[.98] transition border border-gray-200">Print Sticker</button>
               </div>
             )}
             {o.status === 'Completed' && (
               <div className="space-y-2 pt-2">
-                {(!o.deliveryStatus || o.deliveryStatus === '' || o.deliveryStatus === 'Packaged') && (
-                  <>
-                    {!o.deliveryStatus && <button onClick={() => markPackaged(o.id)} className="w-full h-11 bg-amber-500 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Mark as Packaged</button>}
-                    {o.deliveryStatus === 'Packaged' && (
-                      <button onClick={() => {
-                        const guy = prompt('Delivery person name:')
-                        if (guy) markDispatched(o.id, guy)
-                      }} className="w-full h-12 bg-blue-600 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Dispatch (Hand to Delivery Guy)</button>
-                    )}
-                  </>
+                {!o.deliveryStatus && (
+                  <button onClick={() => markPackaged(o.id)} className="w-full h-11 bg-amber-500 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Mark as Packaged</button>
+                )}
+                {o.deliveryStatus === 'Packaged' && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-400 font-medium">How is this order leaving?</p>
+                    <button onClick={() => {
+                      const guy = prompt('Delivery person name:')
+                      if (guy) markDispatched(o.id, guy)
+                    }} className="w-full h-11 bg-blue-600 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Our Delivery</button>
+                    <div className="flex gap-2">
+                      <button onClick={() => markPickedUp(o.id, 'self')} className="flex-1 h-11 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold active:scale-[.98] transition border border-gray-200">Customer Pickup</button>
+                      <button onClick={() => markPickedUp(o.id, 'rider')} className="flex-1 h-11 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold active:scale-[.98] transition border border-gray-200">Rider Pickup</button>
+                    </div>
+                  </div>
                 )}
                 {o.deliveryStatus === 'Out for Delivery' && (
-                  <div className="w-full h-11 bg-blue-50 text-blue-600 rounded-xl text-sm font-semibold flex items-center justify-center border border-blue-200">
-                    Out for delivery — waiting for QR scan
+                  <div className="w-full py-3 bg-blue-50 text-blue-600 rounded-xl text-sm font-medium text-center border border-blue-100">
+                    En route — awaiting delivery confirmation
                   </div>
                 )}
-                {o.deliveryStatus === 'Delivered' && (
-                  <div className="w-full h-11 bg-green-50 text-green-600 rounded-xl text-sm font-semibold flex items-center justify-center border border-green-200">
-                    Delivered successfully
+                {(o.deliveryStatus === 'Delivered' || o.deliveryStatus === 'Picked Up') && (
+                  <div className="w-full py-3 bg-green-50 text-green-600 rounded-xl text-sm font-medium text-center border border-green-100">
+                    {o.deliveryStatus === 'Picked Up' ? `Collected by ${o.deliveryGuy || 'customer'}` : 'Delivered'}
                   </div>
                 )}
-                <button onClick={() => printSticker(o)} className="w-full h-10 bg-white text-gray-600 rounded-xl text-xs font-semibold active:scale-[.98] transition border border-gray-200">Print Sticker</button>
+                <button onClick={() => printSticker(o)} className="w-full h-10 bg-white text-gray-500 rounded-xl text-xs font-semibold active:scale-[.98] transition border border-gray-100">Print Sticker</button>
               </div>
             )}
             {o.status === 'Cancelled' && (
