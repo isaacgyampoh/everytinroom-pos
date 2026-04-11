@@ -92,10 +92,10 @@ export default function Dashboard() {
       {/* Key Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {[
-          { label: "Today's Profit", value: money(todayProfit), color: 'text-green-600', bg: 'bg-green-500' },
-          { label: 'Net Today', value: money(todayProfit - todayExp), color: todayProfit - todayExp >= 0 ? 'text-green-600' : 'text-red-500', bg: 'bg-amber-400' },
+          { label: "Today's Profit", value: money(todayProfit), color: 'text-gray-900', bg: 'bg-gray-200' },
+          { label: 'Net Today', value: money(todayProfit - todayExp), color: todayProfit - todayExp >= 0 ? 'text-gray-900' : 'text-red-500', bg: 'bg-gray-200' },
           { label: 'Profit Margin', value: profitMargin + '%', color: Number(profitMargin) >= 30 ? 'text-green-600' : Number(profitMargin) >= 15 ? 'text-amber-500' : 'text-red-500', bg: 'bg-gray-400' },
-          { label: 'Stock Value', value: money(stockValue), color: 'text-gray-900', bg: 'bg-amber-500' },
+          { label: 'Stock Value', value: money(stockValue), color: 'text-gray-900', bg: 'bg-gray-200' },
         ].map((s, i) => (
           <div key={i} className="bg-white rounded-2xl p-3.5 md:p-4 border border-gray-100/80">
               <div className="text-[10px] md:text-[11px] text-gray-400 font-medium">{s.label}</div>
@@ -126,9 +126,9 @@ export default function Dashboard() {
           <h3 className="text-sm font-bold text-gray-800 mb-4">Payment Split (This Month)</h3>
           <div className="space-y-3">
             {[
-              { label: 'Cash', amount: monthCash, color: 'bg-green-500', pct: monthRev ? (monthCash / monthRev * 100) : 0 },
-              { label: 'Momo', amount: monthMomo, color: 'bg-amber-500', pct: monthRev ? (monthMomo / monthRev * 100) : 0 },
-              { label: 'Split', amount: monthSplit, color: 'bg-violet-500', pct: monthRev ? (monthSplit / monthRev * 100) : 0 },
+              { label: 'Cash', amount: monthCash, color: 'bg-gray-800', pct: monthRev ? (monthCash / monthRev * 100) : 0 },
+              { label: 'Momo', amount: monthMomo, color: 'bg-gray-500', pct: monthRev ? (monthMomo / monthRev * 100) : 0 },
+              { label: 'Split', amount: monthSplit, color: 'bg-gray-300', pct: monthRev ? (monthSplit / monthRev * 100) : 0 },
             ].map((p, i) => (
               <div key={i}>
                 <div className="flex justify-between text-xs mb-1">
@@ -203,7 +203,7 @@ export default function Dashboard() {
             {recentSales.length === 0 && <div className="p-8 text-center text-gray-300 text-sm">No sales yet</div>}
             {recentSales.map(s => (
               <div key={s.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/50 transition">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${s.payment === 'Cash' ? 'bg-green-500' : (s.payment === 'Momo' || s.payment === 'Paystack') ? 'bg-amber-500' : 'bg-violet-500'}`}>
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${s.payment === 'Cash' ? 'bg-gray-700' : (s.payment === 'Momo' || s.payment === 'Paystack') ? 'bg-gray-500' : 'bg-gray-400'}`}>
                   {s.payment === 'Cash' ? '💵' : ''}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -220,7 +220,7 @@ export default function Dashboard() {
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <div className="flex justify-between items-center p-4 border-b border-gray-50">
             <h3 className="text-sm font-bold text-gray-800">Low Stock</h3>
-            <span className="px-2 py-0.5 bg-amber-50 text-gray-900 rounded-lg text-[10px] font-bold">{lowStock.length}</span>
+            <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-lg text-[10px] font-bold">{lowStock.length}</span>
           </div>
           <div className="divide-y divide-gray-50">
             {lowStock.length === 0 && <div className="p-8 text-center text-gray-300 text-sm">All stocked up! </div>}
@@ -233,7 +233,7 @@ export default function Dashboard() {
                   <div className="text-xs font-semibold text-gray-800">{p.name}</div>
                   <div className="text-[10px] text-gray-400">{p.category || '-'}</div>
                 </div>
-                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${p.quantity === 0 ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-gray-900'}`}>
+                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${p.quantity === 0 ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-700'}`}>
                   {p.quantity === 0 ? 'OUT' : p.quantity}
                 </span>
               </div>

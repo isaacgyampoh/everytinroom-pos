@@ -367,7 +367,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             {!splitMode && payMethod === 'Paystack' && (
               <div className="bg-blue-50 rounded-xl p-3.5 border border-blue-100">
                 <div className="text-sm font-bold text-blue-700 mb-1">Paystack Online</div>
-                <div className="text-xs text-blue-600">A Paystack checkout window will open. Customer pays via Momo online. Payment auto-confirmed.</div>
+                <div className="text-xs text-gray-400">Paystack checkout will open for payment.</div>
               </div>
             )}
 

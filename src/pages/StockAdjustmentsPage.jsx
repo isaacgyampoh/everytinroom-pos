@@ -140,7 +140,7 @@ export default function StockAdjustmentsPage() {
                       <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
                         a.reason === 'Damaged' ? 'bg-amber-50 text-amber-600' :
                         a.reason === 'Broken' ? 'bg-red-50 text-red-500' :
-                        a.reason === 'Missing' ? 'bg-violet-50 text-violet-500' :
+                        a.reason === 'Missing' ? 'bg-gray-100 text-gray-600' :
                         a.reason === 'Theft' ? 'bg-red-50 text-red-600' :
                         'bg-gray-100 text-gray-500'
                       }`}>{a.reason}</span>

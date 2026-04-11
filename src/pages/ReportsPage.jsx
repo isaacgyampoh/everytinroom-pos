@@ -159,9 +159,9 @@ export default function ReportsPage() {
         <Section title="Payment Breakdown" icon="">
           <div className="space-y-3">
             {[
-              { label: 'Cash', count: cashSales.length, amount: cashTotal, color: 'bg-green-500', pct: totalRev ? (cashTotal / totalRev * 100) : 0 },
-              { label: 'Mobile Money', count: momoSales.length, amount: momoTotal, color: 'bg-amber-500', pct: totalRev ? (momoTotal / totalRev * 100) : 0 },
-              { label: 'Split', count: splitSales.length, amount: splitSales.reduce((a, s) => a + s.total, 0), color: 'bg-violet-500', pct: totalRev ? (splitSales.reduce((a, s) => a + s.total, 0) / totalRev * 100) : 0 },
+              { label: 'Cash', count: cashSales.length, amount: cashTotal, color: 'bg-gray-800', pct: totalRev ? (cashTotal / totalRev * 100) : 0 },
+              { label: 'Mobile Money', count: momoSales.length, amount: momoTotal, color: 'bg-gray-500', pct: totalRev ? (momoTotal / totalRev * 100) : 0 },
+              { label: 'Split', count: splitSales.length, amount: splitSales.reduce((a, s) => a + s.total, 0), color: 'bg-gray-300', pct: totalRev ? (splitSales.reduce((a, s) => a + s.total, 0) / totalRev * 100) : 0 },
             ].map((p, i) => (
               <div key={i}>
                 <div className="flex justify-between text-sm mb-1.5">
@@ -278,7 +278,7 @@ export default function ReportsPage() {
                   <span className="text-sm font-bold text-red-500">-{money(r.refundAmount)}</span>
                 </div>
               ))}
-              <div className="flex justify-between p-3 bg-violet-50 rounded-xl border border-violet-100">
+              <div className="flex justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
                 <span className="text-sm font-bold text-violet-600">Total Refunds</span>
                 <span className="text-sm font-bold text-violet-600">{money(totalRefAmt)}</span>
               </div>

@@ -198,9 +198,9 @@ export default function InvoicePay() {
               <p className="text-xl font-bold mt-0.5">{order?.order_no}</p>
             </div>
             {isPaid ? (
-              <div className="bg-emerald-500 text-white px-4 py-2 rounded-full text-sm font-bold">Paid</div>
+              <div className="bg-gray-800 text-white px-4 py-2 rounded-xl text-sm font-bold">Paid</div>
             ) : (
-              <div className="bg-amber-500 text-white px-4 py-2 rounded-full text-sm font-bold">Awaiting Payment</div>
+              <div className="bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold">Awaiting Payment</div>
             )}
           </div>
         </div>
@@ -276,13 +276,13 @@ export default function InvoicePay() {
         {/* Payment section */}
         {isPaid ? (
           <div className="space-y-4">
-            <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-6 text-center">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center">
               <h3 className="text-lg font-bold text-emerald-700">Payment Received</h3>
               <p className="text-sm text-emerald-600 mt-1">Thank you. Your order is being prepared.</p>
               {order?.paid_at && <p className="text-xs text-emerald-500 mt-2">Paid on {new Date(order.paid_at).toLocaleString('en-GB')}</p>}
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5">
               <h4 className="text-sm font-bold text-amber-800 mb-1">About Delivery</h4>
               <p className="text-sm text-amber-700">A team member will contact you shortly to confirm your delivery details and delivery fee based on your location.</p>
               <p className="text-xs text-amber-600 mt-2">For urgent enquiries, call: {SHOP.phone}</p>
@@ -304,7 +304,7 @@ export default function InvoicePay() {
             <p className="text-center text-xs text-gray-400 mt-3">Secured by Paystack · Card and Mobile Money accepted</p>
 
             {order?.ussd_code && (
-              <div className="mt-4 bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center">
+              <div className="mt-4 bg-gray-50 border border-gray-200 rounded-2xl p-4 text-center">
                 <p className="text-xs text-amber-600 font-semibold mb-1">Or pay via USSD (no internet needed)</p>
                 <p className="text-lg font-bold text-amber-900 font-mono tracking-wider">*920*141*{order.ussd_code}#</p>
                 <p className="text-[11px] text-amber-500 mt-1">Dial this code on your phone → confirm → pay with MoMo</p>

@@ -32,7 +32,7 @@ export default function Receipts({ onPrintReceipt }) {
                   <td className="p-3 text-sm">{s.customer}</td>
                   <td className="p-3 text-sm">
                     <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${s.type === 'WhatsApp' ? 'bg-wa/10 text-wa' : s.type === 'Wholesale' ? 'bg-amber-50 text-amber-500' : 'bg-green-50 text-green-500'}`}>{s.type}</span>
-                    {''}<span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${s.payment === 'Cash' ? 'bg-green-50 text-green-500' : s.payment === 'Momo' ? 'bg-amber-50 text-amber-500' : 'bg-cyan-50 text-cyan-500'}`}>{s.payment}</span>
+                    {''}<span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${s.payment === 'Cash' ? 'bg-gray-100 text-gray-700' : s.payment === 'Momo' ? 'bg-gray-100 text-gray-700' : 'bg-gray-100 text-gray-700'}`}>{s.payment}</span>
                   </td>
                   <td className="p-3 text-sm"><span className="px-2.5 py-1 bg-gray-100 rounded-lg text-[11px] font-bold text-gray-600">{s.cashier || 'Unknown'}</span></td>
                   <td className="p-3 text-sm font-bold">{money(s.total)}</td>

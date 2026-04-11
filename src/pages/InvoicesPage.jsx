@@ -38,7 +38,7 @@ export default function InvoicesPage() {
         <div><h1 className="text-[22px] md:text-[26px] font-bold">Invoices</h1><p className="text-gray-500">Supplier invoices & receipts</p></div>
         <button onClick={() => { setForm({ invoiceId: '', date: today(), supplier: '', amount: '', notes: '', file: null }); setModal(true) }} className="h-12 px-5 bg-gray-700 text-white rounded-xl text-sm font-semibold">Add Invoice</button>
       </div>
-      <div className="bg-gray-800 rounded-2xl p-7 text-white mb-6"><small className="text-sm opacity-80">Total Invoices Value</small><strong className="block text-[22px] md:text-[26px] font-bold mt-2">{money(totalAmount)}</strong></div>
+      <div className="bg-gray-800 rounded-2xl p-5 text-white mb-6"><small className="text-sm opacity-80">Total Invoices Value</small><strong className="block text-[22px] md:text-[26px] font-bold mt-2">{money(totalAmount)}</strong></div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {invoices.length === 0 && <div className="col-span-full text-center py-12 text-gray-400"><span className="text-xl opacity-15">—</span>No invoices</div>}

@@ -233,14 +233,14 @@ export default function WhatsAppOrders() {
     if (sc === 'paid') return 'bg-emerald-500 text-white'
     if (sc === 'completed') return 'bg-gray-800 text-white'
     if (sc === 'cancelled') return 'bg-red-500 text-white'
-    return 'bg-amber-400 text-black'
+    return 'bg-gray-800 text-white'
   }
 
   const deliveryColor = (s) => {
     if (s === 'Delivered') return 'bg-green-500 text-white'
     if (s === 'Picked Up') return 'bg-green-500 text-white'
     if (s === 'Out for Delivery') return 'bg-blue-500 text-white'
-    if (s === 'Packaged') return 'bg-amber-500 text-white'
+    if (s === 'Packaged') return 'bg-gray-500 text-white'
     return 'bg-gray-200 text-gray-500'
   }
 
@@ -258,13 +258,13 @@ export default function WhatsAppOrders() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-5">
-        <div className="bg-amber-400 rounded-2xl p-4 text-black">
+        <div className="bg-gray-100 rounded-2xl p-4 text-gray-900">
           <div className="text-xs font-medium opacity-60">Pending</div><div className="text-[22px] font-bold mt-0.5">{pending}</div>
         </div>
-        <div className="bg-emerald-500 rounded-2xl p-4 text-white">
+        <div className="bg-gray-900 rounded-2xl p-4 text-white">
           <div className="text-xs font-medium opacity-70">Paid</div><div className="text-[22px] font-bold mt-0.5">{paid}</div>
         </div>
-        <div className="bg-gray-800 rounded-2xl p-4 text-white">
+        <div className="bg-gray-900 rounded-2xl p-4 text-white">
           <div className="text-xs font-medium opacity-70">Completed</div><div className="text-[22px] font-bold mt-0.5">{completed}</div>
         </div>
       </div>
@@ -275,7 +275,7 @@ export default function WhatsAppOrders() {
       <div className="flex gap-1.5 mb-5 overflow-x-auto scrollbar-hide">
         {['Pending', 'Paid', 'Completed', 'Cancelled', 'all'].map(f => (
           <button key={f} onClick={() => setWAFilter(f)}
-            className={`h-8 px-4 rounded-full text-xs font-semibold whitespace-nowrap transition ${waFilter === f ? (f === 'Pending' ? 'bg-amber-400 text-black' : f === 'Paid' ? 'bg-emerald-500 text-white' : 'bg-gray-800 text-white') : 'bg-white text-stone-400'}`}>
+            className={`h-8 px-4 rounded-full text-xs font-semibold whitespace-nowrap transition ${waFilter === f ? ('bg-gray-900 text-white') : 'bg-white text-stone-400'}`}>
             {f === 'all' ? 'All' : f}
           </button>
         ))}
@@ -397,14 +397,13 @@ export default function WhatsAppOrders() {
 
             {/* USSD Payment Code */}
             {o.ussdCode && (
-              <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
-                <div className="text-xs text-amber-600 uppercase tracking-wider mb-2 font-semibold">USSD Payment Code</div>
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                <div className="text-xs text-gray-500 uppercase tracking-wider mb-2 font-semibold">USSD Payment Code</div>
                 <div className="flex items-center justify-between">
-                  <div className="text-lg font-bold text-amber-900 font-mono tracking-wider">*920*141*{o.ussdCode}#</div>
+                  <div className="text-lg font-bold text-gray-900 font-mono tracking-wider">*920*141*{o.ussdCode}#</div>
                   <button onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(`*920*141*${o.ussdCode}#`); toast.success('USSD code copied!') }}
-                    className="h-9 px-4 bg-amber-500 text-white rounded-lg text-xs font-bold active:scale-95 transition">Copy</button>
+                    className="h-9 px-4 bg-gray-500 text-white rounded-lg text-xs font-bold active:scale-95 transition">Copy</button>
                 </div>
-                <p className="text-[11px] text-amber-600 mt-2">Customer dials this code → confirms amount → pays via MoMo</p>
               </div>
             )}
 
@@ -474,7 +473,7 @@ export default function WhatsAppOrders() {
                 <button onClick={() => resendInvoice(o)} className="w-full h-12 bg-[#25d366] text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Resend Invoice</button>
                 <div className="flex gap-2">
                   <button onClick={() => copyLink(o)} className="flex-1 h-11 bg-stone-200 text-stone-700 rounded-xl text-sm font-semibold active:scale-[.98] transition">Copy Link</button>
-                  {o.ussdCode && <button onClick={() => { navigator.clipboard?.writeText(`*920*141*${o.ussdCode}#`); toast.success('USSD code copied!') }} className="flex-1 h-11 bg-amber-400 text-black rounded-xl text-sm font-semibold active:scale-[.98] transition">Copy USSD</button>}
+                  {o.ussdCode && <button onClick={() => { navigator.clipboard?.writeText(`*920*141*${o.ussdCode}#`); toast.success('USSD code copied!') }} className="flex-1 h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold active:scale-[.98] transition">Copy USSD</button>}
                   <button onClick={() => cancel(o.id)} className="flex-1 h-11 bg-red-500 text-white rounded-xl text-sm font-semibold active:scale-[.98] transition">Cancel</button>
                 </div>
               </div>
@@ -516,7 +515,7 @@ export default function WhatsAppOrders() {
             {o.status === 'Completed' && (
               <div className="space-y-2 pt-2">
                 {!o.deliveryStatus && (
-                  <button onClick={() => markPackaged(o.id)} className="w-full h-11 bg-amber-500 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Mark as Packaged</button>
+                  <button onClick={() => markPackaged(o.id)} className="w-full h-11 bg-gray-500 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Mark as Packaged</button>
                 )}
                 {o.deliveryStatus === 'Packaged' && (
                   <div className="space-y-2">
