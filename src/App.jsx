@@ -121,15 +121,19 @@ export default function App() {
         if (count > 0) navigator.setAppBadge(count)
         else navigator.clearAppBadge()
       }
+      // Also tell service worker
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'UPDATE_BADGE', count })
+      }
     } catch {}
   }
 
-  // Set badge on initial load
+  // Update badge whenever waOrders changes
+  const waOrders = useStore(s => s.waOrders)
   useEffect(() => {
-    const s = useStore.getState()
-    const badge = s.waOrders.filter(o => o.status === 'Pending' || o.status === 'Paid').length
+    const badge = waOrders.filter(o => o.status === 'Pending' || o.status === 'Paid').length
     updateBadge(badge)
-  })
+  }, [waOrders])
 
   // Public pages - no login required
   if (window.location.hash.includes('/pay/')) return <Suspense fallback={<Loader />}><InvoicePay /></Suspense>
