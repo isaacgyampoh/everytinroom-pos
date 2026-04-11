@@ -472,80 +472,69 @@ export default function WhatsAppOrders() {
               <div className="space-y-2 pt-2">
                 <button onClick={() => resendInvoice(o)} className="w-full h-12 bg-[#25d366] text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Resend Invoice</button>
                 <div className="flex gap-2">
-                  <button onClick={() => copyLink(o)} className="flex-1 h-11 bg-stone-200 text-stone-700 rounded-xl text-sm font-semibold active:scale-[.98] transition">Copy Link</button>
+                  <button onClick={() => copyLink(o)} className="flex-1 h-11 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold active:scale-[.98] transition">Copy Link</button>
                   {o.ussdCode && <button onClick={() => { navigator.clipboard?.writeText(`*920*141*${o.ussdCode}#`); toast.success('USSD code copied!') }} className="flex-1 h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold active:scale-[.98] transition">Copy USSD</button>}
-                  <button onClick={() => cancel(o.id)} className="flex-1 h-11 bg-red-500 text-white rounded-xl text-sm font-semibold active:scale-[.98] transition">Cancel</button>
+                  <button onClick={() => cancel(o.id)} className="flex-1 h-11 bg-white text-red-500 rounded-xl text-sm font-semibold active:scale-[.98] transition border border-red-200">Cancel</button>
                 </div>
               </div>
             )}
-            {o.status === 'Paid' && (
+
+            {(o.status === 'Paid' || o.status === 'Completed') && (
               <div className="space-y-2 pt-2">
-                {(!o.deliveryStatus || o.deliveryStatus === '') && (
+
+                {/* Step 1: Process & Package */}
+                {(!o.deliveryStatus || o.deliveryStatus === '') && o.status === 'Paid' && (
+                  <button onClick={() => { markPackaged(o.id); complete(o.id) }} className="w-full h-12 bg-gray-900 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Process & Package</button>
+                )}
+                {(!o.deliveryStatus || o.deliveryStatus === '') && o.status === 'Completed' && (
+                  <button onClick={() => markPackaged(o.id)} className="w-full h-12 bg-gray-900 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Mark as Packaged</button>
+                )}
+
+                {/* Step 2: Choose dispatch method */}
+                {o.deliveryStatus === 'Packaged' && (
                   <>
-                    <button onClick={() => { markPackaged(o.id); complete(o.id) }} className="w-full h-12 bg-gray-800 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Process & Package</button>
-                    <button onClick={() => printSticker(o)} className="w-full h-10 bg-white text-gray-600 rounded-xl text-xs font-semibold active:scale-[.98] transition border border-gray-200">Print Delivery Sticker</button>
+                    <p className="text-[11px] text-gray-400 font-medium pt-1">How is this order leaving?</p>
+                    <button onClick={() => {
+                      const guy = prompt('Delivery person name:')
+                      if (guy) markDispatched(o.id, guy)
+                    }} className="w-full h-11 bg-gray-900 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Send with our delivery</button>
+                    <div className="flex gap-2">
+                      <button onClick={() => markPickedUp(o.id, 'self')} className="flex-1 h-11 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold active:scale-[.98] transition">Customer pickup</button>
+                      <button onClick={() => markPickedUp(o.id, 'rider')} className="flex-1 h-11 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold active:scale-[.98] transition">Rider pickup</button>
+                    </div>
                   </>
                 )}
-                {o.deliveryStatus === 'Packaged' && (
-                  <div className="space-y-2">
-                    <p className="text-xs text-gray-400 font-medium">How is this order leaving?</p>
-                    <button onClick={() => {
-                      const guy = prompt('Delivery person name:')
-                      if (guy) markDispatched(o.id, guy)
-                    }} className="w-full h-11 bg-blue-600 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Our Delivery</button>
-                    <div className="flex gap-2">
-                      <button onClick={() => markPickedUp(o.id, 'self')} className="flex-1 h-11 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold active:scale-[.98] transition border border-gray-200">Customer Pickup</button>
-                      <button onClick={() => markPickedUp(o.id, 'rider')} className="flex-1 h-11 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold active:scale-[.98] transition border border-gray-200">Rider Pickup</button>
-                    </div>
-                    <button onClick={() => printSticker(o)} className="w-full h-10 bg-white text-gray-500 rounded-xl text-xs font-semibold active:scale-[.98] transition border border-gray-100">Print Sticker</button>
-                  </div>
-                )}
+
+                {/* Step 3: Out for delivery — show status + print sticker */}
                 {o.deliveryStatus === 'Out for Delivery' && (
-                  <div className="w-full py-3 bg-blue-50 text-blue-600 rounded-xl text-sm font-medium text-center border border-blue-100">
-                    En route — awaiting delivery confirmation
+                  <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100">
+                    <div className="text-sm font-semibold text-gray-700">Out for delivery</div>
+                    <div className="text-xs text-gray-400 mt-1">With: {o.deliveryGuy || 'delivery personnel'}</div>
+                    <div className="text-[11px] text-gray-300 mt-1">Awaiting QR scan confirmation at destination</div>
                   </div>
                 )}
+
+                {/* Final: Delivered or Picked Up */}
                 {(o.deliveryStatus === 'Delivered' || o.deliveryStatus === 'Picked Up') && (
-                  <div className="w-full py-3 bg-green-50 text-green-600 rounded-xl text-sm font-medium text-center border border-green-100">
-                    {o.deliveryStatus === 'Picked Up' ? 'Collected' : 'Delivered'}
-                  </div>
-                )}
-              </div>
-            )}
-            {o.status === 'Completed' && (
-              <div className="space-y-2 pt-2">
-                {!o.deliveryStatus && (
-                  <button onClick={() => markPackaged(o.id)} className="w-full h-11 bg-gray-500 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Mark as Packaged</button>
-                )}
-                {o.deliveryStatus === 'Packaged' && (
-                  <div className="space-y-2">
-                    <p className="text-xs text-gray-400 font-medium">How is this order leaving?</p>
-                    <button onClick={() => {
-                      const guy = prompt('Delivery person name:')
-                      if (guy) markDispatched(o.id, guy)
-                    }} className="w-full h-11 bg-blue-600 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Our Delivery</button>
-                    <div className="flex gap-2">
-                      <button onClick={() => markPickedUp(o.id, 'self')} className="flex-1 h-11 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold active:scale-[.98] transition border border-gray-200">Customer Pickup</button>
-                      <button onClick={() => markPickedUp(o.id, 'rider')} className="flex-1 h-11 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold active:scale-[.98] transition border border-gray-200">Rider Pickup</button>
+                  <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100">
+                    <div className="text-sm font-semibold text-gray-900">{o.deliveryStatus === 'Picked Up' ? 'Collected' : 'Delivered'}</div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      {o.deliveryGuy && `By: ${o.deliveryGuy}`}
+                      {o.deliveredAt && ` · ${fmtDateTime(o.deliveredAt)}`}
                     </div>
                   </div>
                 )}
-                {o.deliveryStatus === 'Out for Delivery' && (
-                  <div className="w-full py-3 bg-blue-50 text-blue-600 rounded-xl text-sm font-medium text-center border border-blue-100">
-                    En route — awaiting delivery confirmation
-                  </div>
+
+                {/* Print Sticker — always available once packaged or beyond */}
+                {o.deliveryStatus && o.deliveryStatus !== '' && (
+                  <button onClick={() => printSticker(o)} className="w-full h-10 bg-white text-gray-600 rounded-xl text-[13px] font-semibold active:scale-[.98] transition border border-gray-200">Print delivery sticker</button>
                 )}
-                {(o.deliveryStatus === 'Delivered' || o.deliveryStatus === 'Picked Up') && (
-                  <div className="w-full py-3 bg-green-50 text-green-600 rounded-xl text-sm font-medium text-center border border-green-100">
-                    {o.deliveryStatus === 'Picked Up' ? `Collected by ${o.deliveryGuy || 'customer'}` : 'Delivered'}
-                  </div>
-                )}
-                <button onClick={() => printSticker(o)} className="w-full h-10 bg-white text-gray-500 rounded-xl text-xs font-semibold active:scale-[.98] transition border border-gray-100">Print Sticker</button>
               </div>
             )}
+
             {o.status === 'Cancelled' && (
               <div className="pt-2">
-                <div className="w-full h-11 bg-red-50 text-red-600 rounded-xl text-sm font-semibold flex items-center justify-center border border-red-200">Order cancelled</div>
+                <div className="w-full py-3 bg-gray-50 text-gray-400 rounded-xl text-sm font-medium text-center border border-gray-100">Order cancelled</div>
               </div>
             )}
           </div>
