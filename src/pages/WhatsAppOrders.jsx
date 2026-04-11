@@ -9,6 +9,11 @@ export default function WhatsAppOrders() {
   const { waOrders, waFilter, setWAFilter, refreshWAOrders, user, setLoading, loadAll } = useStore()
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
+  const [editDelivery, setEditDelivery] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editAddress, setEditAddress] = useState('')
+  const [editNotes, setEditNotes] = useState('')
 
   const pending = waOrders.filter(o => o.status === 'Pending').length
   const paid = waOrders.filter(o => o.status === 'Paid').length
@@ -53,6 +58,28 @@ export default function WhatsAppOrders() {
     else window.open(`https://web.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(msg)}`, '_blank')
     try { navigator.clipboard.writeText(msg) } catch {}
     toast.success('Invoice resent')
+  }
+
+  const saveDeliveryDetails = async () => {
+    const sb = getSupabase()
+    await sb.from('whatsapp_orders').update({
+      customer_name: editName.trim(),
+      customer_phone: editPhone.trim(),
+      address: editAddress.trim(),
+      notes: editNotes.trim() || null,
+    }).eq('id', selected.id)
+    setSelected({ ...selected, customerName: editName.trim(), customerPhone: editPhone.trim(), address: editAddress.trim(), notes: editNotes.trim() })
+    setEditDelivery(false)
+    refreshWAOrders()
+    toast.success('Delivery details saved')
+  }
+
+  const startEditDelivery = (o) => {
+    setEditName(o.customerName || '')
+    setEditPhone(o.customerPhone || '')
+    setEditAddress(o.address || '')
+    setEditNotes(o.notes && o.notes !== 'Invoice from POS' && o.notes !== 'USSD order' ? o.notes : '')
+    setEditDelivery(true)
   }
 
   const copyLink = (o) => {
@@ -194,7 +221,7 @@ export default function WhatsAppOrders() {
       </div>
 
       {/* Order Detail Modal */}
-      <Modal open={!!selected} onClose={() => setSelected(null)} title="Order Details">
+      <Modal open={!!selected} onClose={() => { setSelected(null); setEditDelivery(false) }} title="Order Details">
         {o && (
           <div className="space-y-4">
             {/* Status + Order No */}
@@ -206,23 +233,51 @@ export default function WhatsAppOrders() {
               <span className={`px-4 py-1.5 rounded-full text-xs font-bold ${statusColor(o.status)}`}>{o.status}</span>
             </div>
 
-            {/* Customer Info */}
+            {/* Customer + Delivery Info */}
             <div className="bg-gray-50 rounded-xl p-4">
-              <div className="text-xs text-gray-400 uppercase tracking-wider mb-2 font-semibold">Customer</div>
-              <div className="text-sm font-bold">{o.customerName || 'Not provided'}</div>
-              <div className="text-sm text-gray-500">{o.customerPhone || '—'}</div>
-            </div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Customer & Delivery</div>
+                {!editDelivery && (
+                  <button onClick={() => startEditDelivery(o)} className="text-xs font-semibold text-gray-500 hover:text-gray-800 transition">Edit</button>
+                )}
+              </div>
 
-            {/* Delivery Details */}
-            <div className="bg-gray-50 rounded-xl p-4">
-              <div className="text-xs text-gray-400 uppercase tracking-wider mb-2 font-semibold">Delivery Details</div>
-              {o.address ? (
-                <div>
-                  <div className="text-sm font-semibold text-gray-800">{o.address}</div>
-                  {o.notes && o.notes !== 'Invoice from POS' && <div className="text-sm text-gray-500 mt-1 italic">"{o.notes}"</div>}
+              {editDelivery ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[11px] text-gray-400 block mb-1">Name</label>
+                    <input className="w-full h-10 px-3 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gray-400" value={editName} onChange={e => setEditName(e.target.value)} placeholder="Customer name" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-gray-400 block mb-1">Phone</label>
+                    <input className="w-full h-10 px-3 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gray-400" value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="0XX XXX XXXX" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-gray-400 block mb-1">Delivery Address</label>
+                    <textarea className="w-full h-20 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gray-400 resize-none" value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder="Region, city, area, landmark..." />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-gray-400 block mb-1">Notes (optional)</label>
+                    <input className="w-full h-10 px-3 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gray-400" value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="Special instructions..." />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={saveDeliveryDetails} className="flex-1 h-10 bg-gray-900 text-white rounded-lg text-sm font-semibold active:scale-[.98] transition">Save</button>
+                    <button onClick={() => setEditDelivery(false)} className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-semibold active:scale-[.98] transition">Cancel</button>
+                  </div>
                 </div>
               ) : (
-                <div className="text-sm text-gray-400">No delivery details provided yet</div>
+                <div>
+                  <div className="text-sm font-bold">{o.customerName || 'No name'}</div>
+                  <div className="text-sm text-gray-500">{o.customerPhone || 'No phone'}</div>
+                  {o.address ? (
+                    <div className="text-sm font-semibold text-gray-700 mt-2 bg-white rounded-lg p-3 border border-gray-100">{o.address}</div>
+                  ) : (
+                    <button onClick={() => startEditDelivery(o)} className="mt-2 w-full h-10 bg-white border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-400 font-medium hover:border-gray-300 hover:text-gray-500 transition">
+                      + Add delivery address
+                    </button>
+                  )}
+                  {o.notes && o.notes !== 'Invoice from POS' && o.notes !== 'USSD order' && <div className="text-xs text-gray-400 mt-2 italic">{o.notes}</div>}
+                </div>
               )}
             </div>
 
