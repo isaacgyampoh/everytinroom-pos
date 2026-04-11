@@ -35,6 +35,8 @@ export default function DeliveryConfirm() {
     }).eq('id', orderId)
     setDone(true)
     setConfirming(false)
+    // Auto-close tab after 3 seconds
+    setTimeout(() => { window.close() }, 3000)
   }
 
   if (loading) return (
@@ -56,13 +58,13 @@ export default function DeliveryConfirm() {
   if (done || order.delivery_status === 'Delivered') return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="text-center max-w-sm">
-        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+        <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-5">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Delivered</h1>
-        <p className="text-gray-500 text-sm">Order {order.order_no} has been confirmed as delivered.</p>
-        {order.delivered_at && <p className="text-gray-400 text-xs mt-2">{fmtDateTime(order.delivered_at)}</p>}
-        {(deliveryGuy || order.delivery_guy) && <p className="text-gray-400 text-xs mt-1">By: {deliveryGuy || order.delivery_guy}</p>}
+        <p className="text-gray-500 text-sm">Order {order.order_no} confirmed.</p>
+        {(deliveryGuy || order.delivery_guy) && <p className="text-gray-400 text-xs mt-2">By: {deliveryGuy || order.delivery_guy}</p>}
+        {done && <p className="text-gray-300 text-xs mt-4">This tab will close automatically...</p>}
       </div>
     </div>
   )
