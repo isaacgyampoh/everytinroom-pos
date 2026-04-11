@@ -29,6 +29,7 @@ const StockAdjustmentsPage = lazy(() => import('./pages/StockAdjustmentsPage'))
 const RestockPage = lazy(() => import('./pages/RestockPage'))
 const InvoicePay = lazy(() => import('./pages/InvoicePay'))
 const Catalog = lazy(() => import('./pages/Catalog'))
+const DeliveryConfirm = lazy(() => import('./pages/DeliveryConfirm'))
 
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000 // 30 minutes
 const ADMIN_PAGES = ['products', 'staff', 'promos', 'invoices', 'stocktakes', 'stockadjustments', 'restock']
@@ -137,6 +138,7 @@ export default function App() {
 
   // Public pages - no login required
   if (window.location.hash.includes('/pay/')) return <Suspense fallback={<Loader />}><InvoicePay /></Suspense>
+  if (window.location.hash.includes('/deliver/')) return <Suspense fallback={<Loader />}><DeliveryConfirm /></Suspense>
   if (window.location.hash.includes('/catalog')) return <Suspense fallback={<Loader />}><Catalog /></Suspense>
 
   if (loading) return <><Loader /><Toaster /></>

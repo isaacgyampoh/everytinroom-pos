@@ -61,6 +61,87 @@ export default function WhatsAppOrders() {
     toast.success('Link copied')
   }
 
+  const printSticker = (o) => {
+    const deliverUrl = window.location.origin + '/#/deliver/' + o.id
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(deliverUrl)}`
+    const trackNo = o.trackingNo || o.orderNo
+    const items = o.items || []
+
+    const w = window.open('', '_blank', 'width=400,height=600')
+    w.document.write(`<!DOCTYPE html><html><head><title>Sticker - ${o.orderNo}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Arial', sans-serif; width: 80mm; padding: 4mm; color: #000; }
+  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 3mm; margin-bottom: 3mm; }
+  .logo-text { font-size: 14px; font-weight: 900; letter-spacing: -0.5px; }
+  .tracking { font-size: 18px; font-weight: 900; font-family: monospace; margin: 2mm 0; letter-spacing: 1px; }
+  .section { margin-bottom: 3mm; }
+  .label { font-size: 8px; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-bottom: 1mm; }
+  .value { font-size: 12px; font-weight: 700; }
+  .value-sm { font-size: 10px; }
+  .address { font-size: 11px; font-weight: 700; line-height: 1.4; }
+  .divider { border-top: 1px dashed #999; margin: 3mm 0; }
+  .items { width: 100%; font-size: 9px; border-collapse: collapse; }
+  .items td { padding: 1mm 0; }
+  .items .qty { width: 20px; font-weight: 700; }
+  .items .price { text-align: right; font-weight: 700; }
+  .total-row { border-top: 1px solid #000; font-size: 13px; font-weight: 900; }
+  .qr { text-align: center; margin-top: 3mm; }
+  .qr img { width: 30mm; height: 30mm; }
+  .scan-text { font-size: 7px; text-transform: uppercase; letter-spacing: 0.5px; color: #666; margin-top: 1mm; }
+  .footer { text-align: center; font-size: 7px; color: #999; margin-top: 3mm; padding-top: 2mm; border-top: 1px solid #ddd; }
+  .barcode { text-align: center; font-family: monospace; font-size: 14px; letter-spacing: 4px; font-weight: 900; margin: 2mm 0; }
+  @media print { body { width: 80mm; } @page { size: 80mm auto; margin: 0; } }
+</style></head><body>
+
+<div class="header">
+  <div class="logo-text">EVERYTINROOM</div>
+  <div style="font-size:8px; color:#666;">024 531 5581 / 024 936 5339</div>
+</div>
+
+<div class="section" style="text-align:center;">
+  <div class="label">Tracking Number</div>
+  <div class="tracking">${trackNo}</div>
+  <div class="barcode">||||| ${trackNo.replace(/[^A-Z0-9]/g, ' ')} |||||</div>
+</div>
+
+<div class="divider"></div>
+
+<div class="section">
+  <div class="label">Ship To</div>
+  <div class="value">${o.customerName || 'Customer'}</div>
+  <div class="value-sm" style="margin-top:1mm;">${o.customerPhone || ''}</div>
+  ${o.address ? `<div class="address" style="margin-top:2mm;">${o.address}</div>` : ''}
+</div>
+
+<div class="divider"></div>
+
+<div class="section">
+  <div class="label">Order: ${o.orderNo} · ${new Date(o.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+  <table class="items">
+    ${items.map(it => `<tr><td class="qty">${it.qty}x</td><td>${it.name}</td><td class="price">GHS ${Number(it.lineTotal || it.price * it.qty).toFixed(2)}</td></tr>`).join('')}
+  </table>
+  <table class="items" style="margin-top:2mm;">
+    <tr class="total-row"><td colspan="2">TOTAL</td><td class="price">GHS ${Number(o.total).toFixed(2)}</td></tr>
+  </table>
+</div>
+
+<div class="divider"></div>
+
+<div class="qr">
+  <img src="${qrUrl}" alt="QR" />
+  <div class="scan-text">Scan to confirm delivery</div>
+</div>
+
+<div class="footer">
+  everytinroom.store · Thank you for shopping with us
+</div>
+
+<script>setTimeout(() => { window.print(); }, 500);</script>
+</body></html>`)
+    w.document.close()
+  }
+
   const statusColor = (s) => {
     const sc = s?.toLowerCase()
     if (sc === 'paid') return 'bg-emerald-500 text-white'
@@ -124,7 +205,7 @@ export default function WhatsAppOrders() {
                 </div>
                 <span className={`px-3 py-1.5 rounded-lg text-[11px] font-bold ${statusColor(order.status)}`}>{order.status}</span>
               </div>
-              <div className="text-xs text-stone-400 mb-2">{order.items.length} item{order.items.length !== 1 ? 's' : ''}{order.address ? ' · Delivery filled' : ' · No delivery details'}{order.ussdCode ? ` · USSD: *920*141*${order.ussdCode}#` : ''}</div>
+              <div className="text-xs text-stone-400 mb-2">{order.items.length} item{order.items.length !== 1 ? 's' : ''}{order.address ? ' · Delivery filled' : ' · No delivery details'}{order.ussdCode ? ` · USSD: *920*141*${order.ussdCode}#` : ''}{order.trackingNo ? ` · ${order.trackingNo}` : ''}{order.deliveryStatus === 'Delivered' ? ' · Delivered' : ''}</div>
               <div className="flex items-center justify-between pt-2.5 border-t border-stone-100">
                 <div className="text-lg font-bold">{money(order.total)}</div>
                 <span className="text-xs font-medium text-gray-700">View details</span>
@@ -218,6 +299,28 @@ export default function WhatsAppOrders() {
               </div>
             )}
 
+            {/* Delivery Tracking */}
+            {o.trackingNo && (
+              <div className="bg-gray-900 rounded-xl p-4 text-white">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <div className="text-[10px] text-gray-400 uppercase tracking-wider">Tracking</div>
+                    <div className="text-sm font-bold font-mono">{o.trackingNo}</div>
+                  </div>
+                  <div className={`px-3 py-1 rounded-lg text-[11px] font-bold ${o.deliveryStatus === 'Delivered' ? 'bg-green-500 text-white' : 'bg-amber-400 text-black'}`}>
+                    {o.deliveryStatus || 'Pending'}
+                  </div>
+                </div>
+                {o.deliveryStatus === 'Delivered' && (
+                  <div className="text-xs text-gray-400">
+                    {o.deliveryGuy && <span>By: {o.deliveryGuy}</span>}
+                    {o.deliveredAt && <span> · {fmtDateTime(o.deliveredAt)}</span>}
+                    {o.deliveryNotes && <div className="mt-1 text-gray-500">{o.deliveryNotes}</div>}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Actions */}
             {o.status === 'Pending' && (
               <div className="space-y-2 pt-2">
@@ -232,12 +335,13 @@ export default function WhatsAppOrders() {
             {o.status === 'Paid' && (
               <div className="space-y-2 pt-2">
                 <button onClick={() => complete(o.id)} className="w-full h-12 bg-gray-800 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Process Order</button>
+                <button onClick={() => printSticker(o)} className="w-full h-11 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold active:scale-[.98] transition border border-gray-200">Print Delivery Sticker</button>
                 <button onClick={() => copyLink(o)} className="w-full h-11 bg-stone-200 text-stone-700 rounded-xl text-sm font-semibold active:scale-[.98] transition">Copy Link</button>
               </div>
             )}
             {o.status === 'Completed' && (
-              <div className="pt-2">
-                <div className="w-full h-11 bg-gray-50 text-gray-800 rounded-xl text-sm font-semibold flex items-center justify-center border border-gray-200">Order completed</div>
+              <div className="space-y-2 pt-2">
+                <button onClick={() => printSticker(o)} className="w-full h-11 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold active:scale-[.98] transition border border-gray-200">Print Delivery Sticker</button>
               </div>
             )}
             {o.status === 'Cancelled' && (
