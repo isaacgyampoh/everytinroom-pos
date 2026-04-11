@@ -90,59 +90,104 @@ export default function WhatsAppOrders() {
 
   const printSticker = (o) => {
     const deliverUrl = window.location.origin + '/#/deliver/' + o.id
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(deliverUrl)}`
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(deliverUrl)}`
     const trackNo = o.trackingNo || o.orderNo
+    const orderDate = new Date(o.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 
-    const w = window.open('', '_blank', 'width=400,height=600')
-    w.document.write(`<!DOCTYPE html><html><head><title>Delivery - ${trackNo}</title>
+    const w = window.open('', '_blank', 'width=420,height=700')
+    w.document.write(`<!DOCTYPE html><html><head><title>${trackNo}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Arial', sans-serif; width: 80mm; padding: 4mm; color: #000; }
-  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 3mm; margin-bottom: 4mm; }
-  .logo-text { font-size: 15px; font-weight: 900; letter-spacing: -0.5px; }
-  .phone { font-size: 8px; color: #666; margin-top: 1mm; }
-  .tracking { font-size: 20px; font-weight: 900; font-family: monospace; letter-spacing: 1.5px; }
-  .label { font-size: 7px; text-transform: uppercase; letter-spacing: 1.5px; color: #888; margin-bottom: 1.5mm; }
-  .name { font-size: 16px; font-weight: 900; }
-  .contact { font-size: 11px; font-weight: 700; margin-top: 1.5mm; }
-  .address { font-size: 12px; font-weight: 700; line-height: 1.5; margin-top: 2mm; padding: 2.5mm; background: #f5f5f5; border-radius: 2mm; }
-  .divider { border-top: 1px dashed #bbb; margin: 4mm 0; }
-  .qr { text-align: center; margin-top: 2mm; }
-  .qr img { width: 35mm; height: 35mm; }
-  .scan-text { font-size: 7px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-top: 2mm; }
-  .order-ref { text-align: center; font-size: 8px; color: #999; margin-top: 3mm; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; width: 80mm; color: #000; }
+
+  .sticker { border: 2px solid #000; margin: 2mm; }
+
+  /* === HEADER === */
+  .head { background: #000; color: #fff; padding: 3mm 4mm; display: flex; justify-content: space-between; align-items: center; }
+  .brand { font-size: 13px; font-weight: 800; letter-spacing: 0.5px; }
+  .head-right { text-align: right; font-size: 6px; line-height: 1.6; opacity: 0.7; }
+
+  /* === TRACKING BAR === */
+  .track-bar { background: #000; color: #fff; padding: 2.5mm 4mm; text-align: center; border-top: 1px solid #333; }
+  .track-label { font-size: 6px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.5; }
+  .track-no { font-size: 18px; font-weight: 900; font-family: 'Courier New', monospace; letter-spacing: 2px; margin-top: 1mm; }
+
+  /* === FROM / TO === */
+  .ship-section { padding: 3mm 4mm; }
+  .ship-label { font-size: 6px; text-transform: uppercase; letter-spacing: 2px; color: #999; margin-bottom: 1.5mm; font-weight: 700; }
+
+  .from-box { border-bottom: 1px solid #ddd; padding-bottom: 3mm; margin-bottom: 3mm; }
+  .from-name { font-size: 9px; font-weight: 700; color: #555; }
+  .from-detail { font-size: 7px; color: #999; margin-top: 0.5mm; }
+
+  .to-name { font-size: 16px; font-weight: 900; line-height: 1.2; }
+  .to-phone { font-size: 12px; font-weight: 700; margin-top: 1.5mm; }
+  .to-address { font-size: 11px; font-weight: 600; line-height: 1.5; margin-top: 2mm; padding: 2.5mm 3mm; background: #f0f0f0; border-left: 3px solid #000; }
+
+  /* === QR SECTION === */
+  .qr-section { border-top: 2px solid #000; padding: 3mm 4mm; display: flex; align-items: center; gap: 3mm; }
+  .qr-section img { width: 28mm; height: 28mm; }
+  .qr-info { flex: 1; }
+  .qr-title { font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+  .qr-desc { font-size: 6.5px; color: #666; margin-top: 1mm; line-height: 1.4; }
+  .qr-order { font-size: 8px; font-weight: 700; margin-top: 2mm; font-family: monospace; }
+
+  /* === FOOTER === */
+  .foot { background: #f5f5f5; border-top: 1px solid #ddd; padding: 2mm 4mm; display: flex; justify-content: space-between; font-size: 6px; color: #999; }
+
   @media print { body { width: 80mm; } @page { size: 80mm auto; margin: 0; } }
 </style></head><body>
 
-<div class="header">
-  <div class="logo-text">EVERYTINROOM</div>
-  <div class="phone">024 531 5581 / 024 936 5339</div>
+<div class="sticker">
+
+  <div class="head">
+    <div class="brand">EVERYTINROOM</div>
+    <div class="head-right">
+      024 531 5581<br>
+      024 936 5339
+    </div>
+  </div>
+
+  <div class="track-bar">
+    <div class="track-label">Tracking Number</div>
+    <div class="track-no">${trackNo}</div>
+  </div>
+
+  <div class="ship-section">
+    <div class="from-box">
+      <div class="ship-label">From</div>
+      <div class="from-name">EVERYTINROOM</div>
+      <div class="from-detail">Adenta Aviation Road, Accra</div>
+      <div class="from-detail">www.everytinroom.store</div>
+    </div>
+
+    <div>
+      <div class="ship-label">Deliver To</div>
+      <div class="to-name">${(o.customerName || 'Customer').toUpperCase()}</div>
+      <div class="to-phone">${o.customerPhone || ''}</div>
+      ${o.address ? `<div class="to-address">${o.address}</div>` : ''}
+    </div>
+  </div>
+
+  <div class="qr-section">
+    <img src="${qrUrl}" alt="QR" />
+    <div class="qr-info">
+      <div class="qr-title">Delivery Confirmation</div>
+      <div class="qr-desc">Scan this QR code upon delivery to confirm receipt of package.</div>
+      <div class="qr-order">ORDER: ${o.orderNo}</div>
+      <div class="qr-order">DATE: ${orderDate}</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>everytinroom.store</span>
+    <span>Adenta Aviation Road, Accra</span>
+    <span>${orderDate}</span>
+  </div>
+
 </div>
 
-<div style="text-align:center; margin-bottom:4mm;">
-  <div class="label">Tracking Number</div>
-  <div class="tracking">${trackNo}</div>
-</div>
-
-<div class="divider"></div>
-
-<div>
-  <div class="label">Deliver To</div>
-  <div class="name">${o.customerName || 'Customer'}</div>
-  <div class="contact">${o.customerPhone || ''}</div>
-  ${o.address ? `<div class="address">${o.address}</div>` : ''}
-</div>
-
-<div class="divider"></div>
-
-<div class="qr">
-  <img src="${qrUrl}" alt="QR" />
-  <div class="scan-text">Scan to confirm delivery</div>
-</div>
-
-<div class="order-ref">Order: ${o.orderNo}</div>
-
-<script>setTimeout(() => { window.print(); }, 500);</script>
+<script>setTimeout(() => { window.print(); }, 600);</script>
 </body></html>`)
     w.document.close()
   }
