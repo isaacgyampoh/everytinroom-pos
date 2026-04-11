@@ -525,8 +525,8 @@ export default function WhatsAppOrders() {
                   </div>
                 )}
 
-                {/* Print Sticker — always available once packaged or beyond */}
-                {o.deliveryStatus && o.deliveryStatus !== '' && (
+                {/* Print Sticker — available from packaged until delivered */}
+                {o.deliveryStatus && o.deliveryStatus !== '' && o.deliveryStatus !== 'Delivered' && o.deliveryStatus !== 'Picked Up' && (
                   <button onClick={() => printSticker(o)} className="w-full h-10 bg-white text-gray-600 rounded-xl text-[13px] font-semibold active:scale-[.98] transition border border-gray-200">Print delivery sticker</button>
                 )}
               </div>
