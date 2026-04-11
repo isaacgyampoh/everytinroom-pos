@@ -46,6 +46,29 @@ export default function WhatsAppOrders() {
     setLoading(false); setSelected(null); toast('Cancelled'); refreshWAOrders()
   }
 
+  const markPackaged = async (id) => {
+    const sb = getSupabase()
+    await sb.from('whatsapp_orders').update({
+      delivery_status: 'Packaged',
+      processed_by: user?.name || '',
+      processed_at: new Date().toISOString(),
+    }).eq('id', id)
+    setSelected(s => s ? { ...s, deliveryStatus: 'Packaged' } : s)
+    refreshWAOrders()
+    toast.success('Marked as packaged')
+  }
+
+  const markDispatched = async (id, deliveryGuy) => {
+    const sb = getSupabase()
+    await sb.from('whatsapp_orders').update({
+      delivery_status: 'Out for Delivery',
+      delivery_guy: deliveryGuy,
+    }).eq('id', id)
+    setSelected(s => s ? { ...s, deliveryStatus: 'Out for Delivery', deliveryGuy } : s)
+    refreshWAOrders()
+    toast.success('Dispatched')
+  }
+
   const resendInvoice = (o) => {
     const link = window.location.origin + '/#/pay/' + o.id
     const lines = [`Hi${o.customerName ? ' ' + o.customerName : ''}, just a reminder about your order from EVERYTINROOM.`, '']
@@ -199,6 +222,13 @@ export default function WhatsAppOrders() {
     return 'bg-amber-400 text-black'
   }
 
+  const deliveryColor = (s) => {
+    if (s === 'Delivered') return 'bg-green-500 text-white'
+    if (s === 'Out for Delivery') return 'bg-blue-500 text-white'
+    if (s === 'Packaged') return 'bg-amber-500 text-white'
+    return 'bg-gray-200 text-gray-500'
+  }
+
   const o = selected // shorthand for modal
 
   return (
@@ -254,7 +284,12 @@ export default function WhatsAppOrders() {
                 </div>
                 <span className={`px-3 py-1.5 rounded-lg text-[11px] font-bold ${statusColor(order.status)}`}>{order.status}</span>
               </div>
-              <div className="text-xs text-stone-400 mb-2">{order.items.length} item{order.items.length !== 1 ? 's' : ''}{order.address ? ' · Delivery filled' : ' · No delivery details'}{order.ussdCode ? ` · USSD: *920*141*${order.ussdCode}#` : ''}{order.trackingNo ? ` · ${order.trackingNo}` : ''}{order.deliveryStatus === 'Delivered' ? ' · Delivered' : ''}</div>
+              <div className="text-xs text-stone-400 mb-2">
+                {order.items.length} item{order.items.length !== 1 ? 's' : ''}
+                {order.address ? ' · Delivery filled' : ' · No address'}
+                {order.trackingNo ? ` · ${order.trackingNo}` : ''}
+                {order.deliveryStatus ? ` · ${order.deliveryStatus}` : ''}
+              </div>
               <div className="flex items-center justify-between pt-2.5 border-t border-stone-100">
                 <div className="text-lg font-bold">{money(order.total)}</div>
                 <span className="text-xs font-medium text-gray-700">View details</span>
@@ -376,25 +411,42 @@ export default function WhatsAppOrders() {
               </div>
             )}
 
-            {/* Delivery Tracking */}
+            {/* Delivery Tracking Pipeline */}
             {o.trackingNo && (
-              <div className="bg-gray-900 rounded-xl p-4 text-white">
+              <div className="bg-gray-50 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <div className="text-[10px] text-gray-400 uppercase tracking-wider">Tracking</div>
-                    <div className="text-sm font-bold font-mono">{o.trackingNo}</div>
-                  </div>
-                  <div className={`px-3 py-1 rounded-lg text-[11px] font-bold ${o.deliveryStatus === 'Delivered' ? 'bg-green-500 text-white' : 'bg-amber-400 text-black'}`}>
-                    {o.deliveryStatus || 'Pending'}
+                  <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Delivery Tracking</div>
+                  <div className="text-xs font-bold font-mono text-gray-500">{o.trackingNo}</div>
+                </div>
+
+                {/* Pipeline steps */}
+                <div className="flex items-center gap-1 mb-3">
+                  {['Paid', 'Packaged', 'Out for Delivery', 'Delivered'].map((step, i) => {
+                    const ds = o.deliveryStatus || ''
+                    const stages = ['', 'Packaged', 'Out for Delivery', 'Delivered']
+                    const currentIdx = stages.indexOf(ds)
+                    const stepIdx = i
+                    const done = stepIdx <= currentIdx
+                    const labels = ['Paid', 'Packaged', 'Dispatched', 'Delivered']
+                    return (
+                      <div key={step} className="flex-1 flex flex-col items-center">
+                        <div className={`w-full h-[4px] rounded-full ${done ? 'bg-gray-900' : 'bg-gray-200'}`} />
+                        <div className={`text-[9px] mt-1 font-semibold ${done ? 'text-gray-900' : 'text-gray-300'}`}>{labels[i]}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Current status detail */}
+                <div className="flex items-center justify-between">
+                  <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${deliveryColor(o.deliveryStatus)}`}>
+                    {o.deliveryStatus || 'Awaiting packaging'}
+                  </span>
+                  <div className="text-right">
+                    {o.deliveryGuy && <div className="text-[11px] text-gray-500">By: {o.deliveryGuy}</div>}
+                    {o.deliveredAt && <div className="text-[10px] text-gray-400">{fmtDateTime(o.deliveredAt)}</div>}
                   </div>
                 </div>
-                {o.deliveryStatus === 'Delivered' && (
-                  <div className="text-xs text-gray-400">
-                    {o.deliveryGuy && <span>By: {o.deliveryGuy}</span>}
-                    {o.deliveredAt && <span> · {fmtDateTime(o.deliveredAt)}</span>}
-                    {o.deliveryNotes && <div className="mt-1 text-gray-500">{o.deliveryNotes}</div>}
-                  </div>
-                )}
               </div>
             )}
 
@@ -411,14 +463,56 @@ export default function WhatsAppOrders() {
             )}
             {o.status === 'Paid' && (
               <div className="space-y-2 pt-2">
-                <button onClick={() => complete(o.id)} className="w-full h-12 bg-gray-800 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Process Order</button>
-                <button onClick={() => printSticker(o)} className="w-full h-11 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold active:scale-[.98] transition border border-gray-200">Print Delivery Sticker</button>
-                <button onClick={() => copyLink(o)} className="w-full h-11 bg-stone-200 text-stone-700 rounded-xl text-sm font-semibold active:scale-[.98] transition">Copy Link</button>
+                {/* Show next action based on delivery status */}
+                {(!o.deliveryStatus || o.deliveryStatus === '') && (
+                  <>
+                    <button onClick={() => { markPackaged(o.id); complete(o.id) }} className="w-full h-12 bg-gray-800 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Process & Package</button>
+                    <button onClick={() => printSticker(o)} className="w-full h-11 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold active:scale-[.98] transition border border-gray-200">Print Delivery Sticker</button>
+                  </>
+                )}
+                {o.deliveryStatus === 'Packaged' && (
+                  <button onClick={() => {
+                    const guy = prompt('Delivery person name:')
+                    if (guy) markDispatched(o.id, guy)
+                  }} className="w-full h-12 bg-blue-600 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Dispatch (Hand to Delivery Guy)</button>
+                )}
+                {o.deliveryStatus === 'Out for Delivery' && (
+                  <div className="w-full h-11 bg-blue-50 text-blue-600 rounded-xl text-sm font-semibold flex items-center justify-center border border-blue-200">
+                    Out for delivery — waiting for QR scan confirmation
+                  </div>
+                )}
+                {o.deliveryStatus === 'Delivered' && (
+                  <div className="w-full h-11 bg-green-50 text-green-600 rounded-xl text-sm font-semibold flex items-center justify-center border border-green-200">
+                    Delivered
+                  </div>
+                )}
+                <button onClick={() => printSticker(o)} className="w-full h-10 bg-white text-gray-600 rounded-xl text-xs font-semibold active:scale-[.98] transition border border-gray-200">Print Sticker</button>
               </div>
             )}
             {o.status === 'Completed' && (
               <div className="space-y-2 pt-2">
-                <button onClick={() => printSticker(o)} className="w-full h-11 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold active:scale-[.98] transition border border-gray-200">Print Delivery Sticker</button>
+                {(!o.deliveryStatus || o.deliveryStatus === '' || o.deliveryStatus === 'Packaged') && (
+                  <>
+                    {!o.deliveryStatus && <button onClick={() => markPackaged(o.id)} className="w-full h-11 bg-amber-500 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Mark as Packaged</button>}
+                    {o.deliveryStatus === 'Packaged' && (
+                      <button onClick={() => {
+                        const guy = prompt('Delivery person name:')
+                        if (guy) markDispatched(o.id, guy)
+                      }} className="w-full h-12 bg-blue-600 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Dispatch (Hand to Delivery Guy)</button>
+                    )}
+                  </>
+                )}
+                {o.deliveryStatus === 'Out for Delivery' && (
+                  <div className="w-full h-11 bg-blue-50 text-blue-600 rounded-xl text-sm font-semibold flex items-center justify-center border border-blue-200">
+                    Out for delivery — waiting for QR scan
+                  </div>
+                )}
+                {o.deliveryStatus === 'Delivered' && (
+                  <div className="w-full h-11 bg-green-50 text-green-600 rounded-xl text-sm font-semibold flex items-center justify-center border border-green-200">
+                    Delivered successfully
+                  </div>
+                )}
+                <button onClick={() => printSticker(o)} className="w-full h-10 bg-white text-gray-600 rounded-xl text-xs font-semibold active:scale-[.98] transition border border-gray-200">Print Sticker</button>
               </div>
             )}
             {o.status === 'Cancelled' && (
