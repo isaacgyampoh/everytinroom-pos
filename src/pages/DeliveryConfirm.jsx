@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getSupabase } from '../lib/supabase'
-import { money, fmtDateTime } from '../lib/utils'
+import { fmtDateTime } from '../lib/utils'
 
 export default function DeliveryConfirm() {
   const [order, setOrder] = useState(null)
@@ -94,26 +94,12 @@ export default function DeliveryConfirm() {
           <div className="p-4 border-b border-gray-50">
             <div className="text-xs text-gray-400 mb-1">Order</div>
             <div className="text-lg font-bold">{order.order_no}</div>
-            <div className="text-xs text-gray-400 mt-1">{fmtDateTime(order.date)}</div>
-          </div>
-          <div className="p-4 border-b border-gray-50">
-            <div className="text-xs text-gray-400 mb-1">Customer</div>
-            <div className="text-sm font-semibold">{order.customer_name || 'Customer'}</div>
-            <div className="text-sm text-gray-500">{order.customer_phone}</div>
-            {order.address && <div className="text-sm text-gray-500 mt-1">{order.address}</div>}
           </div>
           <div className="p-4">
-            <div className="text-xs text-gray-400 mb-2">Items</div>
-            {(typeof order.items === 'string' ? JSON.parse(order.items) : order.items || []).map((it, i) => (
-              <div key={i} className="flex justify-between text-sm py-1.5">
-                <span className="text-gray-700">{it.qty}x {it.name}</span>
-                <span className="font-semibold">{money(it.lineTotal || it.price * it.qty)}</span>
-              </div>
-            ))}
-            <div className="flex justify-between text-base font-bold pt-3 mt-2 border-t border-gray-100">
-              <span>Total</span>
-              <span>{money(order.total)}</span>
-            </div>
+            <div className="text-xs text-gray-400 mb-1">Deliver To</div>
+            <div className="text-base font-bold">{order.customer_name || 'Customer'}</div>
+            <div className="text-sm text-gray-500 mt-1">{order.customer_phone}</div>
+            {order.address && <div className="text-sm font-semibold text-gray-700 mt-2 bg-gray-50 rounded-xl p-3">{order.address}</div>}
           </div>
         </div>
 

@@ -63,67 +63,47 @@ export default function WhatsAppOrders() {
 
   const printSticker = (o) => {
     const deliverUrl = window.location.origin + '/#/deliver/' + o.id
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(deliverUrl)}`
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(deliverUrl)}`
     const trackNo = o.trackingNo || o.orderNo
-    const items = o.items || []
 
     const w = window.open('', '_blank', 'width=400,height=600')
-    w.document.write(`<!DOCTYPE html><html><head><title>Sticker - ${o.orderNo}</title>
+    w.document.write(`<!DOCTYPE html><html><head><title>Delivery - ${trackNo}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Arial', sans-serif; width: 80mm; padding: 4mm; color: #000; }
-  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 3mm; margin-bottom: 3mm; }
-  .logo-text { font-size: 14px; font-weight: 900; letter-spacing: -0.5px; }
-  .tracking { font-size: 18px; font-weight: 900; font-family: monospace; margin: 2mm 0; letter-spacing: 1px; }
-  .section { margin-bottom: 3mm; }
-  .label { font-size: 8px; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-bottom: 1mm; }
-  .value { font-size: 12px; font-weight: 700; }
-  .value-sm { font-size: 10px; }
-  .address { font-size: 11px; font-weight: 700; line-height: 1.4; }
-  .divider { border-top: 1px dashed #999; margin: 3mm 0; }
-  .items { width: 100%; font-size: 9px; border-collapse: collapse; }
-  .items td { padding: 1mm 0; }
-  .items .qty { width: 20px; font-weight: 700; }
-  .items .price { text-align: right; font-weight: 700; }
-  .total-row { border-top: 1px solid #000; font-size: 13px; font-weight: 900; }
-  .qr { text-align: center; margin-top: 3mm; }
-  .qr img { width: 30mm; height: 30mm; }
-  .scan-text { font-size: 7px; text-transform: uppercase; letter-spacing: 0.5px; color: #666; margin-top: 1mm; }
-  .footer { text-align: center; font-size: 7px; color: #999; margin-top: 3mm; padding-top: 2mm; border-top: 1px solid #ddd; }
-  .barcode { text-align: center; font-family: monospace; font-size: 14px; letter-spacing: 4px; font-weight: 900; margin: 2mm 0; }
+  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 3mm; margin-bottom: 4mm; }
+  .logo-text { font-size: 15px; font-weight: 900; letter-spacing: -0.5px; }
+  .phone { font-size: 8px; color: #666; margin-top: 1mm; }
+  .tracking { font-size: 20px; font-weight: 900; font-family: monospace; letter-spacing: 1.5px; }
+  .label { font-size: 7px; text-transform: uppercase; letter-spacing: 1.5px; color: #888; margin-bottom: 1.5mm; }
+  .name { font-size: 16px; font-weight: 900; }
+  .contact { font-size: 11px; font-weight: 700; margin-top: 1.5mm; }
+  .address { font-size: 12px; font-weight: 700; line-height: 1.5; margin-top: 2mm; padding: 2.5mm; background: #f5f5f5; border-radius: 2mm; }
+  .divider { border-top: 1px dashed #bbb; margin: 4mm 0; }
+  .qr { text-align: center; margin-top: 2mm; }
+  .qr img { width: 35mm; height: 35mm; }
+  .scan-text { font-size: 7px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-top: 2mm; }
+  .order-ref { text-align: center; font-size: 8px; color: #999; margin-top: 3mm; }
   @media print { body { width: 80mm; } @page { size: 80mm auto; margin: 0; } }
 </style></head><body>
 
 <div class="header">
   <div class="logo-text">EVERYTINROOM</div>
-  <div style="font-size:8px; color:#666;">024 531 5581 / 024 936 5339</div>
+  <div class="phone">024 531 5581 / 024 936 5339</div>
 </div>
 
-<div class="section" style="text-align:center;">
+<div style="text-align:center; margin-bottom:4mm;">
   <div class="label">Tracking Number</div>
   <div class="tracking">${trackNo}</div>
-  <div class="barcode">||||| ${trackNo.replace(/[^A-Z0-9]/g, ' ')} |||||</div>
 </div>
 
 <div class="divider"></div>
 
-<div class="section">
-  <div class="label">Ship To</div>
-  <div class="value">${o.customerName || 'Customer'}</div>
-  <div class="value-sm" style="margin-top:1mm;">${o.customerPhone || ''}</div>
-  ${o.address ? `<div class="address" style="margin-top:2mm;">${o.address}</div>` : ''}
-</div>
-
-<div class="divider"></div>
-
-<div class="section">
-  <div class="label">Order: ${o.orderNo} · ${new Date(o.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-  <table class="items">
-    ${items.map(it => `<tr><td class="qty">${it.qty}x</td><td>${it.name}</td><td class="price">GHS ${Number(it.lineTotal || it.price * it.qty).toFixed(2)}</td></tr>`).join('')}
-  </table>
-  <table class="items" style="margin-top:2mm;">
-    <tr class="total-row"><td colspan="2">TOTAL</td><td class="price">GHS ${Number(o.total).toFixed(2)}</td></tr>
-  </table>
+<div>
+  <div class="label">Deliver To</div>
+  <div class="name">${o.customerName || 'Customer'}</div>
+  <div class="contact">${o.customerPhone || ''}</div>
+  ${o.address ? `<div class="address">${o.address}</div>` : ''}
 </div>
 
 <div class="divider"></div>
@@ -133,9 +113,7 @@ export default function WhatsAppOrders() {
   <div class="scan-text">Scan to confirm delivery</div>
 </div>
 
-<div class="footer">
-  everytinroom.store · Thank you for shopping with us
-</div>
+<div class="order-ref">Order: ${o.orderNo}</div>
 
 <script>setTimeout(() => { window.print(); }, 500);</script>
 </body></html>`)
