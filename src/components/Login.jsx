@@ -43,15 +43,14 @@ export default function Login() {
 
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-white px-6">
+      <div className="w-full max-w-[380px] text-center">
 
-      <div className="w-full max-w-[340px] text-center">
-
-        {/* Logo */}
-        <div className="mb-10">
-          <img src="/logo.png" alt="EverytnRoom" className="w-[140px] h-[140px] mx-auto object-contain" />
+        {/* Logo — clean, no background */}
+        <div className="mb-12">
+          <img src="/logo.png" alt="EverytnRoom" className="h-[48px] md:h-[56px] mx-auto object-contain" />
         </div>
 
-        {/* PIN section */}
+        {/* PIN */}
         <div>
           <p className="text-gray-400 text-[15px] mb-7">Enter your staff PIN</p>
 
