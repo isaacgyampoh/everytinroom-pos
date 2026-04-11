@@ -42,39 +42,42 @@ export default function Login() {
   const filled = pins.filter(p => p).length
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center" style={{ background: '#0A0A0A' }}>
+    <div className="fixed inset-0 z-[1000] flex flex-col overflow-hidden">
       
-      {/* Background pattern */}
-      <div className="absolute inset-0 opacity-[0.03]" style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-      }} />
-
-      <div className="relative z-10 w-full max-w-[380px] mx-6">
+      {/* Top section — vibrant gradient with logo */}
+      <div className="relative flex-1 flex flex-col items-center justify-center px-6" style={{
+        background: 'linear-gradient(145deg, #FF8C42 0%, #FF6B35 25%, #E85D26 50%, #D4472A 75%, #C13525 100%)'
+      }}>
+        {/* Soft overlay shapes */}
+        <div className="absolute top-[-20%] right-[-15%] w-[60vw] h-[60vw] rounded-full" style={{ background: 'radial-gradient(circle, rgba(255,200,100,0.3) 0%, transparent 70%)' }} />
+        <div className="absolute bottom-[-10%] left-[-20%] w-[50vw] h-[50vw] rounded-full" style={{ background: 'radial-gradient(circle, rgba(255,107,53,0.4) 0%, transparent 70%)' }} />
         
-        {/* Logo card */}
-        <div className="text-center mb-8">
-          <div className="w-[100px] h-[100px] mx-auto mb-5 rounded-[22px] overflow-hidden shadow-2xl shadow-white/5 border border-white/[0.06]">
-            <img src="/logo.png" alt="EverytnRoom" className="w-full h-full object-cover" />
+        <div className="relative z-10 text-center">
+          <div className="w-[120px] h-[120px] mx-auto mb-6 rounded-[28px] overflow-hidden bg-white/20 backdrop-blur-sm p-1">
+            <img src="/logo.png" alt="EverytnRoom" className="w-full h-full rounded-[24px] object-cover" />
           </div>
-          <h1 className="text-white text-[24px] font-bold tracking-[-0.02em]" style={{ fontFamily: 'Outfit, sans-serif' }}>
-            EVERYTINROOM
+          <h1 className="text-white text-[28px] font-bold tracking-[-0.02em] drop-shadow-sm" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            EverytnRoom
           </h1>
-          <p className="text-white/25 text-[13px] mt-1 font-medium tracking-wide">POINT OF SALE</p>
+          <p className="text-white/70 text-[14px] mt-1 font-medium">Your One Stop Shop</p>
         </div>
+      </div>
 
-        {/* PIN card */}
-        <div className="bg-white/[0.04] border border-white/[0.06] rounded-[20px] p-7">
+      {/* Bottom section — white card with PIN */}
+      <div className="bg-white rounded-t-[32px] -mt-6 relative z-20 px-6 pt-8 pb-10 safe-bottom">
+        <div className="max-w-[360px] mx-auto">
           
-          <p className="text-white/40 text-[14px] font-medium text-center mb-6">Enter your 4-digit PIN</p>
+          <h2 className="text-[20px] font-bold text-gray-900 text-center mb-1" style={{ fontFamily: 'Outfit, sans-serif' }}>Welcome back</h2>
+          <p className="text-gray-400 text-[14px] text-center mb-7">Enter your staff PIN to continue</p>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-2.5 rounded-xl mb-5 text-[13px] font-medium text-center">
-              Incorrect PIN. Try again.
+            <div className="bg-red-50 border border-red-100 text-red-500 px-4 py-3 rounded-2xl mb-5 text-[13px] font-medium text-center">
+              Incorrect PIN. Please try again.
             </div>
           )}
 
           {/* PIN inputs */}
-          <div className="flex gap-3.5 justify-center mb-7">
+          <div className="flex gap-3.5 justify-center mb-6">
             {pins.map((v, i) => (
               <div key={i} className="relative">
                 <input
@@ -83,21 +86,24 @@ export default function Login() {
                   inputMode="numeric"
                   maxLength={1}
                   value={v}
-                  className="w-[64px] h-[64px] rounded-[14px] text-[22px] font-semibold text-center text-transparent bg-white/[0.05] border-2 focus:outline-none transition-all duration-200"
+                  className="w-[62px] h-[62px] rounded-2xl text-[22px] font-bold text-center bg-gray-50 border-2 focus:outline-none transition-all duration-200"
                   style={{
-                    borderColor: v ? '#fff' : i === filled ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)',
+                    borderColor: v ? '#FF6B35' : i === filled ? '#FFB088' : '#f0f0f0',
+                    color: 'transparent',
+                    caretColor: 'transparent',
+                    background: v ? '#FFF5F0' : '#f8f8f7',
                   }}
                   onChange={e => handleInput(i, e.target.value)}
                   onKeyDown={e => handleKeyDown(i, e)}
                 />
                 {v && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-[14px] h-[14px] rounded-full bg-white" />
+                    <div className="w-[14px] h-[14px] rounded-full" style={{ background: '#FF6B35' }} />
                   </div>
                 )}
                 {!v && i === filled && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-[2px] h-6 bg-white/30 animate-pulse" />
+                    <div className="w-[2px] h-6 rounded-full animate-pulse" style={{ background: '#FFB088' }} />
                   </div>
                 )}
               </div>
@@ -105,24 +111,21 @@ export default function Login() {
           </div>
 
           {/* Progress */}
-          <div className="flex justify-center gap-2">
+          <div className="flex justify-center gap-1.5 mb-2">
             {[0,1,2,3].map(i => (
-              <div key={i} className="h-[3px] rounded-full transition-all duration-300" style={{
+              <div key={i} className="h-[4px] rounded-full transition-all duration-300" style={{
                 width: pins[i] ? 28 : 14,
-                background: pins[i] ? '#fff' : 'rgba(255,255,255,0.1)'
+                background: pins[i] ? '#FF6B35' : '#f0f0f0'
               }} />
             ))}
           </div>
 
           {loading && (
             <div className="flex justify-center mt-6">
-              <div className="w-5 h-5 border-2 border-white/10 border-t-white rounded-full animate-spin" />
+              <div className="w-6 h-6 border-[2.5px] border-orange-100 border-t-[#FF6B35] rounded-full animate-spin" />
             </div>
           )}
         </div>
-
-        {/* Footer */}
-        <p className="text-white/10 text-[11px] text-center mt-6 tracking-wider">SECURED ACCESS</p>
       </div>
     </div>
   )
