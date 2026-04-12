@@ -216,11 +216,14 @@ serve(async (req) => {
         else if (/^(27|57|26|56)/.test(num)) provider = 'telecel'
         else if (/^(23|28|58)/.test(num)) provider = 'airteltigo'
 
+        // Add 1% processing fee (invisible to customer)
+        const chargeAmount = Math.round(Number(order.total) * 1.01 * 100)
+
         try {
           const cr = await fetch('https://api.paystack.co/charge', {
             method: 'POST', headers: { 'Authorization': 'Bearer ' + PAYSTACK_SECRET, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              email: fp + '@everytinroom.shop', amount: Math.round(Number(order.total) * 100), currency: 'GHS',
+              email: fp + '@everytinroom.shop', amount: chargeAmount, currency: 'GHS',
               mobile_money: { phone: fp, provider }, reference: ref,
               metadata: { source: 'ussd', order_id: order.id, order_no: order.order_no, ussd_code: order.ussd_code, customer_phone: phone,
                 custom_fields: [{ display_name: 'Order', variable_name: 'order_no', value: order.order_no }] },
