@@ -210,6 +210,9 @@ serve(async (req) => {
         else if (/^(27|57|26|56)/.test(num)) channel = 'vodafone-gh'
         else if (/^(23|28|58)/.test(num)) channel = 'tigo-gh'
 
+        // Hubtel needs phone as 0XXXXXXXXX (10 digits)
+        const hubtelPhone = '0' + num
+
         // Add 1% processing fee (invisible to customer)
         const chargeAmount = Number((Number(order.total) * 1.01).toFixed(2))
 
@@ -217,23 +220,24 @@ serve(async (req) => {
         const callbackUrl = `https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=hubtel-callback`
 
         try {
-          console.log(`Hubtel charge: ${fp} ${chargeAmount} ${channel} ref:${ref}`)
+          console.log(`Hubtel charge: phone=${hubtelPhone} amount=${chargeAmount} channel=${channel} ref=${ref}`)
           const cr = await fetch(`https://devp-reqsendmoney-230dc-api.hubtel.com/request-money/${HUBTEL_ACCOUNT}`, {
             method: 'POST',
             headers: {
               'Authorization': HUBTEL_AUTH,
               'Content-Type': 'application/json',
+              'Accept': 'application/json',
             },
             body: JSON.stringify({
               CustomerName: order.customer_name || 'Customer',
-              CustomerMsisdn: fp,
+              CustomerMsisdn: hubtelPhone,
               CustomerEmail: fp + '@everytinroom.shop',
               Channel: channel,
               Amount: chargeAmount,
               PrimaryCallbackUrl: callbackUrl,
               SecondaryCallbackUrl: callbackUrl,
               ClientReference: ref,
-              Description: `Payment for order ${order.order_no}`,
+              Description: `Order ${order.order_no}`,
             }),
           })
           const cd = await cr.json()
