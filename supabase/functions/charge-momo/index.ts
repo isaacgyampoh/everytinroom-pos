@@ -221,7 +221,7 @@ serve(async (req) => {
 
         try {
           console.log(`Hubtel charge: phone=${hubtelPhone} amount=${chargeAmount} channel=${channel} ref=${ref}`)
-          const cr = await fetch(`https://devp-reqsendmoney-230dc-api.hubtel.com/request-money/${HUBTEL_ACCOUNT}`, {
+          const cr = await fetch(`https://api.hubtel.com/v1/merchantaccount/merchants/${HUBTEL_ACCOUNT}/receive/mobilemoney`, {
             method: 'POST',
             headers: {
               'Authorization': HUBTEL_AUTH,
