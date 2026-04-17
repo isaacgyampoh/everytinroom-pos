@@ -198,7 +198,7 @@ export default function WhatsAppOrders() {
   <div class="ship">
     <div class="from">
       <div class="from-label">From Sender</div>
-      <div class="from-val">EverytnRoom &bull; Adenta Aviation Road, Accra</div>
+      <div class="from-val">EverytnRoom &bull; Aviation Road J382, Adenta, Accra</div>
     </div>
 
     <div class="to-label">Deliver To Recipient</div>

@@ -97,7 +97,10 @@ export default function Catalog() {
       {/* Hero */}
       <div className="bg-green-900 relative overflow-hidden cat-hero">
         <div className="max-w-6xl mx-auto px-4 py-12 md:py-16 relative z-10">
-          <p className="text-green-400 text-xs font-semibold tracking-[0.2em] uppercase mb-3">{SHOP.address}</p>
+          <a href={SHOP.mapsUrl} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 text-green-400 text-xs font-semibold tracking-[0.2em] uppercase mb-3 hover:text-green-300 transition">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            {SHOP.address}
+          </a>
           <h1 className="text-white text-3xl md:text-5xl font-bold leading-tight mb-3" style={{ fontFamily: "'Playfair Display', serif" }}>Home essentials,<br />delivered to you.</h1>
           <p className="text-green-300/60 text-sm md:text-base max-w-md mb-6">Quality cookware, curtains, bedding and more. Nationwide delivery across Ghana.</p>
           <div className="relative max-w-lg">
@@ -181,8 +184,12 @@ export default function Catalog() {
             <div>
               <h4 className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-3">Contact</h4>
               <div className="flex flex-col gap-2 text-xs text-stone-400">
-                <span>{SHOP.phone}</span>
-                <span>{SHOP.address}</span>
+                <a href={`tel:${SHOP.phone.split('/')[0].trim().replace(/\s/g, '')}`} className="hover:text-white transition">{SHOP.phone}</a>
+                <a href={SHOP.mapsUrl} target="_blank" rel="noopener" className="hover:text-white transition flex items-center gap-1.5">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  {SHOP.addressFull}
+                </a>
+                <p className="text-stone-600 text-[10px]">Yango / Bolt / Uber: {SHOP.yango}</p>
               </div>
             </div>
           </div>
