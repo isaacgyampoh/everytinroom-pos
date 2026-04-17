@@ -8,6 +8,12 @@ const MNOTIFY_API_KEY = Deno.env.get('MNOTIFY_API_KEY') || 'WjANNXLuG7PTy8WsK6Wu
 const MNOTIFY_SENDER_ID = Deno.env.get('MNOTIFY_SENDER_ID') || 'EverytinRM'
 const SHOP = 'EVERYTINROOM'
 
+// Hubtel credentials
+const HUBTEL_API_ID = '36o8qqn'
+const HUBTEL_API_KEY = '6e4657d73cc44e219d4e0a078a9c7d3f'
+const HUBTEL_ACCOUNT = '3746821'
+const HUBTEL_AUTH = 'Basic ' + btoa(HUBTEL_API_ID + ':' + HUBTEL_API_KEY)
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -164,29 +170,9 @@ serve(async (req) => {
       const step = sess?.step || ''
       const isMenuChoice = userData === '1' || userData === '2'
 
-      // OTP step
-      if (step === 'otp' && userData && sess?.paystack_ref) {
-        console.log('OTP submit:', userData.trim(), 'ref:', sess.paystack_ref)
-        try {
-          const r = await fetch('https://api.paystack.co/charge/submit_otp', {
-            method: 'POST', headers: { 'Authorization': 'Bearer ' + PAYSTACK_SECRET, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ otp: userData.trim(), reference: sess.paystack_ref }),
-          })
-          const d = await r.json()
-          console.log('OTP result:', JSON.stringify(d))
-          await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
-          if (d.data?.status === 'success') {
-            await supabase.from('whatsapp_orders').update({ status: 'Paid', paid_at: new Date().toISOString() }).eq('paystack_ref', sess.paystack_ref)
-            return ussdEnd(`Payment successful!\nOrder: ${sess.order_no}\nThank you!`)
-          }
-          if (d.data?.status === 'failed') return ussdEnd(`Payment failed.\nDial *920*141*${sess.order_code}# to retry.`)
-          return ussdEnd(`Payment processing.\nYou will receive confirmation.\nThank you!`)
-        } catch (e) { return ussdEnd(`Error. Dial *920*141*${sess.order_code}# to retry.`) }
-      }
-
       // Extract order code
       let orderCode = ''
-      if (!isMenuChoice && userData && step !== 'otp') {
+      if (!isMenuChoice && userData) {
         const parts = userData.replace(/#/g, '').split('*').filter(Boolean)
         const idx = parts.indexOf('141')
         if (idx >= 0 && parts[idx + 1] && /^\d+$/.test(parts[idx + 1])) orderCode = parts[idx + 1]
@@ -211,59 +197,65 @@ serve(async (req) => {
 
       const total = Number(order.total).toFixed(2)
 
-      // Pay Now
+      // Pay Now — using Hubtel direct MoMo (sends prompt directly, no OTP)
       if (userData === '1') {
         let fp = phone.replace(/\s+/g, '').replace(/^0/, '233').replace(/^\+/, '')
         if (!fp.startsWith('233')) fp = '233' + fp
         const ref = `USSD-${order.ussd_code}-${Date.now().toString(36).toUpperCase()}`
+
+        // Detect Hubtel channel from phone number
         const num = fp.replace('233', '')
-        let provider = 'mtn'
-        if (/^(20|50|24|25|53|54|55|59)/.test(num)) provider = 'mtn'
-        else if (/^(27|57|26|56)/.test(num)) provider = 'telecel'
-        else if (/^(23|28|58)/.test(num)) provider = 'airteltigo'
+        let channel = 'mtn-gh'
+        if (/^(20|50|24|25|53|54|55|59)/.test(num)) channel = 'mtn-gh'
+        else if (/^(27|57|26|56)/.test(num)) channel = 'vodafone-gh'
+        else if (/^(23|28|58)/.test(num)) channel = 'tigo-gh'
 
         // Add 1% processing fee (invisible to customer)
-        const chargeAmount = Math.round(Number(order.total) * 1.01 * 100)
+        const chargeAmount = Number((Number(order.total) * 1.01).toFixed(2))
+
+        // Hubtel callback URL
+        const callbackUrl = `https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=hubtel-callback`
 
         try {
-          const cr = await fetch('https://api.paystack.co/charge', {
-            method: 'POST', headers: { 'Authorization': 'Bearer ' + PAYSTACK_SECRET, 'Content-Type': 'application/json' },
+          console.log(`Hubtel charge: ${fp} ${chargeAmount} ${channel} ref:${ref}`)
+          const cr = await fetch(`https://devp-reqsendmoney-230dc-api.hubtel.com/request-money/${HUBTEL_ACCOUNT}`, {
+            method: 'POST',
+            headers: {
+              'Authorization': HUBTEL_AUTH,
+              'Content-Type': 'application/json',
+            },
             body: JSON.stringify({
-              email: fp + '@everytinroom.shop', amount: chargeAmount, currency: 'GHS',
-              mobile_money: { phone: fp, provider }, reference: ref,
-              metadata: { source: 'ussd', order_id: order.id, order_no: order.order_no, ussd_code: order.ussd_code, customer_phone: phone,
-                custom_fields: [{ display_name: 'Order', variable_name: 'order_no', value: order.order_no }] },
+              CustomerName: order.customer_name || 'Customer',
+              CustomerMsisdn: fp,
+              CustomerEmail: fp + '@everytinroom.shop',
+              Channel: channel,
+              Amount: chargeAmount,
+              PrimaryCallbackUrl: callbackUrl,
+              SecondaryCallbackUrl: callbackUrl,
+              ClientReference: ref,
+              Description: `Payment for order ${order.order_no}`,
             }),
           })
           const cd = await cr.json()
-          console.log('Paystack charge:', JSON.stringify(cd))
-          await supabase.from('whatsapp_orders').update({ paystack_ref: ref, customer_phone: phone }).eq('id', order.id)
+          console.log('Hubtel response:', JSON.stringify(cd))
 
-          if (cd.data?.status === 'send_otp') {
-            await supabase.from('ussd_sessions').upsert({
-              session_id: sessionId, order_code: orderCode, phone, step: 'otp', paystack_ref: ref, order_no: order.order_no, updated_at: new Date().toISOString()
-            }, { onConflict: 'session_id' })
-            return ussdCon(`An OTP has been sent to your phone via SMS.\n\nEnter the code:`)
+          // Save reference to order
+          await supabase.from('whatsapp_orders').update({ paystack_ref: ref, customer_phone: phone }).eq('id', order.id)
+          if (sessionId) await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
+
+          // Hubtel returns ResponseCode "0000" for success
+          if (cd.ResponseCode === '0000' || cd.ResponseCode === '0001' || cd.status === 200) {
+            return ussdEnd(`GHS ${total} for ${order.order_no}\n\nA payment prompt has been sent to your phone.\n\nApprove with your MoMo PIN.\n\nThank you!`)
           }
-          if (cd.data?.status === 'success') {
-            await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
-            await supabase.from('whatsapp_orders').update({ status: 'Paid', paid_at: new Date().toISOString() }).eq('id', order.id)
-            return ussdEnd(`Payment of GHS ${total} successful!\nOrder: ${order.order_no}\nThank you!`)
-          }
-          if (cd.data?.status === 'pay_offline' || cd.data?.status === 'pending') {
-            await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
-            return ussdEnd(`GHS ${total} for ${order.order_no}\n\nApprove on your phone.\nDial *170# > Approvals.\nThank you!`)
-          }
-          if (cd.data?.status === 'failed') {
-            await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
-            return ussdEnd(`Payment failed: ${cd.data?.gateway_response || 'Error'}\nCall 024 531 5581`)
-          }
-          await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
-          if (cd.status) return ussdEnd(`GHS ${total} for ${order.order_no}\nPayment processing.\nThank you!`)
-          return ussdEnd(`Error: ${cd.message || 'Failed'}\nCall 024 531 5581`)
+
+          // Handle errors
+          const errMsg = cd.Data?.Description || cd.Message || cd.message || 'Payment failed'
+          console.error('Hubtel error:', errMsg)
+          return ussdEnd(`Payment error: ${errMsg}\n\nDial *920*141*${orderCode}# to retry.\nOr call 024 531 5581`)
         } catch (e) {
-          await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
-          return ussdEnd(`Payment error. Call 024 531 5581`)
+          console.error('Hubtel exception:', e)
+          if (sessionId) await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
+          return ussdEnd(`Payment error.\nDial *920*141*${orderCode}# to retry.\nCall 024 531 5581`)
         }
       }
 
@@ -276,6 +268,49 @@ serve(async (req) => {
       // Show order
       const name = order.customer_name ? `\n${order.customer_name}` : ''
       return ussdCon(`${SHOP}${name}\nOrder: ${order.order_no}\n\nTotal: GHS ${total}\n\n1. Pay Now\n2. Cancel`)
+    }
+
+    // ==================== HUBTEL CALLBACK ====================
+    if (action === 'hubtel-callback') {
+      const body = await req.json()
+      console.log('HUBTEL CALLBACK:', JSON.stringify(body))
+
+      const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+      const ADMIN_PHONES = '0533547740,0548124978,0554808341'
+
+      const ref = body.ClientReference || body.Data?.ClientReference || ''
+      const status = body.ResponseCode || body.Data?.ResponseCode || ''
+      const desc = body.Data?.Description || body.Description || ''
+
+      console.log(`Hubtel callback: ref=${ref} status=${status} desc=${desc}`)
+
+      if (status === '0000' && ref) {
+        // Payment successful — find and update order
+        const { data: o } = await supabase.from('whatsapp_orders')
+          .select('id,order_no,total,customer_phone,customer_name')
+          .eq('paystack_ref', ref).single()
+
+        if (o) {
+          await supabase.from('whatsapp_orders').update({
+            status: 'Paid',
+            paid_at: new Date().toISOString(),
+          }).eq('id', o.id)
+
+          console.log('Hubtel payment confirmed:', o.order_no)
+          const amount = Number(o.total).toFixed(2)
+
+          // SMS to admin
+          try { await sendSMS(ADMIN_PHONES, `Payment received. ${o.order_no} GHS ${amount}. Process ASAP.`) } catch {}
+          // SMS to customer
+          if (o.customer_phone) {
+            try { await sendSMS(o.customer_phone, `Hi ${o.customer_name || 'Customer'}, your payment of GHS ${amount} has been received.\n\nOrder: ${o.order_no}\n\nYour order will be processed and delivered shortly.\n\nEVERYTINROOM\n024 531 5581`) } catch {}
+          }
+        }
+      } else {
+        console.log('Hubtel callback - not successful:', status, desc)
+      }
+
+      return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } })
     }
 
     // ==================== Initialize ====================
