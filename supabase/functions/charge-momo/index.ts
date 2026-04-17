@@ -9,10 +9,8 @@ const MNOTIFY_SENDER_ID = Deno.env.get('MNOTIFY_SENDER_ID') || 'EverytinRM'
 const SHOP = 'EVERYTINROOM'
 
 // Hubtel credentials
-const HUBTEL_API_ID = '36o8qqn'
-const HUBTEL_API_KEY = '6e4657d73cc44e219d4e0a078a9c7d3f'
-const HUBTEL_ACCOUNT = '3746821'
-const HUBTEL_AUTH = 'Basic ' + btoa(HUBTEL_API_ID + ':' + HUBTEL_API_KEY)
+const HUBTEL_PROXY_URL = 'https://hubtel-proxy.nanagyams99.workers.dev'
+const HUBTEL_PROXY_KEY = 'etr-hubtel-2026'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -221,12 +219,11 @@ serve(async (req) => {
 
         try {
           console.log(`Hubtel charge: phone=${hubtelPhone} amount=${chargeAmount} channel=${channel} ref=${ref}`)
-          const cr = await fetch(`https://api.hubtel.com/v1/merchantaccount/merchants/${HUBTEL_ACCOUNT}/receive/mobilemoney`, {
+          const cr = await fetch(HUBTEL_PROXY_URL, {
             method: 'POST',
             headers: {
-              'Authorization': HUBTEL_AUTH,
               'Content-Type': 'application/json',
-              'Accept': 'application/json',
+              'X-Proxy-Key': HUBTEL_PROXY_KEY,
             },
             body: JSON.stringify({
               CustomerName: order.customer_name || 'Customer',
