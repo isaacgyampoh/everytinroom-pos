@@ -523,7 +523,43 @@ serve(async (req) => {
       return new Response(JSON.stringify({ status: 'sent', type, recipients: ADMIN_PHONES, messageLength: message.length }), { headers: CORS })
     }
 
-    return new Response(JSON.stringify({ error: 'Use ?action=initialize, charge, verify, ussd, or webhook' }), { headers: CORS })
+    // ==================== PAYMENT REMINDERS ====================
+    if (action === 'remind') {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+      
+      // Find orders that are "Pending" and older than 30 minutes
+      const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+      const { data: unpaid } = await supabase
+        .from('whatsapp_orders')
+        .select('id,order_no,customer_name,customer_phone,total,ussd_code,date')
+        .eq('status', 'Pending')
+        .lt('date', thirtyMinAgo)
+        .order('date', { ascending: false })
+        .limit(20)
+
+      if (!unpaid?.length) {
+        return new Response(JSON.stringify({ status: 'no_pending_orders' }), { headers: CORS })
+      }
+
+      let sent = 0
+      for (const o of unpaid) {
+        if (!o.customer_phone) continue
+        const name = o.customer_name || 'Customer'
+        const firstName = name.split(' ')[0]
+        const msg = `Hi ${firstName}, your order ${o.order_no} (GHS ${Number(o.total).toFixed(2)}) is waiting for payment.\n\nDial *920*141*${o.ussd_code}# to pay via MoMo.\n\nOnce paid, we'll process and deliver your order right away.\n\nEVERYTINROOM\n024 531 5581`
+
+        try {
+          await sendSMS(o.customer_phone, msg)
+          // Mark as reminded so we don't send again
+          await supabase.from('whatsapp_orders').update({ notes: (o.notes || '') + ' [Reminder sent]' }).eq('id', o.id)
+          sent++
+        } catch {}
+      }
+
+      return new Response(JSON.stringify({ status: 'sent', reminders: sent, total_pending: unpaid.length }), { headers: CORS })
+    }
+
+    return new Response(JSON.stringify({ error: 'Use ?action=initialize, charge, verify, ussd, webhook, report, or remind' }), { headers: CORS })
   } catch (e) {
     console.error('Error:', e)
     return new Response(JSON.stringify({ success: false, error: e.message }), { status: 500, headers: CORS })

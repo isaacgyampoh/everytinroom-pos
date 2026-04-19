@@ -77,8 +77,9 @@ export default function WhatsAppOrders() {
       delivery_status: 'Picked Up',
       delivery_guy: who,
       delivered_at: new Date().toISOString(),
+      status: 'Completed',
     }).eq('id', id)
-    setSelected(s => s ? { ...s, deliveryStatus: 'Picked Up', deliveryGuy: who, deliveredAt: new Date().toISOString() } : s)
+    setSelected(s => s ? { ...s, deliveryStatus: 'Picked Up', deliveryGuy: who, deliveredAt: new Date().toISOString(), status: 'Completed' } : s)
     refreshWAOrders()
     toast.success(method === 'self' ? 'Customer picked up' : 'Picked up by ' + who)
   }

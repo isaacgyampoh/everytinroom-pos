@@ -32,6 +32,7 @@ export default function DeliveryConfirm() {
       delivery_guy: deliveryGuy.trim(),
       delivered_at: new Date().toISOString(),
       delivery_notes: notes.trim(),
+      status: 'Completed',
     }).eq('id', orderId)
     setDone(true)
     setConfirming(false)
