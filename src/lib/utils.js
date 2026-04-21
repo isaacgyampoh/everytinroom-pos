@@ -17,7 +17,7 @@ export const SHOP = {
   addressFull: 'Aviation Road J382, Adenta, Accra, Ghana',
   mapsUrl: 'https://maps.google.com/?q=Everytinroom+Adenta+Aviation+Road+Accra+Ghana',
   yango: 'Aviation Road J382',
-  website: 'www.everytinroom.store',
+  website: 'www.erbliving.shop',
   promoMsg: '',
 }
 
