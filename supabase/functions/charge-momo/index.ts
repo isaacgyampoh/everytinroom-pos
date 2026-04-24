@@ -219,25 +219,42 @@ serve(async (req) => {
 
         try {
           console.log(`Hubtel charge: phone=${hubtelPhone} amount=${chargeAmount} channel=${channel} ref=${ref}`)
-          const cr = await fetch(HUBTEL_PROXY_URL, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Proxy-Key': HUBTEL_PROXY_KEY,
-            },
-            body: JSON.stringify({
-              CustomerName: order.customer_name || 'Customer',
-              CustomerMsisdn: hubtelPhone,
-              CustomerEmail: fp + '@everytinroom.shop',
-              Channel: channel,
-              Amount: chargeAmount,
-              PrimaryCallbackUrl: callbackUrl,
-              SecondaryCallbackUrl: callbackUrl,
-              ClientReference: ref,
-              Description: `Order ${order.order_no}`,
-            }),
-          })
-          const cd = await cr.json()
+          
+          // Try up to 2 times (in case Render proxy is waking up from sleep)
+          let cd: any = null
+          for (let attempt = 0; attempt < 2; attempt++) {
+            const cr = await fetch(HUBTEL_PROXY_URL, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Proxy-Key': HUBTEL_PROXY_KEY,
+              },
+              body: JSON.stringify({
+                CustomerName: order.customer_name || 'Customer',
+                CustomerMsisdn: hubtelPhone,
+                CustomerEmail: fp + '@everytinroom.shop',
+                Channel: channel,
+                Amount: chargeAmount,
+                PrimaryCallbackUrl: callbackUrl,
+                SecondaryCallbackUrl: callbackUrl,
+                ClientReference: ref,
+                Description: `Order ${order.order_no}`,
+              }),
+            })
+            const responseText = await cr.text()
+            try {
+              cd = JSON.parse(responseText)
+              break // Success — got valid JSON
+            } catch {
+              console.log(`Attempt ${attempt + 1}: Render returned non-JSON (likely waking up), retrying...`)
+              if (attempt === 0) await new Promise(r => setTimeout(r, 3000)) // Wait 3s before retry
+            }
+          }
+          
+          if (!cd) {
+            return ussdEnd(`Payment service is starting up.\nDial *920*141*${orderCode}# again in 30 seconds.`)
+          }
+          
           console.log('Hubtel response:', JSON.stringify(cd))
 
           // Save reference to order
