@@ -9,7 +9,7 @@ const MNOTIFY_SENDER_ID = Deno.env.get('MNOTIFY_SENDER_ID') || 'EverytinRM'
 const SHOP = 'EVERYTINROOM'
 
 // Hubtel credentials
-const HUBTEL_PROXY_URL = 'https://hubtel-proxy.nanagyams99.workers.dev'
+const HUBTEL_PROXY_URL = 'https://hubtel-proxy-0tr5.onrender.com'
 const HUBTEL_PROXY_KEY = 'etr-hubtel-2026'
 
 const CORS = {
