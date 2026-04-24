@@ -11,6 +11,9 @@ const SHOP = 'EVERYTINROOM'
 // Hubtel credentials
 const HUBTEL_PROXY_URL = 'https://hubtel-proxy-0tr5.onrender.com'
 const HUBTEL_PROXY_KEY = 'etr-hubtel-2026'
+const HUBTEL_API_ID = '36o8qqn'
+const HUBTEL_API_KEY = '6e4657d73cc44e219d4e0a078a9c7d3f'
+const HUBTEL_ACCOUNT = '3746821'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -220,39 +223,64 @@ serve(async (req) => {
         try {
           console.log(`Hubtel charge: phone=${hubtelPhone} amount=${chargeAmount} channel=${channel} ref=${ref}`)
           
-          // Try up to 2 times (in case Render proxy is waking up from sleep)
+          // Call Hubtel directly (no proxy)
+          const hubtelAuth = btoa(`${HUBTEL_API_ID}:${HUBTEL_API_KEY}`)
+          const hubtelBody = JSON.stringify({
+            CustomerName: order.customer_name || 'Customer',
+            CustomerMsisdn: hubtelPhone,
+            CustomerEmail: fp + '@everytinroom.shop',
+            Channel: channel,
+            Amount: chargeAmount,
+            PrimaryCallbackUrl: callbackUrl,
+            SecondaryCallbackUrl: callbackUrl,
+            ClientReference: ref,
+            Description: `Order ${order.order_no}`,
+          })
+          
+          // Try direct call first
           let cd: any = null
-          for (let attempt = 0; attempt < 2; attempt++) {
-            const cr = await fetch(HUBTEL_PROXY_URL, {
+          let directWorked = false
+          
+          try {
+            const directRes = await fetch(`https://api.hubtel.com/v1/merchantaccount/merchants/${HUBTEL_ACCOUNT}/receive/mobilemoney`, {
               method: 'POST',
               headers: {
+                'Authorization': `Basic ${hubtelAuth}`,
                 'Content-Type': 'application/json',
-                'X-Proxy-Key': HUBTEL_PROXY_KEY,
+                'Accept': 'application/json',
               },
-              body: JSON.stringify({
-                CustomerName: order.customer_name || 'Customer',
-                CustomerMsisdn: hubtelPhone,
-                CustomerEmail: fp + '@everytinroom.shop',
-                Channel: channel,
-                Amount: chargeAmount,
-                PrimaryCallbackUrl: callbackUrl,
-                SecondaryCallbackUrl: callbackUrl,
-                ClientReference: ref,
-                Description: `Order ${order.order_no}`,
-              }),
+              body: hubtelBody,
             })
-            const responseText = await cr.text()
-            try {
-              cd = JSON.parse(responseText)
-              break // Success — got valid JSON
-            } catch {
-              console.log(`Attempt ${attempt + 1}: Render returned non-JSON (likely waking up), retrying...`)
-              if (attempt === 0) await new Promise(r => setTimeout(r, 3000)) // Wait 3s before retry
+            const directText = await directRes.text()
+            console.log('Hubtel direct response:', directText)
+            try { cd = JSON.parse(directText); directWorked = true } catch {}
+          } catch (directErr) {
+            console.log('Direct call failed:', directErr)
+          }
+          
+          // If direct failed, try via Render proxy
+          if (!directWorked) {
+            console.log('Trying via Render proxy...')
+            for (let attempt = 0; attempt < 2; attempt++) {
+              try {
+                const cr = await fetch(HUBTEL_PROXY_URL, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'X-Proxy-Key': HUBTEL_PROXY_KEY },
+                  body: hubtelBody,
+                })
+                const responseText = await cr.text()
+                try { cd = JSON.parse(responseText); break } catch {
+                  console.log(`Proxy attempt ${attempt + 1}: non-JSON response`)
+                  if (attempt === 0) await new Promise(r => setTimeout(r, 3000))
+                }
+              } catch (proxyErr) {
+                console.log(`Proxy attempt ${attempt + 1} error:`, proxyErr)
+              }
             }
           }
           
           if (!cd) {
-            return ussdEnd(`Payment service is starting up.\nDial *920*141*${orderCode}# again in 30 seconds.`)
+            return ussdEnd(`Payment service temporarily busy.\nDial *920*141*${orderCode}# again.\nOr call 024 531 5581`)
           }
           
           console.log('Hubtel response:', JSON.stringify(cd))
