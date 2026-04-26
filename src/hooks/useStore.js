@@ -131,7 +131,7 @@ export const useStore = create((set, get) => ({
         q(sb, 'sales', { select: 'id,receipt_no,date,items,subtotal,discount,total,profit,payment,split_cash,split_momo,customer,type,cashier,voided', order: 'date', limit: 150 }),
         q(sb, 'expenses', { select: 'id,date,category,description,amount', order: 'date', limit: 100 }),
         q(sb, 'customers', { select: 'id,phone,visit_count,total_spent,last_visit', order: 'total_spent', limit: 300 }),
-        q(sb, 'whatsapp_orders', { order: 'date', limit: 50 }),
+        q(sb, 'whatsapp_orders', { order: 'date', limit: 500 }),
         q(sb, 'refunds', { order: 'date', limit: 50 }),
         q(sb, 'invoices', { order: 'date', limit: 50 }),
         q(sb, 'stock_takes', { order: 'date', limit: 20 }),
@@ -153,7 +153,7 @@ export const useStore = create((set, get) => ({
 
   refreshProducts: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'products', { order: 'name', asc: true }); set({ products: d.map(mapProduct) }) },
   refreshSales: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'sales', { order: 'date', limit: 300 }); set({ sales: d.map(mapSale) }) },
-  refreshWAOrders: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'whatsapp_orders', { order: 'date', limit: 100 }); set({ waOrders: d.map(mapWAOrder) }) },
+  refreshWAOrders: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'whatsapp_orders', { order: 'date', limit: 500 }); set({ waOrders: d.map(mapWAOrder) }) },
   refreshStaff: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'staff', { select: 'id,name,role,active' }); set({ staff: d.map(mapStaff) }) },
   refreshBundles: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'bundles'); set({ bundles: d.map(mapBundle) }) },
   refreshExpenses: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'expenses', { order: 'date', limit: 200 }); set({ expenses: d.map(mapExpense) }) },
