@@ -50,12 +50,13 @@ export default function WhatsAppOrders() {
     const sb = getSupabase()
     await sb.from('whatsapp_orders').update({
       delivery_status: 'Packaged',
+      status: 'Completed',
       processed_by: user?.name || '',
       processed_at: new Date().toISOString(),
     }).eq('id', id)
-    setSelected(s => s ? { ...s, deliveryStatus: 'Packaged' } : s)
+    setSelected(s => s ? { ...s, deliveryStatus: 'Packaged', status: 'Completed' } : s)
     refreshWAOrders()
-    toast.success('Marked as packaged')
+    toast.success('Packaged — moved to Completed')
   }
 
   const markDispatched = async (id, deliveryGuy) => {
@@ -300,11 +301,14 @@ export default function WhatsAppOrders() {
                 </div>
                 <span className={`px-3 py-1.5 rounded-lg text-[11px] font-bold ${statusColor(order.status)}`}>{order.status}</span>
               </div>
-              <div className="text-xs text-stone-400 mb-2">
-                {order.items.length} item{order.items.length !== 1 ? 's' : ''}
-                {order.address ? ' · Delivery filled' : ' · No address'}
-                {order.trackingNo ? ` · ${order.trackingNo}` : ''}
-                {order.deliveryStatus ? ` · ${order.deliveryStatus}` : ''}
+              <div className="text-xs text-stone-400 mb-2 flex items-center gap-2 flex-wrap">
+                <span>{order.items.length} item{order.items.length !== 1 ? 's' : ''}</span>
+                {order.deliveryStatus && (
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${deliveryColor(order.deliveryStatus)}`}>{order.deliveryStatus}</span>
+                )}
+                {order.deliveryGuy && <span className="text-[10px]">· {order.deliveryGuy}</span>}
+                {order.notes && order.notes.includes('PICKUP') && <span className="text-[10px] font-bold text-amber-600">PICKUP</span>}
+                {order.notes && order.notes.includes('DELIVERY') && <span className="text-[10px] font-bold text-blue-600">DELIVERY</span>}
               </div>
               <div className="flex items-center justify-between pt-2.5 border-t border-stone-100">
                 <div className="text-lg font-bold">{money(order.total)}</div>
