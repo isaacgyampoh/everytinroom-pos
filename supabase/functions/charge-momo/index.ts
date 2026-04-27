@@ -189,11 +189,16 @@ serve(async (req) => {
 
       // Look up order
       console.log('Looking up order with ussd_code:', orderCode, 'parsed as:', parseInt(orderCode))
-      const { data: order, error: orderError } = await supabase.from('whatsapp_orders')
+      
+      // Query without .single() to avoid "cannot coerce" error
+      const { data: orders, error: orderError } = await supabase.from('whatsapp_orders')
         .select('id,order_no,total,status,customer_name,customer_phone,ussd_code')
-        .eq('ussd_code', parseInt(orderCode)).single()
+        .eq('ussd_code', parseInt(orderCode))
+        .order('date', { ascending: false })
+        .limit(1)
 
-      console.log('Order lookup result:', order ? order.order_no : 'NULL', 'error:', orderError?.message || 'none')
+      const order = orders?.[0] || null
+      console.log('Order lookup result:', order ? order.order_no : 'NULL', 'error:', orderError?.message || 'none', 'count:', orders?.length || 0)
 
       if (!order) return ussdEnd(`Order ${orderCode} not found.\nCall 024 531 5581`)
       if (order.status === 'Paid' || order.status === 'Completed') return ussdEnd(`Order ${order.order_no} already paid.\nThank you!`)
