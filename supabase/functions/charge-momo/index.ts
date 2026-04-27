@@ -188,11 +188,14 @@ serve(async (req) => {
       }
 
       // Look up order
-      const { data: order } = await supabase.from('whatsapp_orders')
+      console.log('Looking up order with ussd_code:', orderCode, 'parsed as:', parseInt(orderCode))
+      const { data: order, error: orderError } = await supabase.from('whatsapp_orders')
         .select('id,order_no,total,status,customer_name,customer_phone,ussd_code')
         .eq('ussd_code', parseInt(orderCode)).single()
 
-      if (!order) return ussdEnd(`Order ${orderCode} not found.`)
+      console.log('Order lookup result:', order ? order.order_no : 'NULL', 'error:', orderError?.message || 'none')
+
+      if (!order) return ussdEnd(`Order ${orderCode} not found.\nCall 024 531 5581`)
       if (order.status === 'Paid' || order.status === 'Completed') return ussdEnd(`Order ${order.order_no} already paid.\nThank you!`)
       if (order.status === 'Cancelled') return ussdEnd(`Order ${order.order_no} cancelled.\nCall: 024 531 5581`)
 
