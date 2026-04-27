@@ -9,7 +9,7 @@ const MNOTIFY_SENDER_ID = Deno.env.get('MNOTIFY_SENDER_ID') || 'EverytinRM'
 const SHOP = 'EVERYTINROOM'
 
 // Hubtel credentials
-const HUBTEL_PROXY_URL = 'https://hubtel-proxy-0tr5.onrender.com'
+const HUBTEL_PROXY_URL = 'http://178.156.252.66:3000'
 const HUBTEL_PROXY_KEY = 'etr-hubtel-2026'
 const HUBTEL_API_ID = '36o8qqn'
 const HUBTEL_API_KEY = '6e4657d73cc44e219d4e0a078a9c7d3f'
@@ -245,7 +245,7 @@ serve(async (req) => {
           
           // Call Hubtel via Render proxy ONLY
           let cd: any = null
-          console.log('Calling Hubtel via Render proxy:', HUBTEL_PROXY_URL)
+          console.log('Calling Hubtel via Hetzner proxy:', HUBTEL_PROXY_URL)
           
           const cr = await fetch(HUBTEL_PROXY_URL, {
             method: 'POST',
