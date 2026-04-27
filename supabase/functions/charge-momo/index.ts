@@ -223,8 +223,6 @@ serve(async (req) => {
         try {
           console.log(`Hubtel charge: phone=${hubtelPhone} amount=${chargeAmount} channel=${channel} ref=${ref}`)
           
-          // Call Hubtel directly (no proxy)
-          const hubtelAuth = btoa(`${HUBTEL_API_ID}:${HUBTEL_API_KEY}`)
           const hubtelBody = JSON.stringify({
             CustomerName: order.customer_name || 'Customer',
             CustomerMsisdn: hubtelPhone,
@@ -237,46 +235,27 @@ serve(async (req) => {
             Description: `Order ${order.order_no}`,
           })
           
-          // Try direct call first
+          // Call Hubtel via Render proxy ONLY
           let cd: any = null
-          let directWorked = false
+          console.log('Calling Hubtel via Render proxy:', HUBTEL_PROXY_URL)
+          
+          const cr = await fetch(HUBTEL_PROXY_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Proxy-Key': HUBTEL_PROXY_KEY,
+            },
+            body: hubtelBody,
+          })
+          
+          const responseText = await cr.text()
+          console.log('Render proxy response status:', cr.status, 'body:', responseText.substring(0, 300))
           
           try {
-            const directRes = await fetch(`https://api.hubtel.com/v1/merchantaccount/merchants/${HUBTEL_ACCOUNT}/receive/mobilemoney`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Basic ${hubtelAuth}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-              },
-              body: hubtelBody,
-            })
-            const directText = await directRes.text()
-            console.log('Hubtel direct response:', directText)
-            try { cd = JSON.parse(directText); directWorked = true } catch {}
-          } catch (directErr) {
-            console.log('Direct call failed:', directErr)
-          }
-          
-          // If direct failed, try via Render proxy
-          if (!directWorked) {
-            console.log('Trying via Render proxy...')
-            for (let attempt = 0; attempt < 2; attempt++) {
-              try {
-                const cr = await fetch(HUBTEL_PROXY_URL, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'X-Proxy-Key': HUBTEL_PROXY_KEY },
-                  body: hubtelBody,
-                })
-                const responseText = await cr.text()
-                try { cd = JSON.parse(responseText); break } catch {
-                  console.log(`Proxy attempt ${attempt + 1}: non-JSON response`)
-                  if (attempt === 0) await new Promise(r => setTimeout(r, 3000))
-                }
-              } catch (proxyErr) {
-                console.log(`Proxy attempt ${attempt + 1} error:`, proxyErr)
-              }
-            }
+            cd = JSON.parse(responseText)
+          } catch {
+            console.log('Proxy returned non-JSON — likely waking up or error')
+            return ussdEnd(`Payment service temporarily busy.\nDial *920*141*${orderCode}# again in 30s.\nOr call 024 531 5581`)
           }
           
           if (!cd) {
