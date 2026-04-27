@@ -243,7 +243,7 @@ serve(async (req) => {
             Description: `Order ${order.order_no}`,
           })
           
-          // Call Hubtel via Render proxy ONLY
+          // Call Hubtel via Hetzner proxy
           let cd: any = null
           console.log('Calling Hubtel via Hetzner proxy:', HUBTEL_PROXY_URL)
           
@@ -257,12 +257,12 @@ serve(async (req) => {
           })
           
           const responseText = await cr.text()
-          console.log('Render proxy response status:', cr.status, 'body:', responseText.substring(0, 300))
+          console.log('Hetzner proxy response status:', cr.status, 'body:', responseText.substring(0, 300))
           
           try {
             cd = JSON.parse(responseText)
           } catch {
-            console.log('Proxy returned non-JSON — likely waking up or error')
+            console.log('Proxy returned non-JSON')
             return ussdEnd(`Payment service temporarily busy.\nDial *920*141*${orderCode}# again in 30s.\nOr call 024 531 5581`)
           }
           
