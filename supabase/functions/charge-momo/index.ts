@@ -9,7 +9,7 @@ const MNOTIFY_SENDER_ID = Deno.env.get('MNOTIFY_SENDER_ID') || 'EverytinRM'
 const SHOP = 'EVERYTINROOM'
 
 // Hubtel credentials
-const HUBTEL_PROXY_URL = 'http://178.156.252.66:3000'
+const HUBTEL_PROXY_URL = 'http://5.161.243.192:3000'
 const HUBTEL_PROXY_KEY = 'etr-hubtel-2026'
 const HUBTEL_API_ID = '36o8qqn'
 const HUBTEL_API_KEY = '6e4657d73cc44e219d4e0a078a9c7d3f'
