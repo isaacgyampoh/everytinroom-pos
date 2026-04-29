@@ -236,8 +236,8 @@ serve(async (req) => {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              client_id: NALOPAY_CLIENT_ID,
-              client_secret: NALOPAY_CLIENT_SECRET,
+              merchant_id: NALOPAY_CLIENT_ID,
+              api_key: NALOPAY_CLIENT_SECRET,
             }),
           })
           const tokenData = await tokenRes.json()
