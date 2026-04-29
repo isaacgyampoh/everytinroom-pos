@@ -8,12 +8,12 @@ const MNOTIFY_API_KEY = Deno.env.get('MNOTIFY_API_KEY') || 'WjANNXLuG7PTy8WsK6Wu
 const MNOTIFY_SENDER_ID = Deno.env.get('MNOTIFY_SENDER_ID') || 'EverytinRM'
 const SHOP = 'EVERYTINROOM'
 
-// Hubtel credentials
-const HUBTEL_PROXY_URL = 'http://5.161.243.192:3000'
-const HUBTEL_PROXY_KEY = 'etr-hubtel-2026'
-const HUBTEL_API_ID = '36o8qqn'
-const HUBTEL_API_KEY = '6e4657d73cc44e219d4e0a078a9c7d3f'
-const HUBTEL_ACCOUNT = '3746821'
+// NaloPay credentials (direct MoMo charge — no proxy needed)
+const NALOPAY_CLIENT_ID = 'TimA4kiLJWoQ5cTXLf8EKh'
+const NALOPAY_CLIENT_SECRET = '3b3c6f0e30ae457904167129b84d4595268e684921a930caa38695c2a3e28304'
+const NALOPAY_AUTH = 'Basic 2503ad8373e7fd5faea6fd18c9deb3d282e20c6b822d690465be37a23cf3396286092e17bdd86c0a7a0a8c1117542e5a2d751c4dc0f739597d59f8272871b171'
+const NALOPAY_TOKEN_URL = 'https://api.nalopay.com/clientapi/generate-payment-token/'
+const NALOPAY_COLLECTION_URL = 'https://api.nalopay.com/clientapi/collection/'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -206,87 +206,82 @@ serve(async (req) => {
 
       const total = Number(order.total).toFixed(2)
 
-      // Pay Now — using Hubtel direct MoMo (sends prompt directly, no OTP)
+      // Pay Now — using NaloPay MoMo (direct prompt, no OTP, no proxy)
       if (userData === '1') {
         let fp = phone.replace(/\s+/g, '').replace(/^0/, '233').replace(/^\+/, '')
         if (!fp.startsWith('233')) fp = '233' + fp
         const ref = `USSD-${order.ussd_code}-${Date.now().toString(36).toUpperCase()}`
 
-        // Detect Hubtel channel from phone number
+        // NaloPay needs phone as 0XXXXXXXXX
         const num = fp.replace('233', '')
-        let channel = 'mtn-gh'
-        if (/^(20|50|24|25|53|54|55|59)/.test(num)) channel = 'mtn-gh'
-        else if (/^(27|57|26|56)/.test(num)) channel = 'vodafone-gh'
-        else if (/^(23|28|58)/.test(num)) channel = 'tigo-gh'
+        const naloPhone = '0' + num
 
-        // Hubtel needs phone as 0XXXXXXXXX (10 digits)
-        const hubtelPhone = '0' + num
+        // Detect network
+        let network = 'MTN'
+        if (/^(20|50|24|25|53|54|55|59)/.test(num)) network = 'MTN'
+        else if (/^(27|57|26|56)/.test(num)) network = 'VODAFONE'
+        else if (/^(23|28|58)/.test(num)) network = 'AIRTELTIGO'
 
-        // Add 1% processing fee (invisible to customer)
-        const chargeAmount = Number((Number(order.total) * 1.01).toFixed(2))
-
-        // Hubtel callback URL
-        const callbackUrl = `https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=hubtel-callback`
+        const chargeAmount = Number(Number(order.total).toFixed(2))
+        const callbackUrl = `https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=nalopay-callback`
 
         try {
-          console.log(`Hubtel charge: phone=${hubtelPhone} amount=${chargeAmount} channel=${channel} ref=${ref}`)
-          
-          const hubtelBody = JSON.stringify({
-            CustomerName: order.customer_name || 'Customer',
-            CustomerMsisdn: hubtelPhone,
-            CustomerEmail: fp + '@everytinroom.shop',
-            Channel: channel,
-            Amount: chargeAmount,
-            PrimaryCallbackUrl: callbackUrl,
-            SecondaryCallbackUrl: callbackUrl,
-            ClientReference: ref,
-            Description: `Order ${order.order_no}`,
-          })
-          
-          // Call Hubtel via Hetzner proxy
-          let cd: any = null
-          console.log('Calling Hubtel via Hetzner proxy:', HUBTEL_PROXY_URL)
-          
-          const cr = await fetch(HUBTEL_PROXY_URL, {
+          console.log(`NaloPay charge: phone=${naloPhone} amount=${chargeAmount} network=${network} ref=${ref}`)
+
+          // Step 1: Generate payment token
+          const tokenRes = await fetch(NALOPAY_TOKEN_URL, {
             method: 'POST',
             headers: {
+              'Authorization': NALOPAY_AUTH,
               'Content-Type': 'application/json',
-              'X-Proxy-Key': HUBTEL_PROXY_KEY,
             },
-            body: hubtelBody,
+            body: JSON.stringify({
+              client_id: NALOPAY_CLIENT_ID,
+              client_secret: NALOPAY_CLIENT_SECRET,
+            }),
           })
-          
-          const responseText = await cr.text()
-          console.log('Hetzner proxy response status:', cr.status, 'body:', responseText.substring(0, 300))
-          
-          try {
-            cd = JSON.parse(responseText)
-          } catch {
-            console.log('Proxy returned non-JSON')
-            return ussdEnd(`Payment service temporarily busy.\nDial *920*141*${orderCode}# again in 30s.\nOr call 024 531 5581`)
+          const tokenData = await tokenRes.json()
+          console.log('NaloPay token response:', JSON.stringify(tokenData))
+
+          const token = tokenData.token || tokenData.data?.token || tokenData.access_token
+          if (!token) {
+            console.error('NaloPay token failed:', JSON.stringify(tokenData))
+            return ussdEnd(`Payment service error.\nDial *920*141*${orderCode}# to retry.\nCall 024 531 5581`)
           }
-          
-          if (!cd) {
-            return ussdEnd(`Payment service temporarily busy.\nDial *920*141*${orderCode}# again.\nOr call 024 531 5581`)
-          }
-          
-          console.log('Hubtel response:', JSON.stringify(cd))
+
+          // Step 2: Charge MoMo
+          const chargeRes = await fetch(NALOPAY_COLLECTION_URL, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              amount: chargeAmount,
+              phone_number: naloPhone,
+              network: network,
+              reference: ref,
+              description: `Order ${order.order_no}`,
+              callback_url: callbackUrl,
+            }),
+          })
+          const chargeData = await chargeRes.json()
+          console.log('NaloPay charge response:', JSON.stringify(chargeData))
 
           // Save reference to order
           await supabase.from('whatsapp_orders').update({ paystack_ref: ref, customer_phone: phone }).eq('id', order.id)
           if (sessionId) await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
 
-          // Hubtel returns ResponseCode "0000" for success
-          if (cd.ResponseCode === '0000' || cd.ResponseCode === '0001' || cd.status === 200) {
+          // Check if charge was successful
+          if (chargeRes.status === 200 || chargeRes.status === 201 || chargeData.status === 'success' || chargeData.success) {
             return ussdEnd(`GHS ${total} for ${order.order_no}\n\nA payment prompt has been sent to your phone.\n\nApprove with your MoMo PIN.\n\nThank you!`)
           }
 
-          // Handle errors
-          const errMsg = cd.Data?.Description || cd.Message || cd.message || 'Payment failed'
-          console.error('Hubtel error:', errMsg)
-          return ussdEnd(`Payment error: ${errMsg}\n\nDial *920*141*${orderCode}# to retry.\nOr call 024 531 5581`)
+          const errMsg = chargeData.message || chargeData.error || chargeData.detail || 'Payment failed'
+          console.error('NaloPay error:', errMsg)
+          return ussdEnd(`Payment error.\nDial *920*141*${orderCode}# to retry.\nCall 024 531 5581`)
         } catch (e) {
-          console.error('Hubtel exception:', e)
+          console.error('NaloPay exception:', e)
           if (sessionId) await supabase.from('ussd_sessions').delete().eq('session_id', sessionId)
           return ussdEnd(`Payment error.\nDial *920*141*${orderCode}# to retry.\nCall 024 531 5581`)
         }
@@ -301,6 +296,44 @@ serve(async (req) => {
       // Show order
       const name = order.customer_name ? `\n${order.customer_name}` : ''
       return ussdCon(`${SHOP}${name}\nOrder: ${order.order_no}\n\nTotal: GHS ${total}\n\n1. Pay Now\n2. Cancel`)
+    }
+
+    // ==================== NALOPAY CALLBACK ====================
+    if (action === 'nalopay-callback') {
+      const body = await req.json()
+      console.log('NALOPAY CALLBACK:', JSON.stringify(body))
+
+      const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+      const ADMIN_PHONES = '0533547740,0548124978,0554808341'
+
+      const ref = body.reference || body.transaction_reference || body.client_reference || ''
+      const status = (body.status || body.transaction_status || '').toLowerCase()
+
+      console.log(`NaloPay callback: ref=${ref} status=${status}`)
+
+      if ((status === 'success' || status === 'completed' || status === 'paid') && ref) {
+        const { data: o } = await supabase.from('whatsapp_orders')
+          .select('id,order_no,total,customer_phone,customer_name')
+          .eq('paystack_ref', ref).limit(1)
+        
+        const order = o?.[0]
+        if (order) {
+          await supabase.from('whatsapp_orders').update({
+            status: 'Paid',
+            paid_at: new Date().toISOString(),
+          }).eq('id', order.id)
+
+          console.log('NaloPay payment confirmed:', order.order_no)
+          const amount = Number(order.total).toFixed(2)
+
+          try { await sendSMS(ADMIN_PHONES, `Payment received. ${order.order_no} GHS ${amount}. Process ASAP.`) } catch {}
+          if (order.customer_phone) {
+            try { await sendSMS(order.customer_phone, `Hi ${order.customer_name || 'Customer'}, your payment of GHS ${amount} has been received.\n\nOrder: ${order.order_no}\n\nYour order will be processed and delivered shortly.\n\nEVERYTINROOM\n024 531 5581`) } catch {}
+          }
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } })
     }
 
     // ==================== HUBTEL CALLBACK ====================
