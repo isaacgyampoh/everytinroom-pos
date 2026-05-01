@@ -63,48 +63,6 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
     setProcessing(false)
   }
 
-  // Paystack online payment
-  const startPaystackPayment = async () => {
-    setMomoStep('charging'); setMomoMessage('Opening Paystack...')
-    try {
-      const paystackAmount = splitMode ? splitRemainder : total
-      const res = await fetch(CHARGE_URL + '?action=initialize', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone.trim(), amount: paystackAmount, callbackUrl: window.location.origin }),
-      })
-      const data = await res.json()
-      if (!data.success || !data.authorizationUrl) { setMomoStep('failed'); setMomoMessage(data.error || 'Failed to initialize'); return }
-      setMomoStep('waiting'); setMomoMessage('Customer completing payment...')
-      const popup = window.open(data.authorizationUrl, 'paystack_checkout', 'width=500,height=700,scrollbars=yes')
-      let attempts = 0
-      pollRef.current = setInterval(async () => {
-        attempts++
-        if (popup && popup.closed && attempts > 10) {
-          try {
-            const vRes = await fetch(CHARGE_URL + '?action=verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reference: data.reference }) })
-            const vData = await vRes.json()
-            if (vData.paymentStatus === 'success') { clearInterval(pollRef.current); await handlePaystackSuccess(); return }
-          } catch {}
-          clearInterval(pollRef.current); setMomoStep('failed'); setMomoMessage('Payment not completed.'); return
-        }
-        if (attempts >= 90) { clearInterval(pollRef.current); if (popup && !popup.closed) popup.close(); setMomoStep('failed'); setMomoMessage('Payment timed out.'); return }
-        try {
-          const vRes = await fetch(CHARGE_URL + '?action=verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reference: data.reference }) })
-          const vData = await vRes.json()
-          if (vData.paymentStatus === 'success') { clearInterval(pollRef.current); if (popup && !popup.closed) popup.close(); await handlePaystackSuccess() }
-          else if (vData.paymentStatus === 'failed') { clearInterval(pollRef.current); if (popup && !popup.closed) popup.close(); setMomoStep('failed'); setMomoMessage('Payment failed.') }
-        } catch {}
-      }, 2000)
-    } catch (e) { setMomoStep('failed'); setMomoMessage('Network error: ' + e.message) }
-  }
-
-  const handlePaystackSuccess = async () => {
-    setMomoStep('success'); setMomoMessage('Payment confirmed!')
-    const extra = splitMode ? { splitCash: num(splitCash), splitMomo: splitRemainder } : {}
-    const saleData = await recordSale(splitMode ? 'Split' : 'Paystack', extra)
-    if (saleData) { toast.success('Paystack confirmed! ' + saleData.receiptNo); finishSale(saleData) }
-    else { setMomoStep('failed'); setMomoMessage('Payment received but recording failed.') }
-  }
 
   const cancelPaystack = () => { if (pollRef.current) clearInterval(pollRef.current); setMomoStep('idle'); setMomoMessage('') }
 
@@ -131,11 +89,62 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
 
     if (splitMode) {
       if (num(splitCash) < 0 || num(splitCash) > total) { toast.error('Invalid cash amount'); return }
-      if (splitRemainder > 0) startPaystackPayment() // Paystack for momo portion of split
+      if (splitRemainder > 0) createUssdInvoice(splitRemainder, true) // USSD for momo portion of split
       else completeDirectSale('Cash') // All cash in split
     } else if (payMethod === 'Cash') completeDirectSale('Cash')
     else if (payMethod === 'Momo') completeDirectSale('Momo') // Manual momo — just record it
-    else startPaystackPayment() // Paystack online
+    else createUssdInvoice(total, false) // USSD payment
+  }
+
+  // Create a WhatsApp order with USSD code for payment
+  const createUssdInvoice = async (amount, isSplit) => {
+    setProcessing(true)
+    setMomoStep('charging'); setMomoMessage('Creating USSD invoice...')
+    try {
+      const sb = getSupabase()
+      const orderNo = 'POS-' + Date.now().toString(36).toUpperCase()
+      const items = cart.map(c => ({ name: c.name, qty: c.qty, price: c.price, lineTotal: c.lineTotal }))
+      
+      // Get next USSD code
+      const { data: mc } = await sb.from('whatsapp_orders').select('ussd_code').order('ussd_code', { ascending: false }).limit(1)
+      const uc = (mc?.[0]?.ussd_code || 0) + 1
+
+      // Create order
+      await sb.from('whatsapp_orders').insert({
+        order_no: orderNo, date: new Date().toISOString(),
+        customer_name: phone.trim(), customer_phone: phone.trim(),
+        items: JSON.stringify(items), subtotal: total, total: amount,
+        notes: isSplit ? `Split: Cash ${money(num(splitCash))}, USSD ${money(amount)}` : 'POS USSD Payment',
+        status: 'Pending', ussd_code: uc,
+      })
+
+      // Record the cash portion of split immediately
+      if (isSplit && num(splitCash) > 0) {
+        await recordSale('Split', { splitCash: num(splitCash), splitMomo: amount })
+      }
+
+      setMomoStep('waiting')
+      setMomoMessage(`USSD Code: *920*141*${uc}#\nAmount: ${money(amount)}\n\nTell customer to dial this code to pay via MoMo.`)
+      
+      // Poll for payment
+      if (pollRef.current) clearInterval(pollRef.current)
+      pollRef.current = setInterval(async () => {
+        const { data } = await sb.from('whatsapp_orders').select('status').eq('ussd_code', uc).limit(1)
+        if (data?.[0]?.status === 'Paid' || data?.[0]?.status === 'Completed') {
+          clearInterval(pollRef.current)
+          if (!isSplit) {
+            const saleData = await recordSale('Momo')
+            if (saleData) { toast.success('USSD Payment confirmed! ' + saleData.receiptNo); finishSale(saleData) }
+          } else {
+            toast.success('USSD Payment confirmed!')
+            finishSale(null)
+          }
+        }
+      }, 5000)
+    } catch (e) {
+      setMomoStep('failed'); setMomoMessage('Error: ' + e.message)
+    }
+    setProcessing(false)
   }
 
   // Block "Complete Sale" if no phone
@@ -339,8 +348,8 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                 {[
                   { id: 'Cash', icon: '💵', label: 'Cash', sub: 'Manual', color: 'bg-green-500', border: 'border-green-500' },
                   { id: 'Momo', icon: '', label: 'Momo', sub: 'Manual', color: 'bg-gray-500', border: 'border-amber-500' },
-                  { id: 'Paystack', icon: '', label: 'Paystack', sub: 'Online', color: 'bg-blue-500', border: 'border-blue-500' },
-                  { id: 'Split', icon: '✂️', label: 'Split', sub: 'Cash + Paystack', color: 'bg-violet-500', border: 'border-violet-500' },
+                  { id: 'USSD', icon: '📱', label: 'USSD', sub: 'MoMo Prompt', color: 'bg-blue-500', border: 'border-blue-500' },
+                  { id: 'Split', icon: '✂️', label: 'Split', sub: 'Cash + USSD', color: 'bg-violet-500', border: 'border-violet-500' },
                 ].map(m => {
                   const active = m.id === 'Split' ? splitMode : (!splitMode && payMethod === m.id)
                   return (
@@ -363,11 +372,11 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
               </div>
             )}
 
-            {/* Paystack Info */}
-            {!splitMode && payMethod === 'Paystack' && (
+            {/* USSD Info */}
+            {!splitMode && payMethod === 'USSD' && (
               <div className="bg-blue-50 rounded-xl p-3.5 border border-blue-100">
-                <div className="text-sm font-bold text-blue-700 mb-1">Paystack Online</div>
-                <div className="text-xs text-gray-400">Paystack checkout will open for payment.</div>
+                <div className="text-sm font-bold text-blue-700 mb-1">📱 USSD Payment</div>
+                <div className="text-xs text-gray-500">An invoice will be created and a USSD code generated. Send the code to the customer to dial and pay via MoMo.</div>
               </div>
             )}
 
@@ -380,10 +389,10 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                   <input type="number" className="w-full h-11 px-4 bg-white border border-violet-200 rounded-xl text-sm font-bold focus:outline-none focus:border-violet-400" placeholder="0.00" value={splitCash} min={0} max={total} onChange={e => setSplitCash(e.target.value)} />
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-violet-200">
-                  <span className="text-sm font-semibold text-blue-600">Paystack Portion</span>
+                  <span className="text-sm font-semibold text-blue-600">USSD Portion</span>
                   <span className="text-lg font-bold text-blue-600">{money(Math.max(0, splitRemainder))}</span>
                 </div>
-                <div className="text-xs text-violet-500">Cash collected manually. Paystack handles the rest online.</div>
+                <div className="text-xs text-violet-500">Cash collected manually. USSD code sent for the MoMo portion.</div>
               </div>
             )}
 
@@ -391,27 +400,25 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
 
             <button onClick={handleCompleteSale} disabled={processing}
               className="w-full h-12 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm">
-              {processing ? 'Processing...' : splitMode ? '✂️ Confirm Split' : payMethod === 'Cash' ? '💵 Confirm Cash' : payMethod === 'Momo' ? 'Confirm Momo Received' : 'Open Paystack'}
+              {processing ? 'Processing...' : splitMode ? '✂️ Confirm Split' : payMethod === 'Cash' ? '💵 Confirm Cash' : payMethod === 'Momo' ? 'Confirm Momo Received' : '📱 Create USSD Invoice'}
             </button>
           </>)}
 
-          {momoStep === 'charging' && <div className="text-center py-10"><div className="w-14 h-14 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" /><h3 className="text-lg font-bold mb-1">Opening Paystack...</h3><p className="text-gray-400 text-sm">{momoMessage}</p></div>}
+          {momoStep === 'charging' && <div className="text-center py-10"><div className="w-14 h-14 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" /><h3 className="text-lg font-bold mb-1">Creating Invoice...</h3><p className="text-gray-400 text-sm">{momoMessage}</p></div>}
           {momoStep === 'waiting' && (
             <div className="text-center py-6">
-              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 animate-pulse"></div>
-              <h3 className="text-lg font-bold mb-1">Waiting for Paystack</h3>
-              <p className="text-gray-400 text-sm mb-4">Customer is completing payment</p>
-              <div className="bg-blue-50 rounded-xl p-4 mb-4 border border-blue-100">
-                <div className="text-lg font-bold text-blue-700">{money(splitMode ? splitRemainder : total)}</div>
-                <div className="text-sm text-blue-600 mt-0.5">{phone}</div>
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-6 mb-4">
+                <p className="text-xs uppercase tracking-wider text-blue-600 font-semibold mb-2">USSD Payment Code</p>
+                <p className="text-3xl font-bold text-blue-900 font-mono tracking-wider mb-2" style={{ whiteSpace: 'pre-line' }}>{momoMessage.split('\n')[0]?.replace('USSD Code: ', '')}</p>
+                <p className="text-sm text-blue-700 font-semibold">{momoMessage.split('\n')[1]}</p>
+                <button onClick={() => { navigator.clipboard?.writeText(momoMessage.split('\n')[0]?.replace('USSD Code: ', '')); toast.success('Copied!') }} className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">Copy Code</button>
               </div>
-              <div className="flex items-center justify-center gap-1.5 text-blue-500 mb-4">
-                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }} />
-                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
-                <span className="text-xs font-medium ml-1.5">Verifying</span>
+              <p className="text-xs text-gray-500 mb-2">Tell the customer to dial the code above</p>
+              <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+                <div className="w-3 h-3 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+                Waiting for payment confirmation...
               </div>
-              <button onClick={() => { cancelPaystack(); setMomoStep('idle') }} className="h-10 px-5 bg-gray-100 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-200 transition">Cancel</button>
+              <button onClick={() => { if (pollRef.current) clearInterval(pollRef.current); setMomoStep('idle'); setMomoMessage('') }} className="mt-4 text-xs text-gray-400 hover:text-gray-600">Cancel</button>
             </div>
           )}
           {momoStep === 'success' && <div className="text-center py-10"><div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">✅</div><h3 className="text-lg font-bold text-green-600 mb-1">Payment Confirmed!</h3><p className="text-gray-400 text-sm">Recording sale...</p></div>}

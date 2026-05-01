@@ -250,22 +250,34 @@ serve(async (req) => {
           }
 
           // Step 2: Charge MoMo
+          // Generate trans_hash (SHA256 of merchant_id + amount + reference)
+          const hashInput = NALOPAY_CLIENT_ID + chargeAmount + ref
+          const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(hashInput))
+          const transHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
+
+          const chargeBody = {
+            merchant_id: NALOPAY_CLIENT_ID,
+            service_name: 'MOMO_TRANSACTION',
+            trans_hash: transHash,
+            token: token,
+            account_number: naloPhone,
+            account_name: order.customer_name || 'Customer',
+            description: `Order ${order.order_no}`,
+            reference: ref,
+            network: network,
+            amount: chargeAmount,
+            callback: callbackUrl,
+          }
+
+          console.log('NaloPay charge body:', JSON.stringify(chargeBody))
+
           const chargeRes = await fetch(NALOPAY_COLLECTION_URL, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${token}`,
+              'Authorization': NALOPAY_AUTH,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              service_name: 'Everytinroom',
-              amount: chargeAmount,
-              phone_number: naloPhone,
-              network: network,
-              reference: ref,
-              description: `Order ${order.order_no}`,
-              callback_url: callbackUrl,
-              customer_name: order.customer_name || 'Customer',
-            }),
+            body: JSON.stringify(chargeBody),
           })
           const chargeData = await chargeRes.json()
           console.log('NaloPay charge response:', JSON.stringify(chargeData))
