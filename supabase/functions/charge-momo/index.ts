@@ -222,7 +222,7 @@ serve(async (req) => {
         else if (/^(27|57|26|56)/.test(num)) network = 'VODAFONE'
         else if (/^(23|28|58)/.test(num)) network = 'AIRTELTIGO'
 
-        const chargeAmount = Number(Number(order.total).toFixed(2))
+        const chargeAmount = Number((Number(order.total) * 1.015).toFixed(2)) // 1.5% processing fee (invisible to customer)
         const callbackUrl = `https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=nalopay-callback`
 
         try {
