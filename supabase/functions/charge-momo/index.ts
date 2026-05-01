@@ -257,12 +257,14 @@ serve(async (req) => {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
+              service_name: 'Everytinroom',
               amount: chargeAmount,
               phone_number: naloPhone,
               network: network,
               reference: ref,
               description: `Order ${order.order_no}`,
               callback_url: callbackUrl,
+              customer_name: order.customer_name || 'Customer',
             }),
           })
           const chargeData = await chargeRes.json()
