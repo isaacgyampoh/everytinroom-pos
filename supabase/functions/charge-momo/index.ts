@@ -23,17 +23,23 @@ const CORS = {
 }
 
 async function sendSMS(to: string, message: string) {
-  if (!MNOTIFY_API_KEY) return
+  if (!MNOTIFY_API_KEY) { console.log('SMS skipped — no API key'); return }
   const recipients = to.split(',').map(r => r.trim())
   for (const recipient of recipients) {
     const phone = recipient.replace(/\s+/g, '').replace(/^0/, '233')
     try {
-      await fetch(`https://api.mnotify.com/api/sms/quick?key=${MNOTIFY_API_KEY}`, {
+      const res = await fetch(`https://api.mnotify.com/api/sms/quick?key=${MNOTIFY_API_KEY}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ recipient: [phone], sender: MNOTIFY_SENDER_ID, message, is_schedule: false, schedule_date: '' })
       })
-    } catch {
-      try { await fetch(`https://apps.mnotify.net/smsapi?key=${MNOTIFY_API_KEY}&to=${encodeURIComponent(phone)}&msg=${encodeURIComponent(message)}&sender_id=${encodeURIComponent(MNOTIFY_SENDER_ID)}`) } catch {}
+      const data = await res.text()
+      console.log(`SMS to ${phone}: status=${res.status} response=${data.substring(0, 100)}`)
+    } catch (e) {
+      console.log(`SMS primary failed for ${phone}: ${e}`)
+      try { 
+        const res2 = await fetch(`https://apps.mnotify.net/smsapi?key=${MNOTIFY_API_KEY}&to=${encodeURIComponent(phone)}&msg=${encodeURIComponent(message)}&sender_id=${encodeURIComponent(MNOTIFY_SENDER_ID)}`)
+        console.log(`SMS fallback for ${phone}: ${res2.status}`)
+      } catch (e2) { console.log(`SMS fallback also failed for ${phone}: ${e2}`) }
     }
   }
 }
@@ -315,22 +321,37 @@ serve(async (req) => {
     // ==================== NALOPAY CALLBACK ====================
     if (action === 'nalopay-callback') {
       const body = await req.json()
-      console.log('NALOPAY CALLBACK:', JSON.stringify(body))
+      console.log('NALOPAY CALLBACK FULL:', JSON.stringify(body))
 
       const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
       const ADMIN_PHONES = '0533547740,0548124978,0554808341'
 
-      const ref = body.reference || body.transaction_reference || body.client_reference || ''
-      const status = (body.status || body.transaction_status || '').toLowerCase()
+      // Try multiple fields NaloPay might use for reference
+      const ref = body.reference || body.transaction_reference || body.client_reference || body.external_reference || body.order_reference || ''
+      const status = (body.status || body.transaction_status || body.payment_status || '').toLowerCase()
+      const naloRef = body.transaction_id || body.nalopay_reference || body.id || ''
 
-      console.log(`NaloPay callback: ref=${ref} status=${status}`)
+      console.log(`NaloPay callback: ref=${ref} naloRef=${naloRef} status=${status}`)
 
-      if ((status === 'success' || status === 'completed' || status === 'paid') && ref) {
-        const { data: o } = await supabase.from('whatsapp_orders')
+      if ((status === 'success' || status === 'successful' || status === 'completed' || status === 'paid' || status === 'approved') && ref) {
+        // Try finding order by our reference
+        let order: any = null
+        const { data: o1 } = await supabase.from('whatsapp_orders')
           .select('id,order_no,total,customer_phone,customer_name')
           .eq('paystack_ref', ref).limit(1)
-        
-        const order = o?.[0]
+        order = o1?.[0]
+
+        // Fallback: try matching by USSD code extracted from reference (USSD-132-xxx → 132)
+        if (!order && ref.startsWith('USSD-')) {
+          const ussdCode = ref.split('-')[1]
+          if (ussdCode) {
+            const { data: o2 } = await supabase.from('whatsapp_orders')
+              .select('id,order_no,total,customer_phone,customer_name')
+              .eq('ussd_code', parseInt(ussdCode)).eq('status', 'Pending').limit(1)
+            order = o2?.[0]
+          }
+        }
+
         if (order) {
           await supabase.from('whatsapp_orders').update({
             status: 'Paid',
@@ -340,11 +361,23 @@ serve(async (req) => {
           console.log('NaloPay payment confirmed:', order.order_no)
           const amount = Number(order.total).toFixed(2)
 
-          try { await sendSMS(ADMIN_PHONES, `Payment received. ${order.order_no} GHS ${amount}. Process ASAP.`) } catch {}
+          // SMS to admin
+          try { await sendSMS(ADMIN_PHONES, `Payment received! ${order.order_no} GHS ${amount}. ${order.customer_name || ''} ${order.customer_phone || ''}. Process ASAP.`) } catch (smsErr) { console.error('Admin SMS failed:', smsErr) }
+          
+          // SMS to customer
           if (order.customer_phone) {
-            try { await sendSMS(order.customer_phone, `Hi ${order.customer_name || 'Customer'}, your payment of GHS ${amount} has been received.\n\nOrder: ${order.order_no}\n\nYour order will be processed and delivered shortly.\n\nEVERYTINROOM\n024 531 5581`) } catch {}
+            try { 
+              await sendSMS(order.customer_phone, `Hi ${order.customer_name || 'Customer'}, thank you! Your payment of GHS ${amount} has been received.\n\nOrder: ${order.order_no}\n\nYour order will be processed and delivered shortly.\n\nEVERYTINROOM\n024 531 5581`)
+              console.log('Customer SMS sent to:', order.customer_phone) 
+            } catch (smsErr) { console.error('Customer SMS failed:', smsErr) }
+          } else {
+            console.log('No customer phone — skipping SMS')
           }
+        } else {
+          console.error('NaloPay callback: order not found for ref:', ref)
         }
+      } else {
+        console.log('NaloPay callback — not successful or no ref:', status, ref)
       }
 
       return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } })
