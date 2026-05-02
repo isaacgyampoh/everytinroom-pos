@@ -4,8 +4,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const PAYSTACK_SECRET = Deno.env.get('PAYSTACK_SECRET_KEY') || ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://noiiuwkovoojkcwzupye.supabase.co'
 const SUPABASE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-const MNOTIFY_API_KEY = Deno.env.get('MNOTIFY_API_KEY') || 'WjANNXLuG7PTy8WsK6Wuwa2AG'
-const MNOTIFY_SENDER_ID = Deno.env.get('MNOTIFY_SENDER_ID') || 'EverytinRM'
 const SHOP = 'EVERYTINROOM'
 
 // NaloPay credentials (direct MoMo charge — no proxy needed)
@@ -22,24 +20,22 @@ const CORS = {
   'Content-Type': 'application/json',
 }
 
+// Nalo SMS credentials
+const NALO_SMS_USERNAME = 'ISAAC'
+const NALO_SMS_PASSWORD = 'Isaac@1024'
+const NALO_SMS_SENDER = 'EverytinRm'
+
 async function sendSMS(to: string, message: string) {
-  if (!MNOTIFY_API_KEY) { console.log('SMS skipped — no API key'); return }
   const recipients = to.split(',').map(r => r.trim())
   for (const recipient of recipients) {
     const phone = recipient.replace(/\s+/g, '').replace(/^0/, '233')
     try {
-      const res = await fetch(`https://api.mnotify.com/api/sms/quick?key=${MNOTIFY_API_KEY}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipient: [phone], sender: MNOTIFY_SENDER_ID, message, is_schedule: false, schedule_date: '' })
-      })
+      const smsUrl = `https://sms.nalosolutions.com/smsbackend/Aboroye_Standard/compose_sms.php?username=${encodeURIComponent(NALO_SMS_USERNAME)}&password=${encodeURIComponent(NALO_SMS_PASSWORD)}&type=0&dlr=1&destination=${encodeURIComponent(phone)}&source=${encodeURIComponent(NALO_SMS_SENDER)}&message=${encodeURIComponent(message)}`
+      const res = await fetch(smsUrl)
       const data = await res.text()
       console.log(`SMS to ${phone}: status=${res.status} response=${data.substring(0, 100)}`)
     } catch (e) {
-      console.log(`SMS primary failed for ${phone}: ${e}`)
-      try { 
-        const res2 = await fetch(`https://apps.mnotify.net/smsapi?key=${MNOTIFY_API_KEY}&to=${encodeURIComponent(phone)}&msg=${encodeURIComponent(message)}&sender_id=${encodeURIComponent(MNOTIFY_SENDER_ID)}`)
-        console.log(`SMS fallback for ${phone}: ${res2.status}`)
-      } catch (e2) { console.log(`SMS fallback also failed for ${phone}: ${e2}`) }
+      console.log(`SMS failed for ${phone}: ${e}`)
     }
   }
 }
@@ -638,16 +634,15 @@ serve(async (req) => {
     // ==================== PAYMENT REMINDERS ====================
     if (action === 'remind') {
       const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+      const now = Date.now()
       
-      // Find orders that are "Pending" and older than 30 minutes
-      const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+      // Find all pending orders
       const { data: unpaid } = await supabase
         .from('whatsapp_orders')
-        .select('id,order_no,customer_name,customer_phone,total,ussd_code,date')
+        .select('id,order_no,customer_name,customer_phone,total,ussd_code,date,notes')
         .eq('status', 'Pending')
-        .lt('date', thirtyMinAgo)
         .order('date', { ascending: false })
-        .limit(20)
+        .limit(50)
 
       if (!unpaid?.length) {
         return new Response(JSON.stringify({ status: 'no_pending_orders' }), { headers: CORS })
@@ -655,17 +650,42 @@ serve(async (req) => {
 
       let sent = 0
       for (const o of unpaid) {
-        if (!o.customer_phone) continue
+        if (!o.customer_phone || !o.ussd_code) continue
+        
+        const orderAge = now - new Date(o.date).getTime()
+        const mins = Math.floor(orderAge / 60000)
+        const notes = o.notes || ''
         const name = o.customer_name || 'Customer'
         const firstName = name.split(' ')[0]
-        const msg = `Hi ${firstName}, your order ${o.order_no} (GHS ${Number(o.total).toFixed(2)}) is waiting for payment.\n\nDial *920*141*${o.ussd_code}# to pay via MoMo.\n\nOnce paid, we'll process and deliver your order right away.\n\nEVERYTINROOM\n024 531 5581`
+        const amount = `GHS ${Number(o.total).toFixed(2)}`
+        const code = `*920*141*${o.ussd_code}#`
 
-        try {
-          await sendSMS(o.customer_phone, msg)
-          // Mark as reminded so we don't send again
-          await supabase.from('whatsapp_orders').update({ notes: (o.notes || '') + ' [Reminder sent]' }).eq('id', o.id)
-          sent++
-        } catch {}
+        let msg = ''
+
+        // 5 min reminder
+        if (mins >= 5 && mins < 25 && !notes.includes('[R1]')) {
+          msg = `Hi ${firstName}, you're almost done! Complete your order of ${amount}.\n\nDial ${code} to pay now.\n\nEVERYTINROOM\n024 531 5581`
+          await supabase.from('whatsapp_orders').update({ notes: notes + ' [R1]' }).eq('id', o.id)
+        }
+        // 30 min reminder
+        else if (mins >= 30 && mins < 55 && !notes.includes('[R2]')) {
+          msg = `Hi ${firstName}, your order ${o.order_no} (${amount}) is still waiting for payment.\n\nDial ${code} to pay via MoMo.\n\nDon't miss out — we'll process your order right away!\n\nEVERYTINROOM\n024 531 5581`
+          await supabase.from('whatsapp_orders').update({ notes: notes + ' [R2]' }).eq('id', o.id)
+        }
+        // 1 hour reminder
+        else if (mins >= 60 && mins < 120 && !notes.includes('[R3]')) {
+          msg = `Hi ${firstName}, just a friendly reminder. Your order ${o.order_no} (${amount}) is waiting.\n\nDial ${code} to complete payment.\n\nWe're ready to process and deliver!\n\nEVERYTINROOM\n024 531 5581`
+          await supabase.from('whatsapp_orders').update({ notes: notes + ' [R3]' }).eq('id', o.id)
+        }
+        // 24 hour reminder (final)
+        else if (mins >= 1440 && !notes.includes('[R4]')) {
+          msg = `Hi ${firstName}, this is your final reminder. Your order ${o.order_no} (${amount}) will be cancelled soon.\n\nDial ${code} to pay now and secure your items.\n\nEVERYTINROOM\n024 531 5581`
+          await supabase.from('whatsapp_orders').update({ notes: notes + ' [R4]' }).eq('id', o.id)
+        }
+
+        if (msg) {
+          try { await sendSMS(o.customer_phone, msg); sent++ } catch {}
+        }
       }
 
       return new Response(JSON.stringify({ status: 'sent', reminders: sent, total_pending: unpaid.length }), { headers: CORS })
