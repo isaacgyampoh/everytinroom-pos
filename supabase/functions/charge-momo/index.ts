@@ -356,14 +356,30 @@ serve(async (req) => {
 
           console.log('NaloPay payment confirmed:', order.order_no)
           const amount = Number(order.total).toFixed(2)
+          const firstName = (order.customer_name || 'Customer').split(' ')[0]
+          const isPOS = order.order_no.startsWith('POS-') || order.order_no.startsWith('WA-')
+          const isWeb = order.order_no.startsWith('WEB-')
 
           // SMS to admin
-          try { await sendSMS(ADMIN_PHONES, `Payment received! ${order.order_no} GHS ${amount}. ${order.customer_name || ''} ${order.customer_phone || ''}. Process ASAP.`) } catch (smsErr) { console.error('Admin SMS failed:', smsErr) }
+          try { 
+            const adminMsg = isPOS 
+              ? `POS Payment! ${order.order_no} GHS ${amount}. ${order.customer_name || ''} ${order.customer_phone || ''}.`
+              : `Online Payment! ${order.order_no} GHS ${amount}. ${order.customer_name || ''} ${order.customer_phone || ''}. Process & deliver ASAP.`
+            await sendSMS(ADMIN_PHONES, adminMsg) 
+          } catch (smsErr) { console.error('Admin SMS failed:', smsErr) }
           
           // SMS to customer
           if (order.customer_phone) {
             try { 
-              await sendSMS(order.customer_phone, `Hi ${order.customer_name || 'Customer'}, thank you! Your payment of GHS ${amount} has been received.\n\nOrder: ${order.order_no}\n\nYour order will be processed and delivered shortly.\n\nEVERYTINROOM\n024 531 5581`)
+              let custMsg = ''
+              if (isPOS) {
+                // Walk-in customer — short and sweet
+                custMsg = `Thank you for shopping with us, ${firstName}!\n\nYour payment of GHS ${amount} has been received.\n\nWe appreciate your patronage.\n\nEVERYTINROOM & BEDTIME\nAviation Road J382, Adenta\n024 531 5581\nwww.erbliving.shop`
+              } else {
+                // Online customer — include order details and delivery info
+                custMsg = `Hi ${firstName}, thank you for your purchase of GHS ${amount}!\n\nOrder: ${order.order_no}\n\nYour order has been confirmed and is being processed. Our delivery team will contact you shortly.\n\nTrack your order: erbliving.shop/#/track\n\nEVERYTINROOM & BEDTIME\n024 531 5581\nwww.erbliving.shop`
+              }
+              await sendSMS(order.customer_phone, custMsg)
               console.log('Customer SMS sent to:', order.customer_phone) 
             } catch (smsErr) { console.error('Customer SMS failed:', smsErr) }
           } else {
