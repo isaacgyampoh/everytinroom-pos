@@ -7,9 +7,11 @@ const SUPABASE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 const SHOP = 'EVERYTINROOM'
 
 // NaloPay credentials (direct MoMo charge — no proxy needed)
-const NALOPAY_CLIENT_ID = 'TimA4kiLJWoQ5cTXLf8EKh'
-const NALOPAY_CLIENT_SECRET = '3b3c6f0e30ae457904167129b84d4595268e684921a930caa38695c2a3e28304'
-const NALOPAY_AUTH = 'Basic 2503ad8373e7fd5faea6fd18c9deb3d282e20c6b822d690465be37a23cf3396286092e17bdd86c0a7a0a8c1117542e5a2d751c4dc0f739597d59f8272871b171'
+const NALOPAY_MERCHANT_ID = 'TimA4kiLJWoQ5cTXLf8EKh'
+// NaloPay credentials — read from Supabase secrets
+const NALOPAY_MERCHANT_ID = Deno.env.get('NALOPAY_MERCHANT_ID') || 'TimA4kiLJWoQ5cTXLf8EKh'
+const NALOPAY_API_KEY = Deno.env.get('NALOPAY_API_KEY') || '3b3c6f0e30ae457904167129b84d4595268e684921a930caa38695c2a3e28304'
+const NALOPAY_AUTH = Deno.env.get('NALOPAY_AUTH_HEADER') || 'Basic 2503ad8373e7fd5faea6fd18c9deb3d282e20c6b822d690465be37a23cf3396286092e17bdd86c0a7a0a8c1117542e5a2d751c4dc0f739597d59f8272871b171'
 const NALOPAY_TOKEN_URL = 'https://api.nalopay.com/clientapi/generate-payment-token/'
 const NALOPAY_COLLECTION_URL = 'https://api.nalopay.com/clientapi/collection/'
 
@@ -238,7 +240,7 @@ serve(async (req) => {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              merchant_id: NALOPAY_CLIENT_ID,
+              merchant_id: NALOPAY_MERCHANT_ID,
               api_key: NALOPAY_CLIENT_SECRET,
             }),
           })
@@ -253,12 +255,12 @@ serve(async (req) => {
 
           // Step 2: Charge MoMo
           // Generate trans_hash (SHA256 of merchant_id + amount + reference)
-          const hashInput = NALOPAY_CLIENT_ID + chargeAmount + ref
+          const hashInput = NALOPAY_MERCHANT_ID + chargeAmount + ref
           const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(hashInput))
           const transHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
 
           const chargeBody = {
-            merchant_id: NALOPAY_CLIENT_ID,
+            merchant_id: NALOPAY_MERCHANT_ID,
             service_name: 'MOMO_TRANSACTION',
             trans_hash: transHash,
             token: token,

@@ -48,15 +48,55 @@ export default function WhatsAppOrders() {
 
   const markPackaged = async (id) => {
     const sb = getSupabase()
+    
+    // Get the full order to create a sales record
+    const { data: orderData } = await sb.from('whatsapp_orders')
+      .select('*')
+      .eq('id', id)
+      .limit(1)
+    
+    const order = orderData?.[0]
+    
+    // Update delivery status
     await sb.from('whatsapp_orders').update({
       delivery_status: 'Packaged',
       status: 'Completed',
       processed_by: user?.name || '',
       processed_at: new Date().toISOString(),
     }).eq('id', id)
+
+    // Create a sales record if this is a paid order
+    if (order && (order.status === 'Paid' || order.status === 'Completed')) {
+      try {
+        let items = order.items
+        if (typeof items === 'string') items = JSON.parse(items)
+        
+        const saleTotal = Number(order.total) || 0
+        const receiptNo = order.order_no || 'WA-' + Date.now()
+        
+        await sb.from('sales').insert({
+          receipt_no: receiptNo,
+          date: order.paid_at || order.date || new Date().toISOString(),
+          items: items,
+          subtotal: Number(order.subtotal) || saleTotal,
+          discount: 0,
+          total: saleTotal,
+          profit: 0,
+          payment: 'Momo',
+          type: 'Retail',
+          customer: order.customer_phone || order.customer_name || '',
+          cashier: user?.name || 'Online',
+          voided: false,
+        })
+        console.log('Sales record created for:', receiptNo)
+      } catch (e) {
+        console.error('Failed to create sales record:', e)
+      }
+    }
+
     setSelected(s => s ? { ...s, deliveryStatus: 'Packaged', status: 'Completed' } : s)
     refreshWAOrders()
-    toast.success('Packaged — moved to Completed')
+    toast.success('Packaged — sales recorded')
   }
 
   const markDispatched = async (id, deliveryGuy) => {
