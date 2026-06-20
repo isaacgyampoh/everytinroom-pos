@@ -709,6 +709,34 @@ serve(async (req) => {
       return new Response(JSON.stringify({ status: 'sent', reminders: sent, total_pending: unpaid.length }), { headers: CORS })
     }
 
+    // ==================== SEND USSD CODE TO CUSTOMER (isolated, additive) ====================
+    // Texts the customer the USSD shortcode the moment the cashier generates it.
+    // Does NOT initiate or alter any charge — payment still happens when the
+    // customer dials the code (handled by ?action=ussd). Reuses sendSMS().
+    if (action === 'send-ussd-code') {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+      let payload: any = {}
+      try { payload = await req.json() } catch {}
+      const orderId = payload.orderId || payload.order_id || ''
+      const orderNoIn = payload.orderNo || payload.order_no || ''
+      if (!orderId && !orderNoIn) return new Response(JSON.stringify({ success: false, error: 'orderId or orderNo required' }), { headers: CORS })
+
+      let q = supabase.from('whatsapp_orders').select('id,order_no,total,customer_name,customer_phone,ussd_code,status')
+      q = orderId ? q.eq('id', orderId) : q.eq('order_no', orderNoIn)
+      const { data: rows } = await q.limit(1)
+      const order = rows?.[0]
+      if (!order) return new Response(JSON.stringify({ success: false, error: 'Order not found' }), { headers: CORS })
+      if (!order.customer_phone) return new Response(JSON.stringify({ success: false, error: 'No customer phone on order' }), { headers: CORS })
+      if (!order.ussd_code) return new Response(JSON.stringify({ success: false, error: 'Order has no USSD code' }), { headers: CORS })
+
+      const firstName = (order.customer_name || 'Customer').split(' ')[0]
+      const amount = Number(order.total).toFixed(2)
+      const code = `*920*141*${order.ussd_code}#`
+      const msg = `Hi ${firstName}, complete your ${SHOP} payment of GHS ${amount}.\n\nDial ${code} on this phone, then approve with your MoMo PIN.\n\nOrder: ${order.order_no}\n024 531 5581`
+      try { await sendSMS(order.customer_phone, msg) } catch (e) { return new Response(JSON.stringify({ success: false, error: 'SMS failed: ' + (e as Error).message }), { headers: CORS }) }
+      return new Response(JSON.stringify({ success: true, order: order.order_no, phone: order.customer_phone, code }), { headers: CORS })
+    }
+
     return new Response(JSON.stringify({ error: 'Use ?action=initialize, charge, verify, ussd, webhook, report, or remind' }), { headers: CORS })
   } catch (e) {
     console.error('Error:', e)

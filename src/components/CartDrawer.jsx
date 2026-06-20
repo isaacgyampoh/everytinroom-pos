@@ -324,7 +324,19 @@ export default function CartDrawer({ open, onClose, onReceipt, docked }) {
               const ussdCode = `*920*141*${data.ussd_code}#`
               try { await navigator.clipboard.writeText(ussdCode) } catch {}
 
-              toast.success(`USSD Code: ${ussdCode}\n\nCopied to clipboard! Send to customer.`, { duration: 8000 })
+              // Auto-send the code to the customer by SMS (server-side; key stays on backend)
+              let smsOk = false
+              try {
+                const r = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=send-ussd-code', {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ orderId: data.id })
+                })
+                const j = await r.json(); smsOk = !!j.success
+              } catch {}
+
+              toast.success(smsOk
+                ? `USSD code sent to ${phone.trim()} by SMS. ${ussdCode}`
+                : `USSD Code: ${ussdCode}\n\nCopied to clipboard! Send to customer.`, { duration: 8000 })
               clearCart(); setPhone(''); setDiscount(''); onClose()
               const store = useStore.getState()
               store.refreshWAOrders()
