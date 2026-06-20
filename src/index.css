@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-body { font-family: 'DM Sans', system-ui, sans-serif; font-size: 15px; background: #F5F5F3; color: #1a1a1a; letter-spacing: -0.01em; }
+body { font-family: 'DM Sans', system-ui, sans-serif; font-size: 15px; background: #F5F5F3; color: #1a1a1a; letter-spacing: -0.01em; transition: background .2s ease, color .2s ease; }
 h1, h2, h3, h4, h5, h6 { font-family: 'Outfit', 'DM Sans', system-ui, sans-serif; letter-spacing: -0.03em; }
 @media (min-width: 768px) { body { font-size: 16px; } }
 
@@ -30,3 +30,79 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Outfit', 'DM Sans', system-ui, sans-serif
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .animate-fade { animation: fadeIn .2s ease-out; }
 .animate-slide-up { animation: slideUp .25s ease-out; }
+
+/* ════════════════════════════════════════════════════════════
+   DARK THEME
+   Implemented as utility overrides scoped to body.dark so we get a
+   professional dark mode WITHOUT rewriting Tailwind classes across
+   ~100 components. Surgical: colors only, no layout changes.
+   ════════════════════════════════════════════════════════════ */
+body.dark {
+  background: #0f1115;
+  color: #e6e7eb;
+}
+body.dark ::-webkit-scrollbar-thumb { background: #33363d; }
+body.dark ::selection { background: #e6e7eb; color: #0f1115; }
+
+/* surfaces */
+body.dark .bg-white { background-color: #1a1d24 !important; }
+body.dark .bg-stone-50,
+body.dark .bg-stone-100 { background-color: #21242c !important; }
+body.dark .bg-stone-200 { background-color: #2a2e37 !important; }
+body.dark .bg-cream { background-color: #1a1d24 !important; }
+body.dark .bg-stone-100\/60,
+body.dark .bg-stone-100\/50 { background-color: rgba(255,255,255,.04) !important; }
+
+/* product image placeholders */
+body.dark .bg-stone-100.overflow-hidden { background-color: #21242c !important; }
+
+/* dark stays dark — keep the near-black accent surfaces, but lift slightly so they read on a dark bg */
+body.dark .bg-gray-900 { background-color: #2b2f3a !important; }
+body.dark .bg-gray-800 { background-color: #323743 !important; }
+
+/* text */
+body.dark .text-gray-900,
+body.dark .text-gray-800,
+body.dark .text-black { color: #e6e7eb !important; }
+body.dark .text-gray-700,
+body.dark .text-stone-700,
+body.dark .text-stone-600,
+body.dark .text-stone-500 { color: #b4b7c0 !important; }
+body.dark .text-stone-400,
+body.dark .text-stone-300 { color: #7b7f8a !important; }
+body.dark .text-stone-200 { color: #4a4e57 !important; }
+
+/* text that sits ON the accent (gray-900) surfaces must stay light */
+body.dark .bg-gray-900 .text-white,
+body.dark .bg-gray-800 .text-white { color: #fff !important; }
+
+/* borders */
+body.dark .border-stone-200,
+body.dark .border-stone-200\/60,
+body.dark .border-stone-200\/30,
+body.dark .border-stone-100 { border-color: rgba(255,255,255,.08) !important; }
+
+/* inputs */
+body.dark input,
+body.dark textarea,
+body.dark select { background-color: #21242c !important; color: #e6e7eb !important; border-color: rgba(255,255,255,.08) !important; }
+body.dark input::placeholder,
+body.dark textarea::placeholder { color: #6b6f7a !important; }
+
+/* glass header/footer on mobile */
+body.dark .glass { background: rgba(20,22,28,.92) !important; }
+
+/* hover states */
+body.dark .hover\:bg-stone-100:hover,
+body.dark .hover\:bg-stone-50:hover { background-color: #262a33 !important; }
+
+/* keep colored accent chips readable (amber/red/green badges) — leave as-is, they work on dark */
+
+/* sidebar explicit surface (the dark-sidebar helper referenced in Navigation) */
+body.dark .dark-sidebar { background-color: #14161b !important; }
+.dark-sidebar { background: transparent; }
+
+/* shadows softer in dark */
+body.dark .shadow-lg,
+body.dark .shadow-md,
+body.dark .shadow-sm { box-shadow: 0 4px 20px rgba(0,0,0,.4) !important; }
