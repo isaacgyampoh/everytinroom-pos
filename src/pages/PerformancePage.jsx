@@ -42,7 +42,7 @@ export default function PerformancePage() {
 
       {/* Period Tabs */}
       <div className="flex gap-2 overflow-x-auto mb-6 pb-1 scrollbar-hide">
-        {[['today', '📅 Today'], ['week', '📆 This Week'], ['month', '🗓️ This Month'], ['overall', 'Overall']].map(([p, l]) => (
+        {[['today', 'Today'], ['week', 'This Week'], ['month', 'This Month'], ['overall', 'Overall']].map(([p, l]) => (
           <button key={p} onClick={() => setPerfPeriod(p)}
             className={`h-10 md:h-11 px-4 md:px-5 rounded-xl text-[13px] md:text-sm font-semibold whitespace-nowrap transition-all ${perfPeriod === p ? 'bg-gray-700 text-white shadow-md shadow-gray-500/20' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-200'}`}>
             {l}

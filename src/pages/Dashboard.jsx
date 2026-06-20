@@ -204,7 +204,7 @@ export default function Dashboard() {
             {recentSales.map(s => (
               <div key={s.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/50 transition">
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${s.payment === 'Cash' ? 'bg-gray-700' : (s.payment === 'Momo' || s.payment === 'Paystack') ? 'bg-gray-500' : 'bg-gray-400'}`}>
-                  {s.payment === 'Cash' ? '💵' : ''}
+                  
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-gray-800">{s.receiptNo}</div>

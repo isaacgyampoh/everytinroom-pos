@@ -103,9 +103,9 @@ export default function ReportsPage() {
   const staffPerf = Object.values(staffMap).sort((a, b) => b.revenue - a.revenue)
 
   const tabs = [
-    { id: 'today', label: '📅 Today' },
-    { id: 'week', label: '📆 This Week' },
-    { id: 'month', label: '🗓️ This Month' },
+    { id: 'today', label: 'Today' },
+    { id: 'week', label: 'This Week' },
+    { id: 'month', label: 'This Month' },
     { id: 'overall', label: 'Overall' },
   ]
 
@@ -266,7 +266,7 @@ export default function ReportsPage() {
         </Section>
 
         {/* Refund Summary */}
-        <Section title="Refunds" icon="↩️">
+        <Section title="Refunds">
           {fRefunds.length === 0 ? <p className="text-gray-400 text-sm text-center py-4">No refunds</p> : (
             <div className="space-y-2.5">
               {fRefunds.slice(0, 8).map((r, i) => (
@@ -288,7 +288,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Daily Breakdown Table */}
-      <Section title="Daily Breakdown" icon="📅">
+      <Section title="Daily Breakdown">
         <div className="overflow-x-auto -mx-2">
           <table className="w-full min-w-[600px]">
             <thead>
