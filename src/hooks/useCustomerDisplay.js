@@ -3,61 +3,61 @@ import { useStore } from './useStore'
 import { getSupabase } from '../lib/supabase'
 
 /**
- * Broadcasts the live cart to the customer-facing display via Supabase
- * Realtime (broadcast channel — ephemeral, no DB writes, no payment code).
- * Mount once in the cashier app. A second window at #/customer-display
- * subscribes to the same channel.
- *
- * Hardened: waits for SUBSCRIBED before sending; answers "hello" pings
- * from a display that opens mid-sale so it immediately shows the cart.
+ * Customer-facing display sync via Supabase Realtime broadcast.
+ * A single shared channel ('customer-display') is used for everything:
+ * live cart updates, the 'paying' state, and the 'paid' thank-you.
+ * Ephemeral — no DB writes, no payment code.
  */
+
+let sharedChannel = null
+let channelReady = false
+
+function ensureChannel() {
+  if (sharedChannel) return sharedChannel
+  const sb = getSupabase(); if (!sb) return null
+  const ch = sb.channel('customer-display', { config: { broadcast: { self: false } } })
+  ch.subscribe(status => { channelReady = (status === 'SUBSCRIBED') })
+  sharedChannel = ch
+  return ch
+}
+
+function sendState(payload) {
+  const ch = ensureChannel(); if (!ch) return
+  const fire = () => ch.send({ type: 'broadcast', event: 'state', payload: { ...payload, ts: Date.now() } })
+  if (channelReady) fire()
+  else setTimeout(fire, 250) // give the channel a moment to subscribe
+}
+
+/** Mounted once in the cashier app — broadcasts the live cart. */
 export function useCustomerDisplayBroadcast(extra = {}) {
   const cart = useStore(s => s.cart)
-  const chRef = useRef(null)
-  const readyRef = useRef(false)
   const stateRef = useRef(extra)
   stateRef.current = extra
 
-  const buildPayload = () => {
+  const pushCart = () => {
     const c = useStore.getState().cart
     const sub = c.reduce((a, x) => a + x.lineTotal, 0)
-    return {
+    sendState({
       items: c.map(x => ({ name: x.name, qty: x.qty, price: x.price, lineTotal: x.lineTotal, image: x.image || '' })),
       count: c.reduce((a, x) => a + x.qty, 0),
       subtotal: sub,
       status: stateRef.current.status || 'shopping',
       total: stateRef.current.total != null ? stateRef.current.total : sub,
       receiptNo: stateRef.current.receiptNo || null,
-      ts: Date.now(),
-    }
-  }
-
-  const push = () => {
-    const ch = chRef.current
-    if (!ch || !readyRef.current) return
-    ch.send({ type: 'broadcast', event: 'state', payload: buildPayload() })
+    })
   }
 
   useEffect(() => {
-    const sb = getSupabase(); if (!sb) return
-    const ch = sb.channel('customer-display', { config: { broadcast: { self: false } } })
-    ch.on('broadcast', { event: 'hello' }, () => push())
-    ch.subscribe(status => { if (status === 'SUBSCRIBED') { readyRef.current = true; push() } })
-    chRef.current = ch
-    return () => { readyRef.current = false; sb.removeChannel(ch); chRef.current = null }
+    const ch = ensureChannel(); if (!ch) return
+    // a display that opens mid-sale says 'hello' — reply with current cart
+    ch.on('broadcast', { event: 'hello' }, () => pushCart())
+    return () => {} // keep channel alive for the session
   }, [])
 
-  useEffect(() => { push() }, [cart, extra.status, extra.total, extra.receiptNo])
+  useEffect(() => { pushCart() }, [cart, extra.status, extra.total, extra.receiptNo])
 }
 
-/** Fire a one-off broadcast (e.g. the "paid / thank you" screen). */
+/** One-off broadcast (paying / paid) on the same shared channel. */
 export function broadcastDisplay(payload) {
-  const sb = getSupabase(); if (!sb) return
-  const ch = sb.channel('customer-display-oneoff')
-  ch.subscribe(status => {
-    if (status === 'SUBSCRIBED') {
-      ch.send({ type: 'broadcast', event: 'state', payload: { ...payload, ts: Date.now() } })
-      setTimeout(() => sb.removeChannel(ch), 800)
-    }
-  })
+  sendState(payload)
 }
