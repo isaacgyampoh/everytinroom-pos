@@ -38,20 +38,20 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Outfit', 'DM Sans', system-ui, sans-serif
    ~100 components. Surgical: colors only, no layout changes.
    ════════════════════════════════════════════════════════════ */
 body.dark {
-  background: #0f1115;
-  color: #e6e7eb;
+  background: #0d0f13;
+  color: #f4f5f7;
 }
 body.dark ::-webkit-scrollbar-thumb { background: #33363d; }
 body.dark ::selection { background: #e6e7eb; color: #0f1115; }
 
 /* surfaces */
-body.dark .bg-white { background-color: #1a1d24 !important; }
+body.dark .bg-white { background-color: #1c2028 !important; }
 body.dark .bg-stone-50,
 body.dark .bg-stone-100,
 body.dark .bg-gray-50,
-body.dark .bg-gray-100 { background-color: #21242c !important; }
+body.dark .bg-gray-100 { background-color: #23272f !important; }
 body.dark .bg-stone-200,
-body.dark .bg-gray-200 { background-color: #2a2e37 !important; }
+body.dark .bg-gray-200 { background-color: #2d323b !important; }
 body.dark .bg-cream { background-color: #1a1d24 !important; }
 body.dark .bg-stone-100\/60,
 body.dark .bg-stone-100\/50,
@@ -66,22 +66,22 @@ body.dark .bg-stone-100.overflow-hidden { background-color: #21242c !important; 
 body.dark .bg-gray-900 { background-color: #2b2f3a !important; }
 body.dark .bg-gray-800 { background-color: #323743 !important; }
 
-/* text */
+/* text — brightened for readability */
 body.dark .text-gray-900,
 body.dark .text-gray-800,
-body.dark .text-black { color: #e6e7eb !important; }
+body.dark .text-black { color: #f4f5f7 !important; }
 body.dark .text-gray-700,
 body.dark .text-gray-600,
 body.dark .text-stone-700,
 body.dark .text-stone-600,
 body.dark .text-stone-500,
-body.dark .text-gray-500 { color: #b4b7c0 !important; }
+body.dark .text-gray-500 { color: #c9ccd4 !important; }
 body.dark .text-stone-400,
 body.dark .text-stone-300,
 body.dark .text-gray-400,
-body.dark .text-gray-300 { color: #7b7f8a !important; }
+body.dark .text-gray-300 { color: #9499a3 !important; }
 body.dark .text-stone-200,
-body.dark .text-gray-200 { color: #4a4e57 !important; }
+body.dark .text-gray-200 { color: #6b7280 !important; }
 
 /* text that sits ON the accent (gray-900/800) surfaces must stay light */
 body.dark .bg-gray-900 .text-white,

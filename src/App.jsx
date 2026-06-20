@@ -191,7 +191,7 @@ export default function App() {
         </div>
       )}
 
-      <main className={`pt-14 md:pt-0 md:ml-16 pb-24 md:pb-10 min-h-screen ${page === 'pos' ? 'xl:mr-[400px]' : ''}`}>
+      <main className="pt-14 md:pt-0 md:ml-16 pb-24 md:pb-10 min-h-screen">
         <div className="px-4 md:px-8 lg:px-10 py-5 md:py-6">
           <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-7 h-7 border-[2.5px] border-stone-200 border-t-gray-800 rounded-full animate-spin" /></div>}>
             {pages[page] || <POS />}
