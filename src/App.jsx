@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { getSupabase } from './lib/supabase'
 import { useStore } from './hooks/useStore'
+import { useCustomerDisplayBroadcast, broadcastDisplay } from './hooks/useCustomerDisplay'
 import Loader from './components/Loader'
 import Login from './components/Login'
 import Navigation from './components/Navigation'
@@ -30,6 +31,7 @@ const RestockPage = lazy(() => import('./pages/RestockPage'))
 const InvoicePay = lazy(() => import('./pages/InvoicePay'))
 const Catalog = lazy(() => import('./pages/Catalog'))
 const DeliveryConfirm = lazy(() => import('./pages/DeliveryConfirm'))
+const CustomerDisplay = lazy(() => import('./pages/CustomerDisplay'))
 
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000 // 30 minutes
 const ADMIN_PAGES = ['products', 'staff', 'promos', 'invoices', 'stocktakes', 'stockadjustments', 'restock']
@@ -40,6 +42,9 @@ export default function App() {
   const [receipt, setReceipt] = useState(null)
   const [lastActivity, setLastActivity] = useState(Date.now())
   const [salePopup, setSalePopup] = useState(null)
+
+  // Broadcast live cart to the customer-facing display (#/customer-display)
+  useCustomerDisplayBroadcast()
 
   // Apply dark mode
   useEffect(() => {
@@ -110,6 +115,8 @@ export default function App() {
           playSaleSound()
           setSalePopup({ total: s.total, customer: s.customer, payment: s.payment, cashier: s.cashier })
           setTimeout(() => setSalePopup(null), 4000)
+          // show thank-you on the customer display
+          broadcastDisplay({ status: 'paid', total: s.total, receiptNo: s.receipt_no || s.receiptNo || null, items: [], count: 0, subtotal: 0 })
         }
       })
       .subscribe()
@@ -137,6 +144,7 @@ export default function App() {
   }, [waOrders])
 
   // Public pages - no login required
+  if (window.location.hash.includes('/customer-display')) return <Suspense fallback={<Loader />}><CustomerDisplay /></Suspense>
   if (window.location.hash.includes('/pay/')) return <Suspense fallback={<Loader />}><InvoicePay /></Suspense>
   if (window.location.hash.includes('/deliver/')) return <Suspense fallback={<Loader />}><DeliveryConfirm /></Suspense>
   if (window.location.hash.includes('/catalog')) return <Suspense fallback={<Loader />}><Catalog /></Suspense>
