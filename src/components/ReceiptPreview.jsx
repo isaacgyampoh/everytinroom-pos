@@ -1,9 +1,10 @@
+import { useEffect, useRef } from 'react'
 import { money, fmtDateTime, SHOP } from '../lib/utils'
 
 export default function ReceiptPreview({ sale, onClose }) {
-  if (!sale) return null
+  const printedRef = useRef(false)
 
-  const items = Array.isArray(sale.items) ? sale.items : []
+  const items = Array.isArray(sale?.items) ? sale.items : []
 
   const doPrint = () => {
     const w = window.open('', '_blank', 'width=400,height=700')
@@ -98,6 +99,16 @@ export default function ReceiptPreview({ sale, onClose }) {
     w.document.close()
     setTimeout(() => { w.focus(); w.print(); setTimeout(() => w.close(), 1000) }, 300)
   }
+
+  // Auto-print receipt for completed Cash sales (once)
+  useEffect(() => {
+    if (sale && !printedRef.current && sale.payment === 'Cash') {
+      printedRef.current = true
+      setTimeout(() => doPrint(), 250)
+    }
+  }, [sale]) // eslint-disable-line
+
+  if (!sale) return null
 
   return (
     <>

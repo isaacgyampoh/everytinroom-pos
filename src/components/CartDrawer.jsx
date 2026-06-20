@@ -347,21 +347,21 @@ export default function CartDrawer({ open, onClose, onReceipt, docked }) {
               <div className="text-xs text-gray-400 mt-1">{phone}</div>
             </div>
 
-            {/* 4 Payment Methods */}
+            {/* Payment Methods — Cash & USSD only */}
             <div>
               <label className="block text-xs font-semibold text-gray-400 mb-2.5">Payment Method</label>
               <div className="grid grid-cols-2 gap-2.5">
                 {[
-                  { id: 'Cash', icon: '💵', label: 'Cash', sub: 'Manual', color: 'bg-green-500', border: 'border-green-500' },
-                  { id: 'Momo', icon: '', label: 'Momo', sub: 'Manual', color: 'bg-gray-500', border: 'border-amber-500' },
-                  { id: 'USSD', icon: '📱', label: 'USSD', sub: 'MoMo Prompt', color: 'bg-blue-500', border: 'border-blue-500' },
-                  { id: 'Split', icon: '✂️', label: 'Split', sub: 'Cash + USSD', color: 'bg-violet-500', border: 'border-violet-500' },
+                  { id: 'Cash', label: 'Cash', sub: 'Pay at counter', color: 'bg-green-600', border: 'border-green-600',
+                    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg> },
+                  { id: 'USSD', label: 'USSD', sub: 'MoMo prompt', color: 'bg-blue-600', border: 'border-blue-600',
+                    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M11 18h2"/></svg> },
                 ].map(m => {
-                  const active = m.id === 'Split' ? splitMode : (!splitMode && payMethod === m.id)
+                  const active = !splitMode && payMethod === m.id
                   return (
-                    <button key={m.id} onClick={() => { if (m.id === 'Split') { setSplitMode(true); setSplitCash('') } else { setPayMethod(m.id); setSplitMode(false) } }}
-                      className={`h-20 rounded-xl text-sm font-bold border-2 flex flex-col items-center justify-center gap-0.5 transition-all ${active ? m.color + ' text-white ' + m.border + ' shadow-md' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
-                      <span className="text-xl">{m.icon}</span>
+                    <button key={m.id} onClick={() => { setPayMethod(m.id); setSplitMode(false) }}
+                      className={`h-24 rounded-2xl text-sm font-bold border-2 flex flex-col items-center justify-center gap-1.5 transition-all ${active ? m.color + ' text-white ' + m.border + ' shadow-md' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                      <span>{m.icon}</span>
                       <span>{m.label}</span>
                       <span className={`text-[10px] font-medium ${active ? 'opacity-70' : 'opacity-40'}`}>{m.sub}</span>
                     </button>
@@ -370,35 +370,11 @@ export default function CartDrawer({ open, onClose, onReceipt, docked }) {
               </div>
             </div>
 
-            {/* Momo Manual Info */}
-            {!splitMode && payMethod === 'Momo' && (
-              <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100">
-                <div className="text-sm font-bold text-amber-700 mb-1">Manual Momo</div>
-                <div className="text-xs text-gray-700">Confirm you've received {money(total)} via Mobile Money from {phone}, then click to complete.</div>
-              </div>
-            )}
-
             {/* USSD Info */}
             {!splitMode && payMethod === 'USSD' && (
               <div className="bg-blue-50 rounded-xl p-3.5 border border-blue-100">
-                <div className="text-sm font-bold text-blue-700 mb-1">📱 USSD Payment</div>
-                <div className="text-xs text-gray-500">An invoice will be created and a USSD code generated. Send the code to the customer to dial and pay via MoMo.</div>
-              </div>
-            )}
-
-            {/* Split Details */}
-            {splitMode && (
-              <div className="bg-violet-50 rounded-xl p-4 border border-violet-100 space-y-3">
-                <div className="text-sm font-bold text-violet-700">✂️ Split Payment — {money(total)}</div>
-                <div>
-                  <label className="block text-xs font-semibold text-violet-600 mb-1.5">💵 Cash Amount</label>
-                  <input type="number" className="w-full h-11 px-4 bg-white border border-violet-200 rounded-xl text-sm font-bold focus:outline-none focus:border-violet-400" placeholder="0.00" value={splitCash} min={0} max={total} onChange={e => setSplitCash(e.target.value)} />
-                </div>
-                <div className="flex justify-between items-center pt-2 border-t border-violet-200">
-                  <span className="text-sm font-semibold text-blue-600">USSD Portion</span>
-                  <span className="text-lg font-bold text-blue-600">{money(Math.max(0, splitRemainder))}</span>
-                </div>
-                <div className="text-xs text-violet-500">Cash collected manually. USSD code sent for the MoMo portion.</div>
+                <div className="text-sm font-bold text-blue-700 mb-1">USSD Payment</div>
+                <div className="text-xs text-gray-500">A USSD code is generated and sent to the customer by SMS. They dial it to pay via MoMo. The receipt prints once payment is confirmed.</div>
               </div>
             )}
 
@@ -406,7 +382,7 @@ export default function CartDrawer({ open, onClose, onReceipt, docked }) {
 
             <button onClick={handleCompleteSale} disabled={processing}
               className="w-full h-12 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm">
-              {processing ? 'Processing...' : splitMode ? '✂️ Confirm Split' : payMethod === 'Cash' ? '💵 Confirm Cash' : payMethod === 'Momo' ? 'Confirm Momo Received' : '📱 Create USSD Invoice'}
+              {processing ? 'Processing...' : payMethod === 'Cash' ? 'Confirm Cash Payment' : 'Generate & Send USSD Code'}
             </button>
           </>)}
 
@@ -427,7 +403,7 @@ export default function CartDrawer({ open, onClose, onReceipt, docked }) {
               <button onClick={() => { if (pollRef.current) clearInterval(pollRef.current); setMomoStep('idle'); setMomoMessage('') }} className="mt-4 text-xs text-gray-400 hover:text-gray-600">Cancel</button>
             </div>
           )}
-          {momoStep === 'success' && <div className="text-center py-10"><div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">✅</div><h3 className="text-lg font-bold text-green-600 mb-1">Payment Confirmed!</h3><p className="text-gray-400 text-sm">Recording sale...</p></div>}
+          {momoStep === 'success' && <div className="text-center py-10"><div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div><h3 className="text-lg font-bold text-green-600 mb-1">Payment Confirmed!</h3><p className="text-gray-400 text-sm">Recording sale...</p></div>}
         </div>
       </Modal>
 
@@ -449,8 +425,8 @@ export default function CartDrawer({ open, onClose, onReceipt, docked }) {
                 <div className="text-xs text-gray-400 leading-relaxed">{h.items.map(i => i.name).join(', ')}</div>
               </div>
               <div className="flex border-t border-gray-100">
-                <button onClick={() => recallCart(h)} className="flex-1 h-10 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition">↩ Recall</button>
-                <button onClick={() => deleteHeld(h.id)} className="h-10 px-4 text-sm font-semibold text-red-400 hover:bg-red-50 border-l border-gray-100 transition">🗑</button>
+                <button onClick={() => recallCart(h)} className="flex-1 h-10 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition">Recall</button>
+                <button onClick={() => deleteHeld(h.id)} className="h-10 px-4 text-red-400 hover:bg-red-50 border-l border-gray-100 transition flex items-center justify-center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg></button>
               </div>
             </div>
           ))}
