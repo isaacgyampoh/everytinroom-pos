@@ -237,7 +237,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
 
           <button onClick={handleOpenPayment} disabled={cnt === 0 || !phoneValid}
             className="w-full h-12 bg-gray-900 hover:bg-gray-800 rounded-xl text-white text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all ">
-            Complete Sale — {money(total)}
+            Complete Sale · {money(total)}
           </button>
 
           {/* WhatsApp Invoice Button */}
@@ -295,7 +295,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             setProcessing(false)
           }} disabled={cnt === 0 || !phoneValid || processing}
             className="w-full h-12 bg-[#25d366] hover:bg-[#1ebe5d] rounded-xl text-white text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm mt-2 flex items-center justify-center gap-2">
-            Send Invoice via WhatsApp — {money(total)}
+            Send Invoice · {money(total)}
           </button>
 
           {/* Generate USSD Button */}
@@ -344,7 +344,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             setProcessing(false)
           }} disabled={cnt === 0 || !phoneValid || processing}
             className="w-full h-12 bg-amber-500 hover:bg-amber-600 rounded-xl text-white text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm mt-2 flex items-center justify-center gap-2">
-            Generate USSD Code — {money(total)}
+            Generate USSD Code · {money(total)}
           </button>
         </div>
       </div>

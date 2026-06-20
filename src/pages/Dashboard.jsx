@@ -227,7 +227,7 @@ export default function Dashboard() {
             {lowStock.slice(0, 6).map(p => (
               <div key={p.id} className="flex items-center gap-3 px-4 py-3">
                 <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
-                  {p.image ? <img src={p.image} alt="" className="w-full h-full object-cover" /> : <span className="text-xs opacity-30">□</span>}
+                  {p.image ? <img src={p.image} alt="" className="w-full h-full object-cover" /> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-30"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-gray-800">{p.name}</div>

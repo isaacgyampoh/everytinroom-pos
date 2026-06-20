@@ -69,7 +69,7 @@ export default function CustomerDisplay() {
               {s.items.map((it, i) => (
                 <div key={i} className="flex items-center gap-4 bg-white rounded-2xl p-4 shadow-sm">
                   <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-xl bg-stone-100 overflow-hidden flex-shrink-0">
-                    {it.image ? <img src={thumb(it.image, 200)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-stone-300 text-2xl">□</div>}
+                    {it.image ? <img src={thumb(it.image, 200)} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-stone-300"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-lg lg:text-xl font-semibold text-gray-900 truncate">{it.name}</div>

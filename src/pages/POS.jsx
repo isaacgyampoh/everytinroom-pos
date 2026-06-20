@@ -10,7 +10,7 @@ const ProductCard = memo(({ item, price, hasPromo, onAdd }) => {
       className={`bg-white rounded-2xl overflow-hidden text-left transition-transform active:scale-[.97] ${hasPromo ? 'ring-2 ring-gray-400' : ''} ${qty === 0 ? 'opacity-30 pointer-events-none' : ''}`}>
       {hasPromo && <div className="bg-gray-900 text-white text-[10px] font-bold text-center py-1 tracking-wider uppercase">Promo</div>}
       <div className="w-full aspect-[4/3] bg-stone-100 overflow-hidden">
-        {item.image ? <img src={thumb(item.image, 300)} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" fetchPriority="low" /> : <div className="w-full h-full flex items-center justify-center text-stone-200 text-xl">□</div>}
+        {item.image ? <img src={thumb(item.image, 300)} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" fetchPriority="low" /> : <div className="w-full h-full flex items-center justify-center text-stone-300"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>}
       </div>
       <div className="p-2.5">
         <div className="text-[12px] md:text-[13px] font-semibold text-gray-900 leading-snug truncate">{item.name}</div>
