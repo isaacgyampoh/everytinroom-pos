@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../hooks/useStore'
 import { getSupabase } from '../lib/supabase'
 import { money, num } from '../lib/utils'
+import { broadcastDisplay } from '../hooks/useCustomerDisplay'
 import Modal from './Modal'
 import toast from 'react-hot-toast'
 
@@ -29,6 +30,11 @@ export default function CartDrawer({ open, onClose, onReceipt, docked }) {
   const phoneValid = phone.trim().length >= 9
 
   useEffect(() => { return () => { if (pollRef.current) clearInterval(pollRef.current) } }, [])
+
+  // Reflect checkout on the customer display (purely visual; no payment logic)
+  useEffect(() => {
+    if (payOpen) broadcastDisplay({ status: 'paying', total, count: cnt, subtotal: sub, items: cart.map(c => ({ name: c.name, qty: c.qty, price: c.price, lineTotal: c.lineTotal, image: c.image || '' })) })
+  }, [payOpen]) // eslint-disable-line
   useEffect(() => { localStorage.setItem('heldCarts', JSON.stringify(heldCarts)) }, [heldCarts])
 
   const recordSale = async (paymentMethod, extraData = {}) => {

@@ -14,15 +14,16 @@ export default function CustomerDisplay() {
     const ch = sb.channel('customer-display', { config: { broadcast: { self: true } } })
     ch.on('broadcast', { event: 'state' }, ({ payload }) => {
       setS(prev => ({ ...EMPTY, ...payload }))
-      // flash the total when item count rises
       if ((payload.count || 0) > prevCount.current) { setFlash(true); setTimeout(() => setFlash(false), 350) }
       prevCount.current = payload.count || 0
-      // auto-reset after a paid/thank-you screen
       if (payload.status === 'paid') {
         setTimeout(() => { setS(EMPTY); prevCount.current = 0 }, 6000)
       }
     })
-    ch.subscribe()
+    ch.subscribe(status => {
+      // when we connect, ask the cashier app to send the current cart
+      if (status === 'SUBSCRIBED') ch.send({ type: 'broadcast', event: 'hello', payload: { ts: Date.now() } })
+    })
     return () => { sb.removeChannel(ch) }
   }, [])
 
