@@ -109,7 +109,7 @@ export default function POS() {
       )}
 
       {/* Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5">
         {filtered.length === 0 && <div className="col-span-full py-20 text-center text-stone-300 text-sm">No products found</div>}
         {filtered.map((item, idx) => {
           if (mode === 'bundle') return (
