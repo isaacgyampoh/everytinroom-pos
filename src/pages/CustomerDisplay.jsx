@@ -10,6 +10,13 @@ export default function CustomerDisplay() {
   const [flash, setFlash] = useState(false)
   const prevCount = useRef(0)
 
+  // The customer screen is always light, independent of the cashier's theme.
+  useEffect(() => {
+    document.body.classList.remove('dark')
+    document.body.style.background = '#ffffff'
+    return () => { document.body.style.background = '' }
+  }, [])
+
   useEffect(() => {
     const sb = getSupabase(); if (!sb) return
     const ch = sb.channel('customer-display', { config: { broadcast: { self: true } } })
@@ -49,7 +56,7 @@ export default function CustomerDisplay() {
   const empty = !s.items || s.items.length === 0
 
   return (
-    <div className="fixed inset-0 bg-stone-50 overflow-hidden">
+    <div className="fixed inset-0 bg-white overflow-hidden">
       {/* Header — fixed at top */}
       <header className="fixed top-0 left-0 right-0 z-20 flex items-center gap-3 px-8 py-5 bg-[#16181d] text-white">
         <LogoFlat height={22} color="#ffffff" accent="#9a9da3" tagline={false} />
@@ -57,10 +64,10 @@ export default function CustomerDisplay() {
       </header>
 
       {empty ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
-          <Logo height={120} tagline={true} className="mb-8" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 bg-white">
+          <Logo height={120} color="#16181d" accent="#9a9da3" tagline={true} className="mb-8" />
           <h1 className="text-4xl md:text-5xl font-semibold font-heading text-[#16181d] mb-4">Welcome</h1>
-          <p className="text-xl text-stone-400">Your items will appear here as they're scanned</p>
+          <p className="text-xl text-[#8a8d92]">Your items will appear here as they're scanned</p>
         </div>
       ) : (
         <>
