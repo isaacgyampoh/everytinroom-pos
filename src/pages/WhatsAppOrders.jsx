@@ -272,18 +272,18 @@ export default function WhatsAppOrders() {
 
   const statusColor = (s) => {
     const sc = s?.toLowerCase()
-    if (sc === 'paid') return 'bg-emerald-500 text-white'
-    if (sc === 'completed') return 'bg-gray-800 text-white'
-    if (sc === 'cancelled') return 'bg-red-500 text-white'
-    return 'bg-gray-800 text-white'
+    if (sc === 'paid') return 'bg-[#2f6e54] text-white'
+    if (sc === 'completed') return 'bg-[#1a3d30] text-white'
+    if (sc === 'cancelled') return 'bg-[#c0492f] text-white'
+    return 'bg-[#b08642] text-white'
   }
 
   const deliveryColor = (s) => {
-    if (s === 'Delivered') return 'bg-green-500 text-white'
-    if (s === 'Picked Up') return 'bg-green-500 text-white'
-    if (s === 'Out for Delivery') return 'bg-blue-500 text-white'
-    if (s === 'Packaged') return 'bg-gray-500 text-white'
-    return 'bg-gray-200 text-gray-500'
+    if (s === 'Delivered') return 'bg-[#2f6e54] text-white'
+    if (s === 'Picked Up') return 'bg-[#2f6e54] text-white'
+    if (s === 'Out for Delivery') return 'bg-[#b08642] text-white'
+    if (s === 'Packaged') return 'bg-[#5e6b62] text-white'
+    return 'bg-[#dde2dc] text-[#5e6b62]'
   }
 
   const o = selected // shorthand for modal

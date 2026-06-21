@@ -69,7 +69,7 @@ export default function Catalog() {
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center" style={{ colorScheme: 'light' }}><div className="w-7 h-7 border-[2.5px] border-stone-200 border-t-green-700 rounded-full animate-spin" /></div>
 
   return (
-    <div className="min-h-screen bg-white catalog-light" style={{ fontFamily: "'DM Sans', sans-serif", colorScheme: 'light', color: '#111827' }}>
+    <div className="min-h-screen bg-white catalog-light" style={{ fontFamily: "'Hanken Grotesk', sans-serif", colorScheme: 'light', color: '#111827' }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet" />
       <style>{`
         .catalog-light, .catalog-light * { color-scheme: light !important; }
@@ -122,7 +122,7 @@ export default function Catalog() {
           <div className="flex items-center gap-2 mb-3"><div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" /><span className="text-xs font-bold text-stone-800 uppercase tracking-wider">Promo</span></div>
           <div className="flex gap-3 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-2">
             {products.filter(p => promoMap[p.id]).map(p => <div key={'p'+p.id} onClick={() => open(p)} className="flex-shrink-0 w-[140px] cursor-pointer group">
-              <div className="w-full h-24 bg-stone-100 rounded-xl overflow-hidden relative">{p.image ? <img src={thumb(p.image, 400)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" /> : <div className="w-full h-full bg-stone-50" />}<div className="absolute top-1.5 left-1.5 bg-red-500 text-white text-[8px] font-bold px-2 py-0.5 rounded">PROMO</div></div>
+              <div className="w-full h-24 bg-stone-100 rounded-xl overflow-hidden relative">{p.image ? <img src={thumb(p.image, 400)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" /> : <div className="w-full h-full bg-stone-50" />}<div className="absolute top-1.5 left-1.5 bg-[#b08642] text-white text-[8px] font-bold px-2 py-0.5 rounded">PROMO</div></div>
               <p className="text-[11px] font-medium text-stone-700 mt-2 truncate">{p.name}</p>
               <div className="flex items-center gap-1.5"><span className="text-[10px] text-stone-400 line-through">{money(p.price)}</span><span className="text-xs font-bold text-red-600">{money(promoMap[p.id].price)}</span></div>
             </div>)}
@@ -139,7 +139,7 @@ export default function Catalog() {
             return <div key={p.id} className="group cursor-pointer" onClick={() => open(p)}>
               <div className="w-full aspect-square bg-stone-100 rounded-2xl overflow-hidden relative mb-2.5">
                 {p.image ? <img src={thumb(p.image)} alt={p.name} className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" loading="lazy" /> : <div className="w-full h-full bg-stone-50" />}
-                {promo && <div className="absolute top-2 left-2 bg-red-500 text-white text-[9px] font-bold px-2 py-1 rounded-lg">PROMO</div>}
+                {promo && <div className="absolute top-2 left-2 bg-[#b08642] text-white text-[9px] font-bold px-2 py-1 rounded-lg">PROMO</div>}
               </div>
               <p className="text-xs text-stone-400 mb-0.5">{p.category}</p>
               <p className="text-sm font-semibold text-stone-900 leading-snug mb-1 line-clamp-2">{p.name}</p>
@@ -254,7 +254,7 @@ export default function Catalog() {
                 <button onClick={() => share(view)} className="absolute top-3 left-3 w-9 h-9 bg-white/90 backdrop-blur rounded-xl flex items-center justify-center shadow">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
                 </button>
-                {pr && <div className="absolute bottom-3 left-3 bg-red-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl">{pr.name}</div>}
+                {pr && <div className="absolute bottom-3 left-3 bg-[#b08642] text-white text-[11px] font-bold px-3 py-1.5 rounded-xl">{pr.name}</div>}
               </div>
               <div className="p-5">
                 {view.category && <p className="text-xs text-stone-400 mb-1">{view.category}</p>}

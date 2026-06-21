@@ -124,7 +124,7 @@ export default function ReportsPage() {
           const blob = new Blob([csv], { type: 'text/csv' })
           const url = URL.createObjectURL(blob)
           const a = document.createElement('a'); a.href = url; a.download = `everytin-room-report-${tab}-${today()}.csv`; a.click()
-        }} className="h-10 px-4 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 active:scale-[.97] transition">
+        }} className="h-10 px-4 bg-[#1a3d30] text-white rounded-xl text-sm font-semibold hover:bg-[#265a44] active:scale-[.97] transition">
           Export CSV
         </button>
       </div>
