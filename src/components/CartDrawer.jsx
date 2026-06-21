@@ -326,9 +326,9 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
               <label className="block text-xs font-semibold text-gray-400 mb-2.5">Payment Method</label>
               <div className="grid grid-cols-2 gap-2.5">
                 {[
-                  { id: 'Cash', label: 'Cash', sub: 'Pay at counter', color: 'bg-green-600', border: 'border-green-600',
+                  { id: 'Cash', label: 'Cash', sub: 'Pay at counter', color: 'bg-[#1a3d30]', border: 'border-[#1a3d30]',
                     icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg> },
-                  { id: 'USSD', label: 'USSD', sub: 'MoMo prompt', color: 'bg-blue-600', border: 'border-blue-600',
+                  { id: 'USSD', label: 'USSD', sub: 'MoMo prompt', color: 'bg-[#b08642]', border: 'border-[#b08642]',
                     icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M11 18h2"/></svg> },
                 ].map(m => {
                   const active = !splitMode && payMethod === m.id
@@ -346,8 +346,8 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
 
             {/* USSD Info */}
             {!splitMode && payMethod === 'USSD' && (
-              <div className="bg-blue-50 rounded-xl p-3.5 border border-blue-100">
-                <div className="text-sm font-bold text-blue-700 mb-1">USSD Payment</div>
+              <div className="bg-[#f1f5f2] rounded-xl p-3.5 border border-[#bcd1c5]">
+                <div className="text-sm font-bold text-[#1a3d30] mb-1">USSD Payment</div>
                 <div className="text-xs text-gray-500">A USSD code is generated and sent to the customer by SMS. They dial it to pay via MoMo. The receipt prints once payment is confirmed.</div>
               </div>
             )}
@@ -367,7 +367,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                 <p className="text-xs uppercase tracking-wider text-blue-600 font-semibold mb-2">USSD Payment Code</p>
                 <p className="text-3xl font-bold text-blue-900 font-mono tracking-wider mb-2" style={{ whiteSpace: 'pre-line' }}>{momoMessage.split('\n')[0]?.replace('USSD Code: ', '')}</p>
                 <p className="text-sm text-blue-700 font-semibold">{momoMessage.split('\n')[1]}</p>
-                <button onClick={() => { navigator.clipboard?.writeText(momoMessage.split('\n')[0]?.replace('USSD Code: ', '')); toast.success('Copied!') }} className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">Copy Code</button>
+                <button onClick={() => { navigator.clipboard?.writeText(momoMessage.split('\n')[0]?.replace('USSD Code: ', '')); toast.success('Copied!') }} className="mt-3 px-4 py-2 bg-[#1a3d30] text-white rounded-lg text-xs font-bold">Copy Code</button>
               </div>
               <p className="text-xs text-gray-500 mb-2">Tell the customer to dial the code above</p>
               <div className="flex items-center justify-center gap-2 text-xs text-gray-400">

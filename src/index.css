@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-body { font-family: 'DM Sans', system-ui, sans-serif; font-size: 15px; background: #F5F5F3; color: #1a1a1a; letter-spacing: -0.01em; transition: background .2s ease, color .2s ease; }
-h1, h2, h3, h4, h5, h6 { font-family: 'Outfit', 'DM Sans', system-ui, sans-serif; letter-spacing: -0.03em; }
+body { font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 15px; background: #F4F2EC; color: #1c2620; letter-spacing: -0.011em; transition: background .2s ease, color .2s ease; }
+h1, h2, h3, h4, h5, h6 { font-family: 'Fraunces', Georgia, serif; letter-spacing: -0.02em; font-optical-sizing: auto; }
 @media (min-width: 768px) { body { font-size: 16px; } }
 
 ::selection { background: #1a1a24; color: #fff; }
