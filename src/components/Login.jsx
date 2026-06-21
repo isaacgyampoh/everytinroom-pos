@@ -48,7 +48,7 @@ export default function Login() {
 
         {/* Logo */}
         <div className="mb-11 flex justify-center">
-          <Logo height={62} tagline={true} />
+          <Logo height={104} tagline={true} />
         </div>
 
         {/* PIN */}

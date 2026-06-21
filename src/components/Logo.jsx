@@ -1,48 +1,68 @@
 /**
- * EVERYTINROOM — typographic logo, drawn as SVG so it's razor-sharp at
- * any size (rail icon, login, big customer display, thermal receipt).
- * Two forms, one identity:
- *   <Logo />        full wordmark "EVERYTINROOM" (+ optional & BEDTIME)
- *   <LogoMark />    compact monogram for square slots
- * Colours come from currentColor / props so it adapts to dark surfaces.
+ * EVERYTINROOM — typographic logo system (SVG, sharp at any size).
+ *   <Logo />      arched "crest" wordmark (default) — EVERYTINROOM on a
+ *                 gentle arc, "& BEDTIME" straight beneath.
+ *   <LogoFlat />  straight one-line wordmark (clipping fixed).
+ *   <LogoMark />  compact "E" monogram for square slots.
  */
 
-const INK = '#1a3d30'   // brand forest green
-const GOLD = '#b08642'  // brand gold accent
+const INK = '#1a3d30'
+const GOLD = '#b08642'
 
-// Full wordmark — letter-spaced serif caps with a gold hairline rule,
-// the classic premium boutique treatment.
-export function Logo({ height = 40, color = INK, accent = GOLD, tagline = true, className = '' }) {
-  // viewBox sized to the artwork; height scales it, width follows ratio
-  const w = 320, h = tagline ? 92 : 64
+let _id = 0
+const uid = () => `arc${++_id}`
+
+export function Logo({ height = 96, color = INK, accent = GOLD, tagline = true, className = '' }) {
+  const id = uid()
+  const W = 440, H = tagline ? 150 : 120
+  const cx = W / 2
+  const arcY = 96, arcLift = 34
+  const arcPath = `M 60 ${arcY} Q ${cx} ${arcY - arcLift} ${W - 60} ${arcY}`
   return (
-    <svg className={className} height={height} viewBox={`0 0 ${w} ${h}`} fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EVERYTINROOM">
-      <text x={w/2} y={tagline ? 36 : 42} textAnchor="middle"
-        fontFamily="'Fraunces', Georgia, serif" fontWeight="600" fontSize="38"
-        letterSpacing="3.5" fill={color}
-        style={{ fontOpticalSizing: 'auto' }}>EVERYTINROOM</text>
-      {/* gold hairline rules flanking a small diamond — boutique mark */}
-      <line x1={tagline ? 96 : 70} y1={tagline ? 58 : 56} x2={tagline ? 150 : 140} y2={tagline ? 58 : 56} stroke={accent} strokeWidth="1.3" />
-      <rect x={w/2 - 3} y={(tagline ? 58 : 56) - 3} width="6" height="6" fill={accent} transform={`rotate(45 ${w/2} ${tagline ? 58 : 56})`} />
-      <line x1={tagline ? 170 : 180} y1={tagline ? 58 : 56} x2={tagline ? 224 : 250} y2={tagline ? 58 : 56} stroke={accent} strokeWidth="1.3" />
+    <svg className={className} height={height} viewBox={`0 0 ${W} ${H}`} fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EVERYTINROOM & BEDTIME">
+      <defs><path id={id} d={arcPath} /></defs>
+      <text fill={color} fontFamily="'Fraunces', Georgia, serif" fontWeight="600" fontSize="40" letterSpacing="2.5" style={{ fontOpticalSizing: 'auto' }}>
+        <textPath href={`#${id}`} startOffset="50%" textAnchor="middle">EVERYTINROOM</textPath>
+      </text>
+      <line x1={cx - 78} y1={arcY + 18} x2={cx - 14} y2={arcY + 18} stroke={accent} strokeWidth="1.4" />
+      <rect x={cx - 3.5} y={arcY + 18 - 3.5} width="7" height="7" fill={accent} transform={`rotate(45 ${cx} ${arcY + 18})`} />
+      <line x1={cx + 14} y1={arcY + 18} x2={cx + 78} y2={arcY + 18} stroke={accent} strokeWidth="1.4" />
       {tagline && (
-        <text x={w/2} y={80} textAnchor="middle"
-          fontFamily="'Hanken Grotesk', system-ui, sans-serif" fontWeight="600" fontSize="11"
-          letterSpacing="6" fill={color} opacity="0.62">&amp; BEDTIME</text>
+        <text x={cx} y={arcY + 44} textAnchor="middle" fill={color} opacity="0.6"
+          fontFamily="'Hanken Grotesk', system-ui, sans-serif" fontWeight="600" fontSize="13" letterSpacing="7">&amp; BEDTIME</text>
       )}
     </svg>
   )
 }
 
-// Compact monogram — serif "E" with a gold underline tick, in a rounded
-// tile. Used in the nav rail and small avatar slots.
+export function LogoFlat({ height = 44, color = INK, accent = GOLD, tagline = true, className = '' }) {
+  const id = uid()
+  const W = 460, H = tagline ? 96 : 66
+  const cx = W / 2
+  const ruleY = 58
+  return (
+    <svg className={className} height={height} viewBox={`0 0 ${W} ${H}`} fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EVERYTINROOM">
+      <text x={cx} y={tagline ? 38 : 44} textAnchor="middle" fill={color}
+        fontFamily="'Fraunces', Georgia, serif" fontWeight="600" fontSize="40" letterSpacing="3"
+        style={{ fontOpticalSizing: 'auto' }}>EVERYTINROOM</text>
+      <line x1={cx - 78} y1={ruleY} x2={cx - 14} y2={ruleY} stroke={accent} strokeWidth="1.4" />
+      <rect x={cx - 3.5} y={ruleY - 3.5} width="7" height="7" fill={accent} transform={`rotate(45 ${cx} ${ruleY})`} />
+      <line x1={cx + 14} y1={ruleY} x2={cx + 78} y2={ruleY} stroke={accent} strokeWidth="1.4" />
+      {tagline && (
+        <text x={cx} y={84} textAnchor="middle" fill={color} opacity="0.6"
+          fontFamily="'Hanken Grotesk', system-ui, sans-serif" fontWeight="600" fontSize="13" letterSpacing="7">&amp; BEDTIME</text>
+      )}
+    </svg>
+  )
+}
+
 export function LogoMark({ size = 40, bg = INK, fg = '#ffffff', accent = GOLD, rounded = 12, className = '' }) {
   return (
     <svg className={className} width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EVERYTINROOM">
       <rect width="48" height="48" rx={rounded} fill={bg} />
-      <text x="24" y="33" textAnchor="middle"
+      <text x="24" y="33" textAnchor="middle" fill={fg}
         fontFamily="'Fraunces', Georgia, serif" fontWeight="600" fontSize="28"
-        fill={fg} style={{ fontOpticalSizing: 'auto' }}>E</text>
+        style={{ fontOpticalSizing: 'auto' }}>E</text>
       <line x1="17" y1="37" x2="31" y2="37" stroke={accent} strokeWidth="1.6" />
     </svg>
   )

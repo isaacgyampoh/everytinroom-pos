@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getSupabase } from '../lib/supabase'
 import { fmtDateTime } from '../lib/utils'
-import { Logo } from '../components/Logo'
+import { LogoFlat } from '../components/Logo'
 
 export default function DeliveryConfirm() {
   const [order, setOrder] = useState(null)
@@ -75,7 +75,7 @@ export default function DeliveryConfirm() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-5 py-4">
-        <Logo height={30} tagline={false} />
+        <LogoFlat height={26} tagline={false} />
       </div>
 
       <div className="max-w-md mx-auto px-5 py-6">
