@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getSupabase } from '../lib/supabase'
 import { SHOP } from '../lib/utils'
+import { LogoMark } from '../components/Logo'
 
 const money = v => 'GHS ' + Number(v || 0).toFixed(2)
 
@@ -153,7 +154,7 @@ export default function InvoicePay() {
       <div className="bg-[#1a3d30] text-white relative overflow-hidden">
         <div className="max-w-lg mx-auto px-6 py-8 relative z-10">
           <div className="flex items-center gap-3 mb-6">
-            <img src="/logo.png" alt="" className="w-10 h-10 rounded-xl" />
+            <LogoMark size={40} rounded={11} />
             <div>
               <h1 className="font-bold text-lg tracking-tight" style={{ fontFamily: "'Fraunces', serif" }}>{SHOP.name}</h1>
               <p className="text-white/50 text-xs">{SHOP.tagline}</p>
@@ -186,7 +187,7 @@ export default function InvoicePay() {
 
         <div className="max-w-lg mx-auto px-6 py-8 relative z-10">
           <div className="flex items-center gap-3 mb-6">
-            <img src="/logo.png" alt="" className="w-10 h-10 rounded-xl" />
+            <LogoMark size={40} rounded={11} />
             <div>
               <h1 className="font-bold text-lg tracking-tight" style={{ fontFamily: "'Fraunces', serif" }}>{SHOP.name}</h1>
               <p className="text-white/50 text-xs">{SHOP.tagline}</p>

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useStore } from '../hooks/useStore'
 import { getSupabase } from '../lib/supabase'
+import { Logo } from './Logo'
 
 export default function Login() {
   const [pins, setPins] = useState(['', '', '', ''])
@@ -46,8 +47,8 @@ export default function Login() {
       <div className="w-full max-w-[380px] text-center">
 
         {/* Logo */}
-        <div className="mb-11">
-          <img src="/logo.png" alt="EVERYTINROOM" className="h-[48px] md:h-[56px] mx-auto object-contain" />
+        <div className="mb-11 flex justify-center">
+          <Logo height={62} tagline={true} />
         </div>
 
         {/* PIN */}

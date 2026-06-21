@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { getSupabase } from '../lib/supabase'
 import { money, thumb } from '../lib/utils'
+import { Logo, LogoMark } from '../components/Logo'
 
 const EMPTY = { items: [], count: 0, subtotal: 0, total: 0, status: 'shopping', receiptNo: null }
 
@@ -51,15 +52,14 @@ export default function CustomerDisplay() {
     <div className="fixed inset-0 bg-stone-50 overflow-hidden">
       {/* Header — fixed at top */}
       <header className="fixed top-0 left-0 right-0 z-20 flex items-center gap-3 px-8 py-5 bg-[#1a3d30] text-white">
-        <img src="/logo.png" alt="" className="w-9 h-9 rounded-lg" onError={e => { e.target.style.display = 'none' }} />
-        <span className="font-heading text-lg font-bold tracking-tight">EVERYTINROOM</span>
+        <Logo height={26} color="#ffffff" accent="#cfa863" tagline={false} />
         {s.status === 'paying' && <span className="ml-auto text-sm font-semibold bg-[#b08642] px-4 py-1.5 rounded-full">Complete payment on terminal</span>}
       </header>
 
       {empty ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
-          <img src="/logo.png" alt="" className="w-24 h-24 rounded-3xl mb-8 opacity-90" onError={e => { e.target.style.display = 'none' }} />
-          <h1 className="text-4xl md:text-5xl font-bold font-heading text-gray-900 mb-4">Welcome</h1>
+          <Logo height={56} tagline={true} className="mb-10" />
+          <h1 className="text-4xl md:text-5xl font-semibold font-heading text-[#1a3d30] mb-4">Welcome</h1>
           <p className="text-xl text-stone-400">Your items will appear here as they're scanned</p>
         </div>
       ) : (
