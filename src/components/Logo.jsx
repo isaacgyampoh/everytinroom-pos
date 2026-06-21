@@ -14,21 +14,26 @@ const uid = () => `arc${++_id}`
 
 export function Logo({ height = 96, color = INK, accent = GOLD, tagline = true, className = '' }) {
   const id = uid()
-  const W = 440, H = tagline ? 150 : 120
+  // viewBox is wide; the arc path spans almost the full width so its arc-
+  // length comfortably EXCEEDS the word — otherwise textPath clips the
+  // letters that fall past the path ends (which was cutting the E and M).
+  const W = 600, H = tagline ? 150 : 120
   const cx = W / 2
-  const arcY = 96, arcLift = 34
-  const arcPath = `M 60 ${arcY} Q ${cx} ${arcY - arcLift} ${W - 60} ${arcY}`
+  const arcY = 92, arcLift = 30
+  const pad = 24
+  const arcPath = `M ${pad} ${arcY} Q ${cx} ${arcY - arcLift} ${W - pad} ${arcY}`
+  const ruleY = arcY + 22
   return (
     <svg className={className} height={height} viewBox={`0 0 ${W} ${H}`} fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EVERYTINROOM & BEDTIME">
       <defs><path id={id} d={arcPath} /></defs>
-      <text fill={color} fontFamily="'Fraunces', Georgia, serif" fontWeight="600" fontSize="40" letterSpacing="2.5" style={{ fontOpticalSizing: 'auto' }}>
+      <text fill={color} fontFamily="'Fraunces', Georgia, serif" fontWeight="600" fontSize="42" letterSpacing="2" style={{ fontOpticalSizing: 'auto' }}>
         <textPath href={`#${id}`} startOffset="50%" textAnchor="middle">EVERYTINROOM</textPath>
       </text>
-      <line x1={cx - 78} y1={arcY + 18} x2={cx - 14} y2={arcY + 18} stroke={accent} strokeWidth="1.4" />
-      <rect x={cx - 3.5} y={arcY + 18 - 3.5} width="7" height="7" fill={accent} transform={`rotate(45 ${cx} ${arcY + 18})`} />
-      <line x1={cx + 14} y1={arcY + 18} x2={cx + 78} y2={arcY + 18} stroke={accent} strokeWidth="1.4" />
+      <line x1={cx - 80} y1={ruleY} x2={cx - 14} y2={ruleY} stroke={accent} strokeWidth="1.4" />
+      <rect x={cx - 3.5} y={ruleY - 3.5} width="7" height="7" fill={accent} transform={`rotate(45 ${cx} ${ruleY})`} />
+      <line x1={cx + 14} y1={ruleY} x2={cx + 80} y2={ruleY} stroke={accent} strokeWidth="1.4" />
       {tagline && (
-        <text x={cx} y={arcY + 44} textAnchor="middle" fill={color} opacity="0.6"
+        <text x={cx} y={ruleY + 26} textAnchor="middle" fill={color} opacity="0.6"
           fontFamily="'Hanken Grotesk', system-ui, sans-serif" fontWeight="600" fontSize="13" letterSpacing="7">&amp; BEDTIME</text>
       )}
     </svg>
