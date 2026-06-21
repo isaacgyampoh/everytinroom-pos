@@ -31,10 +31,10 @@ export default function CustomerDisplay() {
   // ─── PAID / THANK YOU ───
   if (s.status === 'paid') {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#1a3d30] text-white px-6 relative overflow-hidden">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#16181d] text-white px-6 relative overflow-hidden">
         <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'radial-gradient(circle at 30% 20%, #fff 0, transparent 45%), radial-gradient(circle at 70% 80%, #fff 0, transparent 40%)' }} />
-        <div className="w-24 h-24 rounded-full border-2 border-[#b08642] flex items-center justify-center mb-9 animate-fade relative">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#b08642" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+        <div className="w-24 h-24 rounded-full border-2 border-white/25 flex items-center justify-center mb-9 animate-fade relative">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
         </div>
         <h1 className="text-6xl md:text-7xl font-semibold mb-5 font-heading tracking-tight">Thank you</h1>
         <p className="text-lg text-white/55 mb-1 tracking-wide">Payment received</p>
@@ -51,15 +51,15 @@ export default function CustomerDisplay() {
   return (
     <div className="fixed inset-0 bg-stone-50 overflow-hidden">
       {/* Header — fixed at top */}
-      <header className="fixed top-0 left-0 right-0 z-20 flex items-center gap-3 px-8 py-5 bg-[#1a3d30] text-white">
-        <LogoFlat height={22} color="#ffffff" accent="#cfa863" tagline={false} />
-        {s.status === 'paying' && <span className="ml-auto text-sm font-semibold bg-[#b08642] px-4 py-1.5 rounded-full">Complete payment on terminal</span>}
+      <header className="fixed top-0 left-0 right-0 z-20 flex items-center gap-3 px-8 py-5 bg-[#16181d] text-white">
+        <LogoFlat height={22} color="#ffffff" accent="#9a9da3" tagline={false} />
+        {s.status === 'paying' && <span className="ml-auto text-sm font-semibold bg-white text-[#16181d] px-4 py-1.5 rounded-full">Complete payment on terminal</span>}
       </header>
 
       {empty ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
           <Logo height={120} tagline={true} className="mb-8" />
-          <h1 className="text-4xl md:text-5xl font-semibold font-heading text-[#1a3d30] mb-4">Welcome</h1>
+          <h1 className="text-4xl md:text-5xl font-semibold font-heading text-[#16181d] mb-4">Welcome</h1>
           <p className="text-xl text-stone-400">Your items will appear here as they're scanned</p>
         </div>
       ) : (
@@ -84,7 +84,7 @@ export default function CustomerDisplay() {
 
           {/* Total panel — FIXED to viewport. Physically cannot scroll.
               Bottom bar on portrait/narrow; full-height right column on wide screens. */}
-          <div className="fixed left-0 right-0 bottom-0 lg:left-auto lg:top-0 lg:w-96 z-20 bg-[#1a3d30] text-white px-8 py-6 lg:py-8 lg:flex lg:flex-col lg:justify-end shadow-[0_-8px_30px_rgba(0,0,0,0.25)] lg:shadow-none">
+          <div className="fixed left-0 right-0 bottom-0 lg:left-auto lg:top-0 lg:w-96 z-20 bg-[#16181d] text-white px-8 py-6 lg:py-8 lg:flex lg:flex-col lg:justify-end shadow-[0_-8px_30px_rgba(0,0,0,0.25)] lg:shadow-none">
             <div className="flex items-center justify-between lg:block max-w-3xl mx-auto lg:mx-0 w-full">
               <div className="lg:mb-4">
                 <div className="flex items-center gap-2 text-white/50 text-base lg:text-lg lg:mb-2">

@@ -132,14 +132,14 @@ export default function InvoicePay() {
 
   // Loading
   if (loading) return (
-    <div className="min-h-screen bg-[#f6f4ef] flex items-center justify-center">
-      <div className="w-8 h-8 border-3 border-[#d4dbd0] border-t-[#3d8b6a] rounded-full animate-spin" />
+    <div className="min-h-screen bg-[#f6f6f5] flex items-center justify-center">
+      <div className="w-8 h-8 border-3 border-[#d4dbd0] border-t-[#16181d] rounded-full animate-spin" />
     </div>
   )
 
   // Not found
   if (error && !order) return (
-    <div className="min-h-screen bg-[#f6f4ef] flex items-center justify-center p-6">
+    <div className="min-h-screen bg-[#f6f6f5] flex items-center justify-center p-6">
       <div className="text-center max-w-sm">
         <h1 className="text-xl font-bold text-gray-800 mb-2">Invoice Not Found</h1>
         <p className="text-gray-500 text-sm">{error}</p>
@@ -150,8 +150,8 @@ export default function InvoicePay() {
 
   // Cancelled
   if (isCancelled) return (
-    <div className="min-h-screen bg-[#f6f4ef]">
-      <div className="bg-[#1a3d30] text-white relative overflow-hidden">
+    <div className="min-h-screen bg-[#f6f6f5]">
+      <div className="bg-[#16181d] text-white relative overflow-hidden">
         <div className="max-w-lg mx-auto px-6 py-8 relative z-10">
           <div className="flex items-center gap-3 mb-6">
             <LogoMark size={40} rounded={11} />
@@ -181,9 +181,9 @@ export default function InvoicePay() {
   )
 
   return (
-    <div className="min-h-screen bg-[#f6f4ef]">
+    <div className="min-h-screen bg-[#f6f6f5]">
       {/* Header */}
-      <div className="bg-[#1a3d30] text-white relative overflow-hidden">
+      <div className="bg-[#16181d] text-white relative overflow-hidden">
 
         <div className="max-w-lg mx-auto px-6 py-8 relative z-10">
           <div className="flex items-center gap-3 mb-6">
@@ -224,7 +224,7 @@ export default function InvoicePay() {
           ))}
           <div className="flex justify-between items-center px-4 py-4 bg-gray-50">
             <span className="text-base font-bold text-gray-900">Total</span>
-            <span className="text-xl font-bold text-[#1a3d30]">{money(orderTotal)}</span>
+            <span className="text-xl font-bold text-[#16181d]">{money(orderTotal)}</span>
           </div>
         </div>
 
@@ -235,27 +235,27 @@ export default function InvoicePay() {
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Full Name *</label>
-                <input type="text" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#3d8b6a]"
+                <input type="text" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#16181d]"
                   placeholder="Your full name" value={name} onChange={e => setName(e.target.value)} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Phone Number *</label>
-                <input type="tel" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#3d8b6a]"
+                <input type="tel" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#16181d]"
                   placeholder="e.g. 024 XXX XXXX" value={phone} onChange={e => setPhone(e.target.value)} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Delivery Address *</label>
-                <input type="text" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#3d8b6a]"
+                <input type="text" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#16181d]"
                   placeholder="Area, street name or description" value={address} onChange={e => setAddress(e.target.value)} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Nearest Landmark</label>
-                <input type="text" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#3d8b6a]"
+                <input type="text" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#16181d]"
                   placeholder="e.g. Near the Shell station" value={landmark} onChange={e => setLandmark(e.target.value)} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Delivery Notes</label>
-                <textarea className="w-full h-20 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#3d8b6a] resize-none"
+                <textarea className="w-full h-20 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#16181d] resize-none"
                   placeholder="Any additional information for delivery" value={notes} onChange={e => setNotes(e.target.value)} />
               </div>
             </div>
@@ -294,7 +294,7 @@ export default function InvoicePay() {
             {error && <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-3 text-sm font-medium">{error}</div>}
 
             <button onClick={handlePay} disabled={paying}
-              className="w-full h-14 bg-[#1a3d30] hover:bg-[#265a44] text-white rounded-2xl text-base font-bold flex items-center justify-center gap-2 active:scale-[.98] transition disabled:opacity-50">
+              className="w-full h-14 bg-[#16181d] hover:bg-[#2a2d34] text-white rounded-2xl text-base font-bold flex items-center justify-center gap-2 active:scale-[.98] transition disabled:opacity-50">
               {paying ? (
                 <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Processing...</>
               ) : (

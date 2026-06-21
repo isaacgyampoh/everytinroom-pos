@@ -272,16 +272,16 @@ export default function WhatsAppOrders() {
 
   const statusColor = (s) => {
     const sc = s?.toLowerCase()
-    if (sc === 'paid') return 'bg-[#2f6e54] text-white'
-    if (sc === 'completed') return 'bg-[#1a3d30] text-white'
+    if (sc === 'paid') return 'bg-[#33363d] text-white'
+    if (sc === 'completed') return 'bg-[#16181d] text-white'
     if (sc === 'cancelled') return 'bg-[#c0492f] text-white'
-    return 'bg-[#b08642] text-white'
+    return 'bg-[#16181d] text-white'
   }
 
   const deliveryColor = (s) => {
-    if (s === 'Delivered') return 'bg-[#2f6e54] text-white'
-    if (s === 'Picked Up') return 'bg-[#2f6e54] text-white'
-    if (s === 'Out for Delivery') return 'bg-[#b08642] text-white'
+    if (s === 'Delivered') return 'bg-[#33363d] text-white'
+    if (s === 'Picked Up') return 'bg-[#33363d] text-white'
+    if (s === 'Out for Delivery') return 'bg-[#16181d] text-white'
     if (s === 'Packaged') return 'bg-[#5e6b62] text-white'
     return 'bg-[#dde2dc] text-[#5e6b62]'
   }

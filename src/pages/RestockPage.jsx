@@ -188,7 +188,7 @@ export default function RestockPage() {
                       onChange={e => updateQty(i, e.target.value)}
                       min="1"
                     />
-                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#2f6e54] text-white text-[9px] font-bold px-1.5 rounded-full">+ADD</span>
+                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#33363d] text-white text-[9px] font-bold px-1.5 rounded-full">+ADD</span>
                   </div>
                   <button onClick={() => removeItem(i)} className="w-11 h-11 bg-red-50 rounded-xl flex items-center justify-center text-red-400 hover:bg-red-100 transition">✕</button>
                 </div>
@@ -209,7 +209,7 @@ export default function RestockPage() {
             <button
               onClick={handleRestock}
               disabled={saving || totalItems === 0}
-              className="w-full h-14 bg-[#1a3d30] hover:bg-[#265a44] disabled:bg-gray-300 text-white rounded-2xl text-base font-bold active:scale-[0.98] transition flex items-center justify-center gap-2"
+              className="w-full h-14 bg-[#16181d] hover:bg-[#2a2d34] disabled:bg-gray-300 text-white rounded-2xl text-base font-bold active:scale-[0.98] transition flex items-center justify-center gap-2"
             >
               {saving ? (
                 <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Updating...</>

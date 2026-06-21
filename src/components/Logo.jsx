@@ -6,8 +6,8 @@
  *   <LogoMark />  compact "E" monogram for square slots.
  */
 
-const INK = '#1a3d30'
-const GOLD = '#b08642'
+const INK = '#16181d'
+const GOLD = '#9a9da3'
 
 let _id = 0
 const uid = () => `arc${++_id}`
