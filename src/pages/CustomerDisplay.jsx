@@ -47,25 +47,25 @@ export default function CustomerDisplay() {
   const empty = !s.items || s.items.length === 0
 
   return (
-    <div className="h-screen flex flex-col bg-stone-50 overflow-hidden">
-      {/* Header */}
-      <header className="flex items-center gap-3 px-8 py-5 bg-gray-900 text-white flex-shrink-0">
+    <div className="fixed inset-0 bg-stone-50 overflow-hidden">
+      {/* Header — fixed at top */}
+      <header className="fixed top-0 left-0 right-0 z-20 flex items-center gap-3 px-8 py-5 bg-gray-900 text-white">
         <img src="/logo.png" alt="" className="w-9 h-9 rounded-lg" onError={e => { e.target.style.display = 'none' }} />
         <span className="font-heading text-lg font-bold tracking-tight">EVERYTINROOM</span>
         {s.status === 'paying' && <span className="ml-auto text-sm font-semibold bg-blue-500 px-4 py-1.5 rounded-full">Complete payment on terminal</span>}
       </header>
 
       {empty ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
           <img src="/logo.png" alt="" className="w-24 h-24 rounded-3xl mb-8 opacity-90" onError={e => { e.target.style.display = 'none' }} />
           <h1 className="text-4xl md:text-5xl font-bold font-heading text-gray-900 mb-4">Welcome</h1>
           <p className="text-xl text-stone-400">Your items will appear here as they're scanned</p>
         </div>
       ) : (
-        <div className="flex-1 flex flex-col lg:flex-row min-h-0">
-          {/* Items — the ONLY scrolling area */}
-          <div className="flex-1 overflow-y-auto p-6 lg:p-8 min-h-0">
-            <div className="space-y-3 max-w-3xl mx-auto">
+        <>
+          {/* Items — the ONLY scrolling area. Sits between fixed header and fixed total bar. */}
+          <div className="absolute left-0 right-0 lg:right-96 overflow-y-auto px-6 lg:px-8 py-5" style={{ top: '76px', bottom: '0' }}>
+            <div className="space-y-3 max-w-3xl mx-auto pb-40 lg:pb-5">
               {s.items.map((it, i) => (
                 <div key={i} className="flex items-center gap-4 bg-white rounded-2xl p-4 shadow-sm">
                   <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-xl bg-stone-100 overflow-hidden flex-shrink-0">
@@ -81,9 +81,10 @@ export default function CustomerDisplay() {
             </div>
           </div>
 
-          {/* Total panel — PINNED (right on wide screens, bottom on portrait). Never scrolls. */}
-          <div className="flex-shrink-0 lg:w-96 bg-gray-900 text-white px-8 py-6 lg:py-8 lg:flex lg:flex-col lg:justify-end">
-            <div className="flex items-center justify-between lg:block">
+          {/* Total panel — FIXED to viewport. Physically cannot scroll.
+              Bottom bar on portrait/narrow; full-height right column on wide screens. */}
+          <div className="fixed left-0 right-0 bottom-0 lg:left-auto lg:top-0 lg:w-96 z-20 bg-gray-900 text-white px-8 py-6 lg:py-8 lg:flex lg:flex-col lg:justify-end shadow-[0_-8px_30px_rgba(0,0,0,0.25)] lg:shadow-none">
+            <div className="flex items-center justify-between lg:block max-w-3xl mx-auto lg:mx-0 w-full">
               <div className="lg:mb-4">
                 <div className="flex items-center gap-2 text-white/50 text-base lg:text-lg lg:mb-2">
                   <span>Items</span><span className="font-semibold text-white/80">{s.count}</span>
@@ -94,7 +95,7 @@ export default function CustomerDisplay() {
               <div className={`text-5xl lg:text-7xl font-bold tabular-nums transition-transform duration-300 ${flash ? 'scale-105 lg:scale-110' : 'scale-100'}`}>{money(s.total)}</div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   )
