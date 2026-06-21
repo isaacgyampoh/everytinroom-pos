@@ -30,15 +30,16 @@ export default function CustomerDisplay() {
   // ─── PAID / THANK YOU ───
   if (s.status === 'paid') {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white px-6">
-        <div className="w-28 h-28 rounded-full bg-green-500 flex items-center justify-center mb-8 animate-fade">
-          <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#1a3d30] text-white px-6 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'radial-gradient(circle at 30% 20%, #fff 0, transparent 45%), radial-gradient(circle at 70% 80%, #fff 0, transparent 40%)' }} />
+        <div className="w-24 h-24 rounded-full border-2 border-[#b08642] flex items-center justify-center mb-9 animate-fade relative">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#b08642" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
         </div>
-        <h1 className="text-5xl md:text-6xl font-bold mb-4 font-heading">Thank You!</h1>
-        <p className="text-xl text-white/60 mb-2">Payment received</p>
-        <div className="text-4xl font-bold mt-4">{money(s.total)}</div>
-        {s.receiptNo && <p className="text-white/40 mt-3 text-sm">Receipt {s.receiptNo}</p>}
-        <p className="text-white/30 mt-10 text-sm">EVERYTINROOM · See you again soon</p>
+        <h1 className="text-6xl md:text-7xl font-semibold mb-5 font-heading tracking-tight">Thank you</h1>
+        <p className="text-lg text-white/55 mb-1 tracking-wide">Payment received</p>
+        <div className="text-5xl font-semibold mt-5 tabular-nums">{money(s.total)}</div>
+        {s.receiptNo && <p className="text-white/35 mt-4 text-sm tracking-wide">Receipt {s.receiptNo}</p>}
+        <p className="text-white/30 mt-12 text-xs tracking-[0.2em] uppercase">EVERYTINROOM &middot; Adenta</p>
       </div>
     )
   }
@@ -49,10 +50,10 @@ export default function CustomerDisplay() {
   return (
     <div className="fixed inset-0 bg-stone-50 overflow-hidden">
       {/* Header — fixed at top */}
-      <header className="fixed top-0 left-0 right-0 z-20 flex items-center gap-3 px-8 py-5 bg-gray-900 text-white">
+      <header className="fixed top-0 left-0 right-0 z-20 flex items-center gap-3 px-8 py-5 bg-[#1a3d30] text-white">
         <img src="/logo.png" alt="" className="w-9 h-9 rounded-lg" onError={e => { e.target.style.display = 'none' }} />
         <span className="font-heading text-lg font-bold tracking-tight">EVERYTINROOM</span>
-        {s.status === 'paying' && <span className="ml-auto text-sm font-semibold bg-blue-500 px-4 py-1.5 rounded-full">Complete payment on terminal</span>}
+        {s.status === 'paying' && <span className="ml-auto text-sm font-semibold bg-[#b08642] px-4 py-1.5 rounded-full">Complete payment on terminal</span>}
       </header>
 
       {empty ? (
@@ -83,7 +84,7 @@ export default function CustomerDisplay() {
 
           {/* Total panel — FIXED to viewport. Physically cannot scroll.
               Bottom bar on portrait/narrow; full-height right column on wide screens. */}
-          <div className="fixed left-0 right-0 bottom-0 lg:left-auto lg:top-0 lg:w-96 z-20 bg-gray-900 text-white px-8 py-6 lg:py-8 lg:flex lg:flex-col lg:justify-end shadow-[0_-8px_30px_rgba(0,0,0,0.25)] lg:shadow-none">
+          <div className="fixed left-0 right-0 bottom-0 lg:left-auto lg:top-0 lg:w-96 z-20 bg-[#1a3d30] text-white px-8 py-6 lg:py-8 lg:flex lg:flex-col lg:justify-end shadow-[0_-8px_30px_rgba(0,0,0,0.25)] lg:shadow-none">
             <div className="flex items-center justify-between lg:block max-w-3xl mx-auto lg:mx-0 w-full">
               <div className="lg:mb-4">
                 <div className="flex items-center gap-2 text-white/50 text-base lg:text-lg lg:mb-2">

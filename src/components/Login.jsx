@@ -42,20 +42,20 @@ export default function Login() {
   const filled = pins.filter(p => p).length
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-white px-6">
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-[#F4F2EC] px-6">
       <div className="w-full max-w-[380px] text-center">
 
-        {/* Logo — clean, no background */}
-        <div className="mb-12">
-          <img src="/logo.png" alt="EverytnRoom" className="h-[48px] md:h-[56px] mx-auto object-contain" />
+        {/* Logo */}
+        <div className="mb-11">
+          <img src="/logo.png" alt="EVERYTINROOM" className="h-[48px] md:h-[56px] mx-auto object-contain" />
         </div>
 
         {/* PIN */}
         <div>
-          <p className="text-gray-400 text-[15px] mb-7">Enter your staff PIN</p>
+          <p className="text-[#5e6b62] text-[15px] mb-7 tracking-wide">Enter your staff PIN</p>
 
           {error && (
-            <div className="bg-red-50 text-red-500 px-4 py-3 rounded-2xl mb-6 text-[13px] font-medium">
+            <div className="bg-[#fbeae6] text-[#c0492f] px-4 py-3 rounded-2xl mb-6 text-[13px] font-medium">
               Incorrect PIN. Please try again.
             </div>
           )}
@@ -71,8 +71,8 @@ export default function Login() {
                   value={v}
                   className="w-16 h-16 rounded-2xl text-center border-2 focus:outline-none transition-all duration-200"
                   style={{
-                    borderColor: v ? '#111' : i === filled ? '#999' : '#E5E7EB',
-                    background: v ? '#111' : '#FAFAFA',
+                    borderColor: v ? '#1a3d30' : i === filled ? '#8fb39e' : '#dde2dc',
+                    background: v ? '#1a3d30' : '#FAF8F2',
                     color: 'transparent',
                     caretColor: 'transparent',
                   }}
@@ -90,7 +90,7 @@ export default function Login() {
 
           {loading && (
             <div className="flex justify-center">
-              <div className="w-6 h-6 border-[2.5px] border-gray-200 border-t-gray-800 rounded-full animate-spin" />
+              <div className="w-6 h-6 border-[2.5px] border-[#dde2dc] border-t-[#1a3d30] rounded-full animate-spin" />
             </div>
           )}
         </div>

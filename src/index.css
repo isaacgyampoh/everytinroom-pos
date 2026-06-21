@@ -38,20 +38,20 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Fraunces', Georgia, serif; letter-spacing
    ~100 components. Surgical: colors only, no layout changes.
    ════════════════════════════════════════════════════════════ */
 body.dark {
-  background: #0d0f13;
-  color: #f4f5f7;
+  background: #11150f;
+  color: #eef0ea;
 }
 body.dark ::-webkit-scrollbar-thumb { background: #33363d; }
 body.dark ::selection { background: #e6e7eb; color: #0f1115; }
 
 /* surfaces */
-body.dark .bg-white { background-color: #1c2028 !important; }
+body.dark .bg-white { background-color: #1a2019 !important; }
 body.dark .bg-stone-50,
 body.dark .bg-stone-100,
 body.dark .bg-gray-50,
-body.dark .bg-gray-100 { background-color: #23272f !important; }
+body.dark .bg-gray-100 { background-color: #212a20 !important; }
 body.dark .bg-stone-200,
-body.dark .bg-gray-200 { background-color: #2d323b !important; }
+body.dark .bg-gray-200 { background-color: #2b352a !important; }
 body.dark .bg-cream { background-color: #1a1d24 !important; }
 body.dark .bg-stone-100\/60,
 body.dark .bg-stone-100\/50,
