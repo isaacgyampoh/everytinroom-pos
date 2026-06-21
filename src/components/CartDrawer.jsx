@@ -124,13 +124,23 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
         status: 'Pending', ussd_code: uc,
       })
 
+      // Auto-send the USSD code to the customer by SMS (server-side; key stays on backend)
+      let smsOk = false
+      try {
+        const r = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=send-ussd-code', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderNo })
+        })
+        const j = await r.json(); smsOk = !!j.success
+      } catch {}
+
       // Record the cash portion of split immediately
       if (isSplit && num(splitCash) > 0) {
         await recordSale('Split', { splitCash: num(splitCash), splitMomo: amount })
       }
 
       setMomoStep('waiting')
-      setMomoMessage(`USSD Code: *920*141*${uc}#\nAmount: ${money(amount)}\n\nTell customer to dial this code to pay via MoMo.`)
+      setMomoMessage(smsOk ? `USSD code sent to ${phone.trim()} by SMS.\nCode: *920*141*${uc}#\nAmount: ${money(amount)}\n\nCustomer dials it to pay via MoMo.` : `USSD Code: *920*141*${uc}#\nAmount: ${money(amount)}\n\nTell customer to dial this code to pay via MoMo.`)
       
       // Poll for payment
       if (pollRef.current) clearInterval(pollRef.current)
@@ -298,54 +308,6 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             Send Invoice · {money(total)}
           </button>
 
-          {/* Generate USSD Button */}
-          <button onClick={async () => {
-            if (!phoneValid) { toast.error('Enter phone number first!'); return }
-            if (cnt === 0) return
-            setProcessing(true)
-            try {
-              const sb = getSupabase()
-              const orderNo = 'WA-' + Date.now().toString(36).toUpperCase()
-              const orderItems = cart.map(c => ({ name: c.name, qty: c.qty, price: c.price, lineTotal: c.lineTotal }))
-              const { data, error } = await sb.from('whatsapp_orders').insert({
-                order_no: orderNo,
-                date: new Date().toISOString(),
-                customer_name: '',
-                customer_phone: phone.trim(),
-                items: orderItems,
-                subtotal: sub,
-                delivery_fee: 0,
-                total: total,
-                status: 'Pending',
-                notes: 'USSD order'
-              }).select('id,ussd_code').single()
-              if (error) { toast.error('Failed to generate USSD'); setProcessing(false); return }
-
-              const ussdCode = `*920*141*${data.ussd_code}#`
-              try { await navigator.clipboard.writeText(ussdCode) } catch {}
-
-              // Auto-send the code to the customer by SMS (server-side; key stays on backend)
-              let smsOk = false
-              try {
-                const r = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=send-ussd-code', {
-                  method: 'POST', headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ orderId: data.id })
-                })
-                const j = await r.json(); smsOk = !!j.success
-              } catch {}
-
-              toast.success(smsOk
-                ? `USSD code sent to ${phone.trim()} by SMS. ${ussdCode}`
-                : `USSD Code: ${ussdCode}\n\nCopied to clipboard! Send to customer.`, { duration: 8000 })
-              clearCart(); setPhone(''); setDiscount(''); onClose()
-              const store = useStore.getState()
-              store.refreshWAOrders()
-            } catch (e) { toast.error('Error generating USSD') }
-            setProcessing(false)
-          }} disabled={cnt === 0 || !phoneValid || processing}
-            className="w-full h-12 bg-amber-500 hover:bg-amber-600 rounded-xl text-white text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm mt-2 flex items-center justify-center gap-2">
-            Generate USSD Code · {money(total)}
-          </button>
         </div>
       </div>
 
