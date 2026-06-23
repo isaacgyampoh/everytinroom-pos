@@ -1,8 +1,16 @@
 import { useStore } from '../hooks/useStore'
+import { useEffect, useState } from 'react'
 import { money, today, weekStartDate, monthStart, isoDate, fmtDate } from '../lib/utils'
 
 export default function Dashboard() {
-  const { sales, expenses, products, customers, refunds, stockAdjustments, user, setPage } = useStore()
+  const { sales, expenses, products, customers, refunds, stockAdjustments, user, setPage, shopOpen, shopSettingLoaded, fetchShopOpen, setShopOpen } = useStore()
+  const [toggling, setToggling] = useState(false)
+  useEffect(() => { fetchShopOpen() }, [])
+  const onToggleShop = async () => {
+    setToggling(true)
+    await setShopOpen(!shopOpen)
+    setToggling(false)
+  }
   const t = today(), ws = weekStartDate(), ms = monthStart()
 
   const todaySales = sales.filter(s => !s.voided && isoDate(s.date) === t)
@@ -62,6 +70,23 @@ export default function Dashboard() {
           <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight text-gray-900">{greet}, {user?.name || 'Boss'}</h1>
           <p className="text-gray-400 text-[13px] mt-0.5">{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
         </div>
+      </div>
+
+      {/* Online shop on/off */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-4 flex items-center gap-4">
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${shopOpen ? 'bg-[#16181d]' : 'bg-gray-200'}`}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={shopOpen ? '#fff' : '#8a8d92'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1-5h16l1 5M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9M3 9h18"/></svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[15px] font-bold text-gray-900">Online Shop</div>
+          <div className="text-[13px] text-gray-400">
+            {!shopSettingLoaded ? 'Checking…' : shopOpen ? 'Open — customers can order on erbliving.shop' : 'Closed — customers see a "back soon" page'}
+          </div>
+        </div>
+        <button onClick={onToggleShop} disabled={toggling || !shopSettingLoaded}
+          className={`relative w-14 h-8 rounded-full transition-colors flex-shrink-0 disabled:opacity-50 ${shopOpen ? 'bg-[#16181d]' : 'bg-gray-300'}`}>
+          <span className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow transition-all ${shopOpen ? 'left-7' : 'left-1'}`} />
+        </button>
       </div>
 
       {/* Alerts */}

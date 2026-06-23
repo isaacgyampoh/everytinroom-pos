@@ -52,6 +52,26 @@ export const useStore = create((set, get) => ({
   login: (user, isAdmin) => set({ user, isAdmin }),
   logout: () => set({ user: null, isAdmin: false }),
 
+  // Shop on/off switch (shared with the e-commerce site via store_settings)
+  shopOpen: true,
+  shopSettingLoaded: false,
+  fetchShopOpen: async () => {
+    const sb = getSupabase(); if (!sb) return
+    try {
+      const { data } = await sb.from('store_settings').select('shop_open').eq('id', 1).single()
+      set({ shopOpen: data ? !!data.shop_open : true, shopSettingLoaded: true })
+    } catch { set({ shopSettingLoaded: true }) }
+  },
+  setShopOpen: async (open) => {
+    const sb = getSupabase(); if (!sb) return false
+    set({ shopOpen: open }) // optimistic
+    try {
+      const { error } = await sb.from('store_settings').update({ shop_open: open, updated_at: new Date().toISOString() }).eq('id', 1)
+      if (error) { set({ shopOpen: !open }); return false } // revert on failure
+      return true
+    } catch { set({ shopOpen: !open }); return false }
+  },
+
   addToCart: (item) => {
     const cart = [...get().cart]
     const existing = cart.find(c => c.isBundle ? c.bundleId === item.bundleId : c.productId === item.productId)
