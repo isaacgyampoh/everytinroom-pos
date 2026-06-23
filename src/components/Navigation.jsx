@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useStore } from '../hooks/useStore'
 import { LogoMark } from './Logo'
 
@@ -56,7 +56,8 @@ const AP = ['dash','products','bundles','staff','expenses','reports','customers'
 export default function Navigation({ onOpenCart }) {
   const [expanded, setExpanded] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const { page, setPage, user, isAdmin, logout, waOrders, cart, darkMode, toggleDark } = useStore()
+  const { page, setPage, user, isAdmin, logout, waOrders, cart, darkMode, toggleDark, shopOpen, shopSettingLoaded, fetchShopOpen, setShopOpen } = useStore()
+  useEffect(() => { if (isAdmin) fetchShopOpen() }, [isAdmin])
   const wa = waOrders.filter(o => o.status === 'Pending' || o.status === 'Paid').length
   const cc = cart.reduce((a, c) => a + c.qty, 0)
   const go = (p) => { if (!isAdmin && AP.includes(p)) return; setPage(p); setMobileOpen(false) }
@@ -103,6 +104,15 @@ export default function Navigation({ onOpenCart }) {
           <span className="flex-shrink-0 w-5 flex justify-center"><I d="M2 3h20v14H2zM8 21h8M12 17v4" /></span>
           <span className={`text-[13px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'}`}>Customer Screen</span>
         </button>
+        {isAdmin && <button onClick={() => setShopOpen(!shopOpen)} disabled={!shopSettingLoaded} className="w-full flex items-center gap-3 h-10 px-3 rounded-xl text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition disabled:opacity-50">
+          <span className="flex-shrink-0 w-5 flex justify-center"><I d="M3 9l1-5h16l1 5M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9M3 9h18" /></span>
+          <span className={`flex-1 flex items-center justify-between text-[13px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'}`}>
+            <span>Online Shop</span>
+            <span className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${shopOpen ? 'bg-[#16181d]' : 'bg-stone-300'}`}>
+              <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${shopOpen ? 'left-[18px]' : 'left-0.5'}`} />
+            </span>
+          </span>
+        </button>}
         {isAdmin && <button onClick={toggleDark} className="w-full flex items-center gap-3 h-10 px-3 rounded-xl text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition">
           <span className="flex-shrink-0 w-5 flex justify-center">{darkMode ? <I d="M12 3v1m0 16v1m9-9h-1M4 12H3m3.34-5.66l-.7-.7m12.73 0l-.71.7M6.34 17.66l-.7.7m12.73 0l-.71-.7M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" /> : <I d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />}</span>
           <span className={`text-[13px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'}`}>{darkMode ? 'Light mode' : 'Dark mode'}</span>
@@ -168,6 +178,12 @@ export default function Navigation({ onOpenCart }) {
         </div>
       </div>
       <div className="p-3 safe-bottom space-y-2 border-t border-stone-100">
+        {isAdmin && <button onClick={() => setShopOpen(!shopOpen)} disabled={!shopSettingLoaded} className="w-full py-3 bg-stone-100 rounded-xl text-sm font-semibold flex items-center justify-between px-4 disabled:opacity-50">
+          <span className="flex items-center gap-2"><I d="M3 9l1-5h16l1 5M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9M3 9h18" /> Online Shop {shopOpen ? 'Open' : 'Closed'}</span>
+          <span className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${shopOpen ? 'bg-[#16181d]' : 'bg-stone-300'}`}>
+            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${shopOpen ? 'left-[18px]' : 'left-0.5'}`} />
+          </span>
+        </button>}
         {isAdmin && <button onClick={toggleDark} className="w-full py-3 bg-stone-100 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
           {darkMode ? <I d="M12 3v1m0 16v1m9-9h-1M4 12H3m3.34-5.66l-.7-.7m12.73 0l-.71.7M6.34 17.66l-.7.7m12.73 0l-.71-.7M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" /> : <I d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />}
           {darkMode ? 'Light Mode' : 'Dark Mode'}
