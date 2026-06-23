@@ -58,18 +58,25 @@ export const useStore = create((set, get) => ({
   fetchShopOpen: async () => {
     const sb = getSupabase(); if (!sb) return
     try {
-      const { data } = await sb.from('store_settings').select('shop_open').eq('id', 1).single()
-      set({ shopOpen: data ? !!data.shop_open : true, shopSettingLoaded: true })
-    } catch { set({ shopSettingLoaded: true }) }
+      const { data, error } = await sb.from('store_settings').select('shop_open').limit(1)
+      if (error) console.error('store_settings read error:', error.message)
+      const row = Array.isArray(data) ? data[0] : null
+      set({ shopOpen: row ? row.shop_open === true : true, shopSettingLoaded: true })
+    } catch (e) { console.error('fetchShopOpen failed:', e); set({ shopSettingLoaded: true }) }
   },
   setShopOpen: async (open) => {
-    const sb = getSupabase(); if (!sb) return false
+    const sb = getSupabase(); if (!sb) return { ok: false, error: 'No connection' }
     set({ shopOpen: open }) // optimistic
     try {
-      const { error } = await sb.from('store_settings').update({ shop_open: open, updated_at: new Date().toISOString() }).eq('id', 1)
-      if (error) { set({ shopOpen: !open }); return false } // revert on failure
-      return true
-    } catch { set({ shopOpen: !open }); return false }
+      // upsert (not update) so a missing row gets created; select back to verify it actually saved
+      const { data, error } = await sb.from('store_settings')
+        .upsert({ id: 1, shop_open: open, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+        .select('shop_open')
+      if (error) { set({ shopOpen: !open }); console.error('setShopOpen error:', error.message); return { ok: false, error: error.message } }
+      const saved = Array.isArray(data) ? data[0] : null
+      if (!saved || saved.shop_open !== open) { set({ shopOpen: !open }); return { ok: false, error: 'Save did not persist (check table/permissions)' } }
+      return { ok: true }
+    } catch (e) { set({ shopOpen: !open }); console.error('setShopOpen failed:', e); return { ok: false, error: String(e) } }
   },
 
   addToCart: (item) => {

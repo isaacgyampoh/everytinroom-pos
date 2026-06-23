@@ -1,5 +1,6 @@
 import { useStore } from '../hooks/useStore'
 import { useEffect, useState } from 'react'
+import toast from 'react-hot-toast'
 import { money, today, weekStartDate, monthStart, isoDate, fmtDate } from '../lib/utils'
 
 export default function Dashboard() {
@@ -8,8 +9,11 @@ export default function Dashboard() {
   useEffect(() => { fetchShopOpen() }, [])
   const onToggleShop = async () => {
     setToggling(true)
-    await setShopOpen(!shopOpen)
+    const next = !shopOpen
+    const res = await setShopOpen(next)
     setToggling(false)
+    if (res?.ok) toast.success(next ? 'Online shop is now OPEN' : 'Online shop is now CLOSED')
+    else toast.error('Could not save: ' + (res?.error || 'unknown error'))
   }
   const t = today(), ws = weekStartDate(), ms = monthStart()
 
