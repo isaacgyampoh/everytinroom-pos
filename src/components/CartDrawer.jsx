@@ -121,7 +121,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
         customer_name: phone.trim(), customer_phone: phone.trim(),
         items: JSON.stringify(items), subtotal: total, total: amount,
         notes: isSplit ? `Split: Cash ${money(num(splitCash))}, USSD ${money(amount)}` : 'POS USSD Payment',
-        status: 'Pending', ussd_code: uc,
+        status: 'Pending', ussd_code: uc, paystack_ref: orderNo,
       })
 
       // Auto-send the USSD code to the customer by SMS (server-side; key stays on backend)
@@ -134,13 +134,27 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
         const j = await r.json(); smsOk = !!j.success
       } catch {}
 
+      // MOOLRE: push the instant approve-with-PIN prompt straight to the customer's phone.
+      // Toggle on by setting localStorage 'use-moolre' = '1' (lets you test without removing NaloPay).
+      let moolrePrompt = false
+      if (localStorage.getItem('use-moolre') === '1') {
+        try {
+          const mr = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=moolre-charge', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: phone.trim(), amount, orderNo, externalref: orderNo })
+          })
+          const mj = await mr.json(); moolrePrompt = !!mj.success
+          if (!moolrePrompt) console.warn('Moolre charge failed:', mj.error)
+        } catch (e) { console.warn('Moolre charge error:', e) }
+      }
+
       // Record the cash portion of split immediately
       if (isSplit && num(splitCash) > 0) {
         await recordSale('Split', { splitCash: num(splitCash), splitMomo: amount })
       }
 
       setMomoStep('waiting')
-      setMomoMessage(smsOk ? `USSD code sent to ${phone.trim()} by SMS.\nCode: *920*141*${uc}#\nAmount: ${money(amount)}\n\nCustomer dials it to pay via MoMo.` : `USSD Code: *920*141*${uc}#\nAmount: ${money(amount)}\n\nTell customer to dial this code to pay via MoMo.`)
+      setMomoMessage(moolrePrompt ? `Payment prompt sent to ${phone.trim()}.\nAmount: ${money(amount)}\n\nCustomer approves with their MoMo PIN on their phone.` : (smsOk ? `USSD code sent to ${phone.trim()} by SMS.\nCode: *920*141*${uc}#\nAmount: ${money(amount)}\n\nCustomer dials it to pay via MoMo.` : `USSD Code: *920*141*${uc}#\nAmount: ${money(amount)}\n\nTell customer to dial this code to pay via MoMo.`))
       
       // Poll for payment
       if (pollRef.current) clearInterval(pollRef.current)
