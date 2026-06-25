@@ -264,63 +264,6 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             Complete Sale · {money(total)}
           </button>
 
-          {/* WhatsApp Invoice Button */}
-          <button onClick={async () => {
-            if (!phoneValid) { toast.error('Enter phone number first!'); return }
-            if (cnt === 0) return
-            setProcessing(true)
-            try {
-              const sb = getSupabase()
-              const orderNo = 'WA-' + Date.now().toString(36).toUpperCase()
-              const orderItems = cart.map(c => ({ name: c.name, qty: c.qty, price: c.price, lineTotal: c.lineTotal }))
-              const { data, error } = await sb.from('whatsapp_orders').insert({
-                order_no: orderNo,
-                date: new Date().toISOString(),
-                customer_name: '',
-                customer_phone: phone.trim(),
-                items: orderItems,
-                subtotal: sub,
-                delivery_fee: 0,
-                total: total,
-                status: 'Pending',
-                notes: 'Invoice from POS'
-              }).select('id,ussd_code').single()
-              if (error) { toast.error('Failed to create invoice'); setProcessing(false); return }
-
-              const link = window.location.origin + '/#/pay/' + data.id
-              const ussd = data.ussd_code ? `\n\nOr dial *920*141*${data.ussd_code}# to pay via USSD` : ''
-              const lines = ['Hi, your order from EVERYTINROOM is ready.', '']
-              orderItems.forEach(it => lines.push(`${it.qty}x ${it.name} - GHS ${Number(it.lineTotal).toFixed(2)}`))
-              lines.push('', `Total: GHS ${Number(total).toFixed(2)}`, '', 'Please click the link below to make payment and fill in your delivery details:', link)
-              if (ussd) lines.push(ussd)
-              lines.push('', 'Thank you.')
-              const msg = lines.join('\n')
-
-              // Copy message to clipboard first
-              try { await navigator.clipboard.writeText(msg) } catch {}
-
-              // Try to open WhatsApp
-              const waPhone = phone.trim().replace(/^0/, '233')
-              const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent)
-
-              if (isMobile) {
-                // Mobile: use WhatsApp deep link
-                window.location.href = `whatsapp://send?phone=${waPhone}&text=${encodeURIComponent(msg)}`
-              } else {
-                // Desktop: open WhatsApp Web
-                window.open(`https://web.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(msg)}`, '_blank')
-              }
-
-              toast.success('Invoice created! Message copied to clipboard.\nPaste in WhatsApp if it didn\'t open automatically.', { duration: 5000 })
-              clearCart(); setPhone(''); setDiscount(''); onClose()
-              const store = useStore.getState()
-              store.refreshWAOrders()
-            } catch (e) { toast.error('Error creating invoice') }
-            setProcessing(false)
-          }} disabled={cnt === 0 || !phoneValid || processing}
-            className="w-full h-12 bg-[#25d366] hover:bg-[#1ebe5d] rounded-xl text-white text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm mt-2 flex items-center justify-center gap-2">
-            Send Invoice · {money(total)}
-          </button>
 
         </div>
       </div>
@@ -335,20 +278,22 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
               <div className="text-xs text-gray-400 mt-1">{phone}</div>
             </div>
 
-            {/* Payment Methods — Cash & USSD only */}
+            {/* Payment Methods — Split, Cash, USSD */}
             <div>
               <label className="block text-xs font-semibold text-gray-400 mb-2.5">Payment Method</label>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-3 gap-2.5">
                 {[
-                  { id: 'Cash', label: 'Cash', sub: 'Pay at counter', color: 'bg-[#16181d]', border: 'border-[#16181d]',
+                  { id: 'Split', label: 'Split', sub: 'Cash + USSD',
+                    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h18M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg> },
+                  { id: 'Cash', label: 'Cash', sub: 'At counter',
                     icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg> },
-                  { id: 'USSD', label: 'USSD', sub: 'MoMo prompt', color: 'bg-[#16181d]', border: 'border-[#16181d]',
+                  { id: 'USSD', label: 'USSD', sub: 'MoMo prompt',
                     icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M11 18h2"/></svg> },
                 ].map(m => {
-                  const active = !splitMode && payMethod === m.id
+                  const active = m.id === 'Split' ? splitMode : (!splitMode && payMethod === m.id)
                   return (
-                    <button key={m.id} onClick={() => { setPayMethod(m.id); setSplitMode(false) }}
-                      className={`h-24 rounded-2xl text-sm font-bold border-2 flex flex-col items-center justify-center gap-1.5 transition-all ${active ? m.color + ' text-white ' + m.border + ' shadow-md' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                    <button key={m.id} onClick={() => { if (m.id === 'Split') { setSplitMode(true); setSplitCash('') } else { setPayMethod(m.id); setSplitMode(false) } }}
+                      className={`h-24 rounded-2xl text-sm font-bold border-2 flex flex-col items-center justify-center gap-1.5 transition-all ${active ? 'bg-[#16181d] text-white border-[#16181d] shadow-md' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
                       <span>{m.icon}</span>
                       <span>{m.label}</span>
                       <span className={`text-[10px] font-medium ${active ? 'opacity-70' : 'opacity-40'}`}>{m.sub}</span>
@@ -366,11 +311,27 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
               </div>
             )}
 
+            {/* Split Details — Cash + USSD (MoMo) */}
+            {splitMode && (
+              <div className="bg-[#f6f6f5] rounded-xl p-4 border border-gray-200 space-y-3">
+                <div className="text-sm font-bold text-[#16181d]">Split Payment · {money(total)}</div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1.5">Cash Amount</label>
+                  <input type="number" inputMode="decimal" className="w-full h-11 px-4 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-gray-400" placeholder="0.00" value={splitCash} min={0} max={total} onChange={e => setSplitCash(e.target.value)} />
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                  <span className="text-sm font-semibold text-gray-500">USSD (MoMo) portion</span>
+                  <span className="text-lg font-bold text-[#16181d]">{money(Math.max(0, splitRemainder))}</span>
+                </div>
+                <div className="text-xs text-gray-400">Cash collected at the counter. A USSD code is sent for the MoMo portion.</div>
+              </div>
+            )}
+
             {momoStep === 'failed' && <div className="bg-red-50 rounded-xl p-3.5 text-red-600 text-sm font-medium border border-red-100"> {momoMessage}</div>}
 
             <button onClick={handleCompleteSale} disabled={processing}
               className="w-full h-12 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm">
-              {processing ? 'Processing...' : payMethod === 'Cash' ? 'Confirm Cash Payment' : 'Generate & Send USSD Code'}
+              {processing ? 'Processing...' : splitMode ? 'Confirm Split · Send USSD' : payMethod === 'Cash' ? 'Confirm Cash Payment' : 'Generate & Send USSD Code'}
             </button>
           </>)}
 
