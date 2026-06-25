@@ -19,7 +19,11 @@ export default function CustomerDisplay() {
 
   useEffect(() => {
     const sb = getSupabase(); if (!sb) return
-    const ch = sb.channel('customer-display', { config: { broadcast: { self: true } } })
+    // read ?reg=<id> from the hash URL so this screen pairs only with its own POS
+    let reg = ''
+    try { const h = window.location.hash; const qs = h.includes('?') ? h.split('?')[1] : ''; reg = new URLSearchParams(qs).get('reg') || '' } catch {}
+    const chanName = reg ? `customer-display-${reg}` : 'customer-display'
+    const ch = sb.channel(chanName, { config: { broadcast: { self: true } } })
     ch.on('broadcast', { event: 'state' }, ({ payload }) => {
       setS(prev => ({ ...EMPTY, ...payload }))
       if ((payload.count || 0) > prevCount.current) { setFlash(true); setTimeout(() => setFlash(false), 350) }

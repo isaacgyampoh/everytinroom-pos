@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '../hooks/useStore'
 import { LogoMark } from './Logo'
+import { getRegisterId } from '../hooks/useCustomerDisplay'
 import toast from 'react-hot-toast'
 
 // Clean minimal SVG icons
@@ -107,7 +108,7 @@ export default function Navigation({ onOpenCart }) {
       {/* Bottom */}
       <div className="relative z-10 px-2 pb-3 flex-shrink-0 space-y-0.5">
         <div className="my-2 mx-2 h-px bg-stone-200/60" />
-        <button onClick={() => window.open(window.location.origin + '/#/customer-display', 'customer-display', 'width=1280,height=800')} className="w-full flex items-center gap-3 h-10 px-3 rounded-xl text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition">
+        <button onClick={() => { const reg = getRegisterId(); window.open(window.location.origin + '/#/customer-display?reg=' + reg, 'customer-display-' + reg, 'width=1280,height=800') }} className="w-full flex items-center gap-3 h-10 px-3 rounded-xl text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition">
           <span className="flex-shrink-0 w-5 flex justify-center"><I d="M2 3h20v14H2zM8 21h8M12 17v4" /></span>
           <span className={`text-[13px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'}`}>Customer Screen</span>
         </button>
