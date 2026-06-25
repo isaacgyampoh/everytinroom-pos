@@ -69,7 +69,7 @@ export default function Catalog() {
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center" style={{ colorScheme: 'light' }}><div className="w-7 h-7 border-[2.5px] border-stone-200 border-t-green-700 rounded-full animate-spin" /></div>
 
   return (
-    <div className="min-h-screen bg-white catalog-light" style={{ fontFamily: "'Hanken Grotesk', sans-serif", colorScheme: 'light', color: '#111827' }}>
+    <div className="min-h-screen bg-white catalog-light" style={{ fontFamily: "'Inter', sans-serif", colorScheme: 'light', color: '#111827' }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet" />
       <style>{`
         .catalog-light, .catalog-light * { color-scheme: light !important; }

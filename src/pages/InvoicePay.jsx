@@ -156,7 +156,7 @@ export default function InvoicePay() {
           <div className="flex items-center gap-3 mb-6">
             <LogoMark size={40} rounded={11} />
             <div>
-              <h1 className="font-bold text-lg tracking-tight" style={{ fontFamily: "'Fraunces', serif" }}>{SHOP.name}</h1>
+              <h1 className="font-bold text-lg tracking-tight" style={{ fontFamily: "'Inter', sans-serif" }}>{SHOP.name}</h1>
               <p className="text-white/50 text-xs">{SHOP.tagline}</p>
             </div>
           </div>
@@ -189,7 +189,7 @@ export default function InvoicePay() {
           <div className="flex items-center gap-3 mb-6">
             <LogoMark size={40} rounded={11} />
             <div>
-              <h1 className="font-bold text-lg tracking-tight" style={{ fontFamily: "'Fraunces', serif" }}>{SHOP.name}</h1>
+              <h1 className="font-bold text-lg tracking-tight" style={{ fontFamily: "'Inter', sans-serif" }}>{SHOP.name}</h1>
               <p className="text-white/50 text-xs">{SHOP.tagline}</p>
             </div>
           </div>

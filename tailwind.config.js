@@ -3,7 +3,7 @@ export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
-      fontFamily: { sans: ['Hanken Grotesk', 'system-ui', 'sans-serif'], heading: ['Fraunces', 'Georgia', 'serif'] },
+      fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'], heading: ['Inter', 'system-ui', 'sans-serif'] },
       colors: {
         brand: { 50: '#f6f6f5', 100: '#ececeb', 200: '#d8d9d7', 300: '#b8bab8', 400: '#8e9090', 500: '#5f6163', 600: '#42454a', 700: '#2a2d34', 800: '#1f2127', 900: '#16181d' },
         surface: '#f6f6f5',

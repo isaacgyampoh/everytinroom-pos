@@ -26,7 +26,7 @@ export function Logo({ height = 96, color = INK, accent = GOLD, tagline = true, 
   return (
     <svg className={className} height={height} viewBox={`0 0 ${W} ${H}`} fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EVERYTINROOM & BEDTIME">
       <defs><path id={id} d={arcPath} /></defs>
-      <text fill={color} fontFamily="'Fraunces', Georgia, serif" fontWeight="600" fontSize="42" letterSpacing="2" style={{ fontOpticalSizing: 'auto' }}>
+      <text fill={color} fontFamily="'Inter', system-ui, sans-serif" fontWeight="700" fontSize="40" letterSpacing="3" style={{ fontOpticalSizing: 'auto' }}>
         <textPath href={`#${id}`} startOffset="50%" textAnchor="middle">EVERYTINROOM</textPath>
       </text>
       <line x1={cx - 80} y1={ruleY} x2={cx - 14} y2={ruleY} stroke={accent} strokeWidth="1.4" />
@@ -34,7 +34,7 @@ export function Logo({ height = 96, color = INK, accent = GOLD, tagline = true, 
       <line x1={cx + 14} y1={ruleY} x2={cx + 80} y2={ruleY} stroke={accent} strokeWidth="1.4" />
       {tagline && (
         <text x={cx} y={ruleY + 26} textAnchor="middle" fill={color} opacity="0.6"
-          fontFamily="'Hanken Grotesk', system-ui, sans-serif" fontWeight="600" fontSize="13" letterSpacing="7">&amp; BEDTIME</text>
+          fontFamily="'Inter', system-ui, sans-serif" fontWeight="600" fontSize="12" letterSpacing="6">&amp; BEDTIME</text>
       )}
     </svg>
   )
@@ -48,14 +48,14 @@ export function LogoFlat({ height = 44, color = INK, accent = GOLD, tagline = tr
   return (
     <svg className={className} height={height} viewBox={`0 0 ${W} ${H}`} fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EVERYTINROOM">
       <text x={cx} y={tagline ? 38 : 44} textAnchor="middle" fill={color}
-        fontFamily="'Fraunces', Georgia, serif" fontWeight="600" fontSize="40" letterSpacing="3"
+        fontFamily="'Inter', system-ui, sans-serif" fontWeight="700" fontSize="38" letterSpacing="3.5"
         style={{ fontOpticalSizing: 'auto' }}>EVERYTINROOM</text>
       <line x1={cx - 78} y1={ruleY} x2={cx - 14} y2={ruleY} stroke={accent} strokeWidth="1.4" />
       <rect x={cx - 3.5} y={ruleY - 3.5} width="7" height="7" fill={accent} transform={`rotate(45 ${cx} ${ruleY})`} />
       <line x1={cx + 14} y1={ruleY} x2={cx + 78} y2={ruleY} stroke={accent} strokeWidth="1.4" />
       {tagline && (
         <text x={cx} y={84} textAnchor="middle" fill={color} opacity="0.6"
-          fontFamily="'Hanken Grotesk', system-ui, sans-serif" fontWeight="600" fontSize="13" letterSpacing="7">&amp; BEDTIME</text>
+          fontFamily="'Inter', system-ui, sans-serif" fontWeight="600" fontSize="12" letterSpacing="6">&amp; BEDTIME</text>
       )}
     </svg>
   )
@@ -66,7 +66,7 @@ export function LogoMark({ size = 40, bg = INK, fg = '#ffffff', accent = GOLD, r
     <svg className={className} width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EVERYTINROOM">
       <rect width="48" height="48" rx={rounded} fill={bg} />
       <text x="24" y="33" textAnchor="middle" fill={fg}
-        fontFamily="'Fraunces', Georgia, serif" fontWeight="600" fontSize="28"
+        fontFamily="'Inter', system-ui, sans-serif" fontWeight="700" fontSize="26"
         style={{ fontOpticalSizing: 'auto' }}>E</text>
       <line x1="17" y1="37" x2="31" y2="37" stroke={accent} strokeWidth="1.6" />
     </svg>

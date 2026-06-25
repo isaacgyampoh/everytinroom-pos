@@ -19,7 +19,7 @@ const ProductCard = memo(({ item, price, hasPromo, onAdd }) => {
             {hasPromo && <div className="text-[10px] text-stone-400 line-through">{money(item.price)}</div>}
             <div className={`text-base font-bold leading-none ${hasPromo ? 'text-gray-900' : 'text-gray-900'}`}>{money(price)}</div>
           </div>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${qty === 0 ? 'bg-red-100 text-red-600' : qty <= 5 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-700'}`}>
+          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${qty === 0 ? 'bg-gray-900 text-white' : qty <= 5 ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-500'}`}>
             {qty === 0 ? 'OUT' : qty}
           </span>
         </div>

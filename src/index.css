@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-body { font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 15px; background: #f6f6f5; color: #16181d; letter-spacing: -0.011em; transition: background .2s ease, color .2s ease; }
-h1, h2, h3, h4, h5, h6 { font-family: 'Fraunces', Georgia, serif; letter-spacing: -0.02em; font-optical-sizing: auto; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 15px; background: #f6f6f5; color: #16181d; letter-spacing: -0.011em; transition: background .2s ease, color .2s ease; }
+h1, h2, h3, h4, h5, h6 { font-family: 'Inter', -apple-system, system-ui, sans-serif; letter-spacing: -0.022em; font-weight: 700; }
 @media (min-width: 768px) { body { font-size: 16px; } }
 
 ::selection { background: #1a1a24; color: #fff; }
@@ -18,6 +18,11 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Fraunces', Georgia, serif; letter-spacing
   .scrollbar-hide::-webkit-scrollbar { display: none; }
   .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 }
+
+/* Refined surfaces — crisp hairline + whisper shadow on the common card
+   pattern, the way Square/Linear-class apps do it. */
+.bg-white.rounded-2xl { box-shadow: 0 1px 2px rgba(16,24,29,.04), 0 1px 1px rgba(16,24,29,.03); border: 1px solid rgba(16,24,29,.05); }
+body.dark .bg-white.rounded-2xl { box-shadow: none; border-color: rgba(255,255,255,.06); }
 
 @media print {
   @page { size: 80mm auto; margin: 0 4mm; }
