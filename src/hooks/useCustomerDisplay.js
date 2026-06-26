@@ -102,24 +102,41 @@ export function isCustomerScreenOpen() {
 export async function openCustomerScreenAuto() {
   // already open? leave it.
   if (customerWin && !customerWin.closed) return customerWin
+
+  // Touch devices (phones/tablets) never auto-open — they're single-screen.
+  const isTouchOnly = (navigator.maxTouchPoints || 0) > 0 && !window.matchMedia('(pointer: fine)').matches
+  if (isTouchOnly) return null
+
+  // ONLY auto-open when a genuine second physical display exists (the POS).
+  // Phones and single-screen laptops have one screen -> do nothing.
+  let hasSecondScreen = false
+  try {
+    if ('getScreenDetails' in window) {
+      const sd = await window.getScreenDetails()
+      hasSecondScreen = sd.screens.length > 1
+    } else if (window.screen && window.screen.isExtended === true) {
+      // Some browsers expose screen.isExtended without full screen details.
+      hasSecondScreen = true
+    }
+  } catch (e) { console.warn('screen detect:', e); hasSecondScreen = false }
+  if (!hasSecondScreen) return null // single screen (phone/laptop) -> never auto-open
+
   const reg = getRegisterId()
   const url = window.location.origin + '/#/customer-display?reg=' + reg
   const winName = 'customer-display-' + reg
 
-  // Try to place on the second display via Window Management API (Chrome/Edge).
+  // Place it on the second display in fullscreen.
   try {
-    if ('getScreenDetails' in window) {
-      const sd = await window.getScreenDetails()
-      const other = sd.screens.find(s => s !== sd.currentScreen) || sd.screens.find(s => !s.isPrimary)
-      if (other) {
-        const feat = `left=${other.availLeft},top=${other.availTop},width=${other.availWidth},height=${other.availHeight},fullscreen=yes`
-        const w = window.open(url, winName, feat)
-        if (w) { customerWin = w; return w }
-      }
+    const sd = await window.getScreenDetails()
+    const other = sd.screens.find(s => s !== sd.currentScreen) || sd.screens.find(s => !s.isPrimary)
+    if (other) {
+      const feat = `left=${other.availLeft},top=${other.availTop},width=${other.availWidth},height=${other.availHeight},fullscreen=yes`
+      const w = window.open(url, winName, feat)
+      if (w) { customerWin = w; return w }
     }
   } catch (e) { console.warn('auto-place fallback:', e) }
 
-  // Fallback: open a normal window (single screen / no permission / blocked).
+  // Rare fallback (second screen reported but placement failed): plain window.
   const w = window.open(url, winName, 'width=1280,height=800')
   if (w) customerWin = w
   return w
