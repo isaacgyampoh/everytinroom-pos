@@ -36,6 +36,28 @@ body.dark .bg-white.rounded-2xl { box-shadow: none; border-color: rgba(255,255,2
 .animate-fade { animation: fadeIn .2s ease-out; }
 .animate-slide-up { animation: slideUp .25s ease-out; }
 
+/* Idle customer-screen motion — calm, classy breathing + drift */
+@keyframes idleBreath {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 1; }
+  50% { transform: translateY(-10px) scale(1.012); opacity: .94; }
+}
+@keyframes idleDrift {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(8px); }
+}
+@keyframes idleRise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes idleHalo {
+  0%, 100% { opacity: .35; transform: scale(1); }
+  50% { opacity: .6; transform: scale(1.08); }
+}
+.idle-breath { animation: idleBreath 7s ease-in-out infinite; }
+.idle-drift { animation: idleDrift 9s ease-in-out infinite; }
+.idle-rise { animation: idleRise .9s ease-out both; }
+.idle-halo { animation: idleHalo 8s ease-in-out infinite; }
+
 /* ════════════════════════════════════════════════════════════
    DARK THEME
    Implemented as utility overrides scoped to body.dark so we get a

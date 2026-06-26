@@ -5,9 +5,19 @@ import { Logo, LogoFlat, LogoMark } from '../components/Logo'
 
 const EMPTY = { items: [], count: 0, subtotal: 0, total: 0, status: 'shopping', receiptNo: null }
 
+// Panels that gently cycle on the idle screen
+const IDLE_PANELS = [
+  { k: 'welcome', title: 'Welcome', sub: 'Your items will appear here as they are scanned' },
+  { k: 'pay', title: 'Pay your way', sub: 'Cash  ·  Mobile Money (USSD)' },
+  { k: 'hours', title: 'Open daily', sub: 'Mon – Sat  ·  8:00am – 7:00pm' },
+  { k: 'location', title: 'Find us', sub: 'Aviation Road J382, Adenta, Accra' },
+  { k: 'contact', title: 'Talk to us', sub: '024 531 5581  ·  024 936 5339' },
+]
+
 export default function CustomerDisplay() {
   const [s, setS] = useState(EMPTY)
   const [flash, setFlash] = useState(false)
+  const [idleIdx, setIdleIdx] = useState(0)
   const prevCount = useRef(0)
 
   // The customer screen is always light, independent of the cashier's theme.
@@ -59,6 +69,13 @@ export default function CustomerDisplay() {
   // ─── SHOPPING / IDLE ───
   const empty = !s.items || s.items.length === 0
 
+  // Cycle the idle info panels, but only while the screen is idle (empty).
+  useEffect(() => {
+    if (!empty) { setIdleIdx(0); return }
+    const t = setInterval(() => setIdleIdx(i => (i + 1) % IDLE_PANELS.length), 5000)
+    return () => clearInterval(t)
+  }, [empty])
+
   return (
     <div className="fixed inset-0 bg-white overflow-hidden">
       {/* Header — fixed at top */}
@@ -68,10 +85,23 @@ export default function CustomerDisplay() {
       </header>
 
       {empty ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 bg-white">
-          <Logo height={120} color="#16181d" accent="#9a9da3" tagline={true} className="mb-8" />
-          <h1 className="text-4xl md:text-5xl font-semibold font-heading text-[#16181d] mb-4">Welcome</h1>
-          <p className="text-xl text-[#8a8d92]">Your items will appear here as they're scanned</p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 bg-white overflow-hidden">
+          {/* soft breathing halo behind the logo */}
+          <div className="absolute w-[460px] h-[460px] rounded-full idle-halo" style={{ background: 'radial-gradient(circle, rgba(16,24,29,0.05) 0%, rgba(16,24,29,0) 70%)' }} />
+          <div className="relative idle-breath">
+            <Logo height={120} color="#16181d" accent="#9a9da3" tagline={true} className="mb-10" />
+          </div>
+          {/* crossfading info panel — re-keys on idleIdx so it re-animates */}
+          <div key={idleIdx} className="idle-rise relative" style={{ minHeight: '120px' }}>
+            <h1 className="text-4xl md:text-5xl font-bold text-[#16181d] mb-3 tracking-tight">{IDLE_PANELS[idleIdx].title}</h1>
+            <p className="text-lg md:text-xl text-[#8a8d92] max-w-xl">{IDLE_PANELS[idleIdx].sub}</p>
+          </div>
+          {/* progress dots */}
+          <div className="absolute bottom-12 flex gap-2 idle-drift">
+            {IDLE_PANELS.map((_, i) => (
+              <span key={i} className={`h-1.5 rounded-full transition-all duration-500 ${i === idleIdx ? 'w-6 bg-[#16181d]' : 'w-1.5 bg-[#d8d9d7]'}`} />
+            ))}
+          </div>
         </div>
       ) : (
         <>
