@@ -69,19 +69,19 @@ export default function POS() {
 
   return (
     <div >
-      <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight">Point of Sale</h1>
+      <h1 className="text-[19px] md:text-[22px] font-bold tracking-tight">Point of Sale</h1>
 
       {promoCount > 0 && (
-        <div className="bg-gray-900 rounded-2xl px-5 py-3 mt-4 flex items-center gap-3 text-white ">
+        <div className="bg-gray-900 rounded-xl px-4 py-2.5 mt-3 flex items-center gap-3 text-white ">
           
-          <span className="text-sm font-bold ">{promoCount} product{promoCount > 1 ? 's' : ''} on promo!</span>
+          <span className="text-sm font-semibold ">{promoCount} product{promoCount > 1 ? 's' : ''} on promo!</span>
         </div>
       )}
 
       {/* Search */}
-      <div className="relative mt-5 mb-4">
+      <div className="relative mt-3.5 mb-3">
         
-        <input className="w-full h-12 md:h-13 pl-4 pr-4 bg-white rounded-2xl text-sm font-medium placeholder:text-stone-300 focus:outline-none focus:ring-2 focus:ring-gray-400/30" placeholder="Search or scan barcode..." value={query}
+        <input className="w-full h-11 md:h-12 pl-4 pr-4 bg-white rounded-xl text-sm font-medium placeholder:text-stone-300 focus:outline-none focus:ring-2 focus:ring-gray-400/30" placeholder="Search or scan barcode..." value={query}
           onChange={e => { setQuery(e.target.value); const v = e.target.value.trim(); if (v.length > 3) { const ex = products.find(p => p.name.toLowerCase() === v.toLowerCase()); if (ex && searchAdd(ex)) setQuery('') } }}
           onKeyDown={e => { if (e.key === 'Enter' && query.trim() && filtered[0] && mode !== 'bundle') { if (searchAdd(filtered[0])) setQuery('') } }}
         />
@@ -98,7 +98,7 @@ export default function POS() {
       </div>
 
       {mode !== 'bundle' && (
-        <div className="flex gap-1.5 overflow-x-auto mb-5 scrollbar-hide">
+        <div className="flex gap-1.5 overflow-x-auto mb-3.5 scrollbar-hide">
           {categories.map(c => (
             <button key={c} onClick={() => setCat(c)}
               className={`h-8 px-3.5 rounded-full text-xs font-semibold whitespace-nowrap transition ${selectedCat === c ? 'bg-gray-800 text-white' : 'bg-white text-stone-400 hover:text-stone-600'}`}>
@@ -109,7 +109,7 @@ export default function POS() {
       )}
 
       {/* Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2 md:gap-2.5">
         {filtered.length === 0 && <div className="col-span-full py-20 text-center text-stone-300 text-sm">No products found</div>}
         {filtered.map((item, idx) => {
           if (mode === 'bundle') return (
