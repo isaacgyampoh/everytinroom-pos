@@ -3,8 +3,13 @@ import { getSupabase } from '../lib/supabase'
 import { SHOP } from '../lib/utils'
 
 const money = v => 'GHS ' + Number(v || 0).toFixed(2)
+const IK_ENDPOINT = 'https://ik.imagekit.io/bqikvsp59'
 const thumb = (url, w = 500) => {
   if (!url) return ''
+  if (IK_ENDPOINT && url.includes('res.cloudinary.com/')) {
+    const path = url.split('res.cloudinary.com/')[1]
+    return `${IK_ENDPOINT}/${path}?tr=w-${w},q-70,f-auto`
+  }
   if (url.includes('cloudinary')) return url.replace('/upload/', `/upload/w_${w},f_auto/`)
   if (url.includes('supabase')) return url + (url.includes('?') ? '&' : '?') + `width=${w}&quality=80`
   return url

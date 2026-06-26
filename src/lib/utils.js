@@ -11,19 +11,22 @@ export const fmtDateTime = d => d ? new Date(d).toLocaleDateString('en-GB', { da
 // through ImageKit (faster, auto WebP/AVIF, 20GB/mo free). Leave '' to keep
 // using the raw image URLs / Cloudinary transforms as before.
 // Example: 'https://ik.imagekit.io/everytinroom'
-export const IMAGEKIT_ENDPOINT = ''
+export const IMAGEKIT_ENDPOINT = 'https://ik.imagekit.io/bqikvsp59'
 
 export const thumb = (url, w) => {
   if (!url) return ''
-  // If ImageKit is configured, proxy + optimize the existing image URL through it.
-  // ImageKit fetches the original (e.g. the Cloudinary URL), resizes to width w,
-  // auto-compresses and serves modern formats from its CDN.
-  if (IMAGEKIT_ENDPOINT) {
+  // Route through ImageKit (external origin -> res.cloudinary.com).
+  // ImageKit serves the path AFTER the origin domain, so we strip the
+  // Cloudinary host and append the rest to the ImageKit endpoint, then add
+  // resize/compress/auto-format. Non-Cloudinary URLs are left as-is.
+  if (IMAGEKIT_ENDPOINT && url.includes('res.cloudinary.com/')) {
     const ep = IMAGEKIT_ENDPOINT.replace(/\/+$/, '')
-    return `${ep}/${encodeURIComponent(url)}?tr=w-${w},q-70,f-auto`
+    const path = url.split('res.cloudinary.com/')[1] // e.g. dls9fai0i/image/upload/.../abc.jpg
+    return `${ep}/${path}?tr=w-${w},q-70,f-auto`
   }
   // Fallback: Cloudinary on-the-fly transform (original behaviour).
-  return url.replace(/\/upload\//, `/upload/w_${w},c_fill,q_auto,f_auto/`)
+  if (url.includes('/upload/')) return url.replace(/\/upload\//, `/upload/w_${w},c_fill,q_auto,f_auto/`)
+  return url
 }
 
 export const SHOP = {
