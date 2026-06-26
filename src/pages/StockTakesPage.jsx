@@ -25,6 +25,65 @@ export default function StockTakesPage() {
   const outOfStock = products.filter(p => p.quantity === 0)
   const totalStockValue = products.reduce((a, p) => a + p.price * p.quantity, 0)
 
+  // Print a paper stock-count sheet on the 80mm thermal printer.
+  // Staff walk around ticking / writing the physical count by hand.
+  const printStockSheet = () => {
+    const sorted = [...products].sort((a, b) =>
+      (a.category || 'zzz').localeCompare(b.category || 'zzz') || a.name.localeCompare(b.name))
+    const date = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    let cat = ''
+    const rows = sorted.map(p => {
+      let head = ''
+      if ((p.category || 'Uncategorised') !== cat) {
+        cat = p.category || 'Uncategorised'
+        head = `<tr><td colspan="3" class="cat">${cat}</td></tr>`
+      }
+      return head + `<tr>
+        <td class="nm">${p.name}</td>
+        <td class="sys">${p.quantity}</td>
+        <td class="cnt">________</td>
+      </tr>`
+    }).join('')
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Stock Sheet</title>
+      <style>
+        @page { size: 80mm auto; margin: 0; }
+        * { box-sizing: border-box; }
+        body { width: 72mm; margin: 0 auto; padding: 6mm 2mm; font-family: 'Courier New', monospace; color: #000; }
+        h1 { font-size: 15px; text-align: center; margin: 0 0 2px; letter-spacing: 1px; }
+        .sub { text-align: center; font-size: 10px; margin-bottom: 2px; }
+        .meta { font-size: 10px; display: flex; justify-content: space-between; border-bottom: 1px dashed #000; padding-bottom: 4px; margin-bottom: 4px; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        th { text-align: left; border-bottom: 1px solid #000; padding: 2px 0; font-size: 10px; }
+        th.sys, th.cnt { text-align: right; }
+        td { padding: 3px 0; vertical-align: bottom; }
+        td.nm { width: 56%; }
+        td.sys { width: 16%; text-align: right; padding-right: 4px; }
+        td.cnt { width: 28%; text-align: right; font-weight: bold; }
+        td.cat { font-weight: bold; padding-top: 7px; border-bottom: 1px dotted #000; font-size: 11px; text-transform: uppercase; }
+        .foot { margin-top: 8px; border-top: 1px dashed #000; padding-top: 6px; font-size: 10px; }
+        .sign { margin-top: 16px; }
+      </style></head><body>
+      <h1>STOCK COUNT SHEET</h1>
+      <div class="sub">EVERYTINROOM &amp; BEDTIME</div>
+      <div class="meta"><span>${date}</span><span>${products.length} items</span></div>
+      <table>
+        <thead><tr><th>Product</th><th class="sys">Sys</th><th class="cnt">Count</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="foot">
+        Sys = quantity in system. Write the real count you find.
+        <div class="sign">Counted by: ____________________</div>
+        <div class="sign">Checked by: _____________________</div>
+      </div>
+      <script>window.onload = function(){ window.print(); setTimeout(function(){ window.close() }, 300) }<\/script>
+      </body></html>`
+
+    const w = window.open('', 'stock-sheet', 'width=360,height=640')
+    if (!w) { alert('Allow popups to print the stock sheet.'); return }
+    w.document.write(html); w.document.close()
+  }
+
   const startStockTake = () => {
     setCounts(products.map(p => ({ productId: p.id, name: p.name, category: p.category, systemQty: p.quantity, countedQty: '', variance: 0 })))
     setNotes(''); setSearch(''); setModal(true)
@@ -78,6 +137,7 @@ export default function StockTakesPage() {
           <p className="text-gray-400 text-sm mt-0.5">Count inventory, track variances & adjustments</p>
         </div>
         <div className="flex gap-2">
+          <button onClick={printStockSheet} className="h-11 px-4 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition">Print Stock Sheet</button>
           <button onClick={() => setAdjModal(true)} className="h-11 px-4 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition">Adjust</button>
           <button onClick={startStockTake} className="h-11 px-5 bg-gray-700 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition">New Stock Take</button>
         </div>
