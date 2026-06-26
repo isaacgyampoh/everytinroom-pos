@@ -185,7 +185,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
         toast.success('Code sent — ready for next customer')
         clearCart(); setDiscount(0); setPhone(''); setPayOpen(false)
         setSplitMode(false); setSplitCash(''); setMomoStep('idle'); setMomoMessage('')
-      }, 30000)
+      }, 60000)
     } catch (e) {
       setMomoStep('failed'); setMomoMessage('Error: ' + e.message)
     }
