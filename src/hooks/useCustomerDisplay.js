@@ -84,3 +84,43 @@ export function useCustomerDisplayBroadcast(extra = {}) {
 export function broadcastDisplay(payload) {
   sendState(payload)
 }
+
+// Track the customer window so we don't open duplicates.
+let customerWin = null
+
+/** True if the customer screen window is currently open. */
+export function isCustomerScreenOpen() {
+  return !!(customerWin && !customerWin.closed)
+}
+
+/**
+ * Auto-open the customer screen on the SECOND physical display.
+ * Built for non-technical use: after the cashier logs in, this fires and
+ * places the customer screen on the 2nd monitor in fullscreen. If the window
+ * is already open, it does nothing. Safe to call repeatedly.
+ */
+export async function openCustomerScreenAuto() {
+  // already open? leave it.
+  if (customerWin && !customerWin.closed) return customerWin
+  const reg = getRegisterId()
+  const url = window.location.origin + '/#/customer-display?reg=' + reg
+  const winName = 'customer-display-' + reg
+
+  // Try to place on the second display via Window Management API (Chrome/Edge).
+  try {
+    if ('getScreenDetails' in window) {
+      const sd = await window.getScreenDetails()
+      const other = sd.screens.find(s => s !== sd.currentScreen) || sd.screens.find(s => !s.isPrimary)
+      if (other) {
+        const feat = `left=${other.availLeft},top=${other.availTop},width=${other.availWidth},height=${other.availHeight},fullscreen=yes`
+        const w = window.open(url, winName, feat)
+        if (w) { customerWin = w; return w }
+      }
+    }
+  } catch (e) { console.warn('auto-place fallback:', e) }
+
+  // Fallback: open a normal window (single screen / no permission / blocked).
+  const w = window.open(url, winName, 'width=1280,height=800')
+  if (w) customerWin = w
+  return w
+}

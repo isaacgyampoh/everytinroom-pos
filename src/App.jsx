@@ -46,6 +46,31 @@ export default function App() {
   // Broadcast live cart to the customer-facing display (#/customer-display)
   useCustomerDisplayBroadcast()
 
+  // Auto-launch the customer screen on the 2nd display once a cashier is in.
+  // Runs after login (which is the user gesture browsers require). Designed so
+  // a non-technical client just opens the app and the customer screen appears.
+  useEffect(() => {
+    if (!user) return
+    if (window.location.hash.includes('/customer-display')) return // don't spawn from the customer window itself
+    let cancelled = false
+    const KEY = 'customer-window-open'
+    const launch = async () => {
+      try {
+        const { openCustomerScreenAuto } = await import('./hooks/useCustomerDisplay')
+        if (!cancelled) await openCustomerScreenAuto()
+      } catch (e) { console.warn('auto customer screen:', e) }
+    }
+    // slight delay so the POS UI paints first
+    const t = setTimeout(launch, 600)
+    // keep it alive: only relaunch if the customer window was actually closed
+    const keepAlive = setInterval(async () => {
+      if (cancelled || window.location.hash.includes('/customer-display')) return
+      const { isCustomerScreenOpen } = await import('./hooks/useCustomerDisplay')
+      if (!isCustomerScreenOpen()) launch()
+    }, 15000)
+    return () => { cancelled = true; clearTimeout(t); clearInterval(keepAlive) }
+  }, [user])
+
   // Apply dark mode
   useEffect(() => {
     document.body.classList.toggle('dark', darkMode)
