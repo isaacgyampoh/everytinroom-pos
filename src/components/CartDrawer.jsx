@@ -185,7 +185,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
         toast.success('Code sent — ready for next customer')
         clearCart(); setDiscount(0); setPhone(''); setPayOpen(false)
         setSplitMode(false); setSplitCash(''); setMomoStep('idle'); setMomoMessage('')
-      }, 60000)
+      }, 20000)
     } catch (e) {
       setMomoStep('failed'); setMomoMessage('Error: ' + e.message)
     }
@@ -357,14 +357,14 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                 <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-2">USSD Payment Code</p>
                 <p className="text-3xl font-bold text-[#16181d] font-mono tracking-wider mb-2" style={{ whiteSpace: 'pre-line' }}>{momoMessage.split('\n')[0]?.replace('USSD Code: ', '')}</p>
                 <p className="text-sm text-gray-500 font-semibold">{momoMessage.split('\n')[1]}</p>
-                <button onClick={() => { navigator.clipboard?.writeText(momoMessage.split('\n')[0]?.replace('USSD Code: ', '')); toast.success('Copied!') }} className="mt-3 px-4 py-2 bg-[#16181d] text-white rounded-lg text-xs font-bold">Copy Code</button>
+                <button onClick={() => { navigator.clipboard?.writeText(momoMessage.split('\n')[0]?.replace('USSD Code: ', '')); toast.success('Code copied'); if (pollRef.current) clearInterval(pollRef.current); if (autoCloseRef.current) clearTimeout(autoCloseRef.current); clearCart(); setDiscount(0); setPhone(''); setPayOpen(false); setSplitMode(false); setSplitCash(''); setMomoStep('idle'); setMomoMessage('') }} className="mt-3 px-5 py-2.5 bg-[#16181d] text-white rounded-lg text-xs font-bold">Copy & Done</button>
               </div>
               <p className="text-sm text-gray-600 font-medium mb-2">Read the code to the customer — they also get an SMS</p>
               <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
                 <div className="w-3 h-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
                 Closes automatically — ready for the next customer
               </div>
-              <button onClick={() => { if (pollRef.current) clearInterval(pollRef.current); if (autoCloseRef.current) clearTimeout(autoCloseRef.current); setMomoStep('idle'); setMomoMessage('') }} className="mt-4 text-xs text-gray-400 hover:text-gray-600">Close now</button>
+              <button onClick={() => { if (pollRef.current) clearInterval(pollRef.current); if (autoCloseRef.current) clearTimeout(autoCloseRef.current); clearCart(); setDiscount(0); setPhone(''); setPayOpen(false); setSplitMode(false); setSplitCash(''); setMomoStep('idle'); setMomoMessage('') }} className="mt-4 text-xs font-semibold text-gray-500 hover:text-gray-800">Close & start new order</button>
             </div>
           )}
           {momoStep === 'success' && <div className="text-center py-10"><div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div><h3 className="text-lg font-bold text-green-600 mb-1">Payment Confirmed!</h3><p className="text-gray-400 text-sm">Recording sale...</p></div>}
