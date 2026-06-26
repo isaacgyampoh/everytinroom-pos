@@ -11,7 +11,7 @@ export const fmtDateTime = d => d ? new Date(d).toLocaleDateString('en-GB', { da
 // through ImageKit (faster, auto WebP/AVIF, 20GB/mo free). Leave '' to keep
 // using the raw image URLs / Cloudinary transforms as before.
 // Example: 'https://ik.imagekit.io/everytinroom'
-export const IMAGEKIT_ENDPOINT = 'https://ik.imagekit.io/bqikvsp59'
+export const IMAGEKIT_ENDPOINT = ''
 
 export const thumb = (url, w) => {
   if (!url) return ''

@@ -3,7 +3,7 @@ import { getSupabase } from '../lib/supabase'
 import { SHOP } from '../lib/utils'
 
 const money = v => 'GHS ' + Number(v || 0).toFixed(2)
-const IK_ENDPOINT = 'https://ik.imagekit.io/bqikvsp59'
+const IK_ENDPOINT = ''
 const thumb = (url, w = 500) => {
   if (!url) return ''
   if (IK_ENDPOINT && url.includes('res.cloudinary.com/')) {
