@@ -158,7 +158,7 @@ export const useStore = create((set, get) => ({
         q(sb, 'sales', { select: 'id,receipt_no,date,items,subtotal,discount,total,profit,payment,split_cash,split_momo,customer,type,cashier,voided', order: 'date', limit: 150 }),
         q(sb, 'expenses', { select: 'id,date,category,description,amount', order: 'date', limit: 100 }),
         q(sb, 'customers', { select: 'id,phone,visit_count,total_spent,last_visit', order: 'total_spent', limit: 300 }),
-        q(sb, 'whatsapp_orders', { order: 'date', limit: 500 }),
+        q(sb, 'whatsapp_orders', { select: 'id,order_no,date,customer_name,customer_phone,items,subtotal,delivery_fee,total,status,ussd_code,paystack_ref,address,notes,paid_at', order: 'date', limit: 200 }),
         q(sb, 'refunds', { order: 'date', limit: 50 }),
         q(sb, 'invoices', { order: 'date', limit: 50 }),
         q(sb, 'stock_takes', { order: 'date', limit: 20 }),
