@@ -13,7 +13,7 @@ const ProductCard = memo(({ item, price, hasPromo, onAdd }) => {
         {item.image ? <img src={thumb(item.image, 300)} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" fetchPriority="low" /> : <div className="w-full h-full flex items-center justify-center text-stone-300"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>}
       </div>
       <div className="p-2.5">
-        <div className="text-[12px] md:text-[13px] font-semibold text-gray-900 leading-snug truncate">{item.name}</div>
+        <div className="text-[12px] md:text-[13px] font-semibold text-gray-900 leading-snug break-words">{item.name}</div>
         <div className="flex items-end justify-between mt-1.5">
           <div>
             {hasPromo && <div className="text-[10px] text-stone-400 line-through">{money(item.price)}</div>}

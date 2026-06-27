@@ -9,7 +9,7 @@ export default function Products() {
   const { products, refreshProducts, setLoading } = useStore()
   const [query, setQuery] = useState('')
   const [modal, setModal] = useState(false)
-  const [form, setForm] = useState({ id: '', name: '', category: '', costPrice: '', price: '', wholesalePrice: '', wholesaleMinQty: '', quantity: '', file: null, existingImage: '' })
+  const [form, setForm] = useState({ id: '', name: '', category: '', costPrice: '', price: '', wholesalePrice: '', wholesaleMinQty: '', quantity: '', groupTag: '', file: null, existingImage: '' })
   const [preview, setPreview] = useState('')
   const [migrating, setMigrating] = useState(false)
   const filtered = products.filter(p => p.name.toLowerCase().includes(query.toLowerCase()))
@@ -49,8 +49,8 @@ export default function Products() {
     if (failed > 0) toast.error(`${failed} images failed - check Cloudinary upload preset`)
   }
 
-  const openNew = () => { setForm({ id: '', name: '', category: '', costPrice: '', price: '', wholesalePrice: '', wholesaleMinQty: '', quantity: '', file: null, existingImage: '' }); setPreview(''); setModal(true) }
-  const openEdit = (p) => { setForm({ id: p.id, name: p.name, category: p.category, costPrice: p.costPrice, price: p.price, wholesalePrice: p.wholesalePrice, wholesaleMinQty: p.wholesaleMinQty || '', quantity: p.quantity, file: null, existingImage: p.image }); setPreview(p.image || ''); setModal(true) }
+  const openNew = () => { setForm({ id: '', name: '', category: '', costPrice: '', price: '', wholesalePrice: '', wholesaleMinQty: '', quantity: '', groupTag: '', file: null, existingImage: '' }); setPreview(''); setModal(true) }
+  const openEdit = (p) => { setForm({ id: p.id, name: p.name, category: p.category, costPrice: p.costPrice, price: p.price, wholesalePrice: p.wholesalePrice, wholesaleMinQty: p.wholesaleMinQty || '', quantity: p.quantity, groupTag: p.groupTag || '', file: null, existingImage: p.image }); setPreview(p.image || ''); setModal(true) }
   const handleFile = (e) => { const file = e.target.files[0]; if (!file) return; setForm({ ...form, file }); const r = new FileReader(); r.onload = (ev) => setPreview(ev.target.result); r.readAsDataURL(file) }
 
   const save = async () => {
@@ -68,7 +68,7 @@ export default function Products() {
         if (data.secure_url) imageUrl = data.secure_url
       } catch (e) { toast.error('Image upload failed') }
     }
-    const data = { name: form.name.trim(), category: form.category.trim(), cost_price: num(form.costPrice), price: num(form.price), wholesale_price: num(form.wholesalePrice), wholesale_min_qty: num(form.wholesaleMinQty), quantity: num(form.quantity), image: imageUrl }
+    const data = { name: form.name.trim(), category: form.category.trim(), cost_price: num(form.costPrice), price: num(form.price), wholesale_price: num(form.wholesalePrice), wholesale_min_qty: num(form.wholesaleMinQty), quantity: num(form.quantity), group_tag: form.groupTag.trim().toLowerCase(), image: imageUrl }
     if (form.id) await sb.from('products').update(data).eq('id', form.id); else await sb.from('products').insert(data)
     await refreshProducts(); setLoading(false); setModal(false); toast.success('Saved!')
   }
@@ -90,7 +90,7 @@ export default function Products() {
           <div><label className="block text-xs font-semibold text-gray-500 mb-2">Name</label><input className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
           <div><label className="block text-xs font-semibold text-gray-500 mb-2">Category</label><select className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base appearance-none" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}><option value="">Select category...</option>{['Curtains','Kitchenware','Cookware Sets','Racks','Rods','Chairs','Carpets','Home Appliances','Blankets','Bed Sheets','Mats','Pillows','Towels & Covers','Artefacts & Decor','Other'].map(c => <option key={c} value={c}>{c}</option>)}</select></div>
           <div className="grid grid-cols-2 gap-3.5"><div><label className="block text-xs font-semibold text-gray-500 mb-2">Cost</label><input type="number" className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base" value={form.costPrice} onChange={e => setForm({ ...form, costPrice: e.target.value })} /></div><div><label className="block text-xs font-semibold text-gray-500 mb-2">Price</label><input type="number" className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} /></div></div>
-          <div className="grid grid-cols-3 gap-3"><div><label className="block text-xs font-semibold text-gray-500 mb-2">Wholesale Price</label><input type="number" className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base" placeholder="0.00" value={form.wholesalePrice} onChange={e => setForm({ ...form, wholesalePrice: e.target.value })} /></div><div><label className="block text-xs font-semibold text-gray-500 mb-2">Min Qty</label><input type="number" className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base" placeholder="e.g. 6" value={form.wholesaleMinQty} onChange={e => setForm({ ...form, wholesaleMinQty: e.target.value })} /></div><div><label className="block text-xs font-semibold text-gray-500 mb-2">Stock</label><input type="number" className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} /></div></div>
+          <div><label className="block text-xs font-semibold text-gray-500 mb-2">Variant Group <span className="font-normal text-gray-400">(optional)</span></label><input className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base" placeholder="e.g. sunblock-curtains" value={form.groupTag} onChange={e => setForm({ ...form, groupTag: e.target.value })} /><p className="text-xs text-gray-400 mt-1.5">Give every colour/type of the same product the SAME group so 5 across colours triggers wholesale. Leave blank if no variants.</p></div>
           {num(form.wholesalePrice) > 0 && num(form.wholesaleMinQty) > 0 && <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">💡 When a customer buys <b>{form.wholesaleMinQty}+</b> units, price auto-switches from <b>GHS {num(form.price).toFixed(2)}</b> → <b>GHS {num(form.wholesalePrice).toFixed(2)}</b></div>}
         </div>
       </Modal>

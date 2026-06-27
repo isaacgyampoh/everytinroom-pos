@@ -2,7 +2,35 @@ import { create } from 'zustand'
 import { getSupabase } from '../lib/supabase'
 import { num } from '../lib/utils'
 
-const mapProduct = p => ({ id: p.id, name: p.name, category: p.category || '', costPrice: num(p.cost_price), price: num(p.price), wholesalePrice: num(p.wholesale_price), wholesaleMinQty: num(p.wholesale_min_qty) || 0, quantity: num(p.quantity), image: p.image || '' })
+const mapProduct = p => ({ id: p.id, name: p.name, category: p.category || '', costPrice: num(p.cost_price), price: num(p.price), wholesalePrice: num(p.wholesale_price), wholesaleMinQty: num(p.wholesale_min_qty) || 0, quantity: num(p.quantity), image: p.image || '', groupTag: (p.group_tag || '').trim().toLowerCase() })
+
+// Recalculate wholesale pricing across the whole cart.
+// Variants that share a product's group_tag have their quantities SUMMED;
+// if the group total reaches the wholesale min qty, every item in that group
+// gets the wholesale price. Ungrouped products fall back to their own qty.
+function applyWholesale(cart, products) {
+  const prodById = {}
+  for (const p of products) prodById[p.id] = p
+  // total qty per group key (group_tag if set, else the product id)
+  const groupQty = {}
+  for (const c of cart) {
+    if (c.isBundle) continue
+    const prod = prodById[c.productId]; if (!prod) continue
+    const key = prod.groupTag ? 'g:' + prod.groupTag : 'p:' + c.productId
+    groupQty[key] = (groupQty[key] || 0) + c.qty
+  }
+  return cart.map(c => {
+    if (c.isBundle) { c.lineTotal = c.qty * c.price; return c }
+    const prod = prodById[c.productId]
+    if (!prod) { c.lineTotal = c.qty * c.price; return c }
+    const key = prod.groupTag ? 'g:' + prod.groupTag : 'p:' + c.productId
+    const totalQty = groupQty[key] || c.qty
+    const wholesaleOn = prod.wholesalePrice > 0 && prod.wholesaleMinQty > 0 && totalQty >= prod.wholesaleMinQty
+    c.price = wholesaleOn ? prod.wholesalePrice : (c.originalPrice || prod.price)
+    c.lineTotal = c.qty * c.price
+    return c
+  })
+}
 const mapBundle = b => ({ id: b.id, name: b.name, products: typeof b.products === 'string' ? JSON.parse(b.products) : (b.products || []), bundlePrice: num(b.bundle_price), active: b.active })
 const mapSale = s => ({ id: s.id, receiptNo: s.receipt_no, date: s.date, items: typeof s.items === 'string' ? JSON.parse(s.items) : (s.items || []), subtotal: num(s.subtotal), discount: num(s.discount), total: num(s.total), profit: num(s.profit), payment: s.payment, splitCash: num(s.split_cash), splitMomo: num(s.split_momo), customer: s.customer || 'Walk-in', type: s.type || 'Retail', cashier: s.cashier || '', voided: s.voided })
 const mapStaff = s => ({ id: s.id, name: s.name, role: s.role, active: s.active })
@@ -85,18 +113,8 @@ export const useStore = create((set, get) => ({
     if (existing) {
       if (!item.isBundle) { const prod = get().products.find(p => p.id === item.productId); if (prod && existing.qty >= prod.quantity) return false }
       existing.qty++
-      // Auto-switch price based on wholesale min qty
-      if (!existing.isBundle) {
-        const prod = get().products.find(p => p.id === existing.productId)
-        if (prod && prod.wholesalePrice > 0 && prod.wholesaleMinQty > 0 && existing.qty >= prod.wholesaleMinQty) {
-          existing.price = prod.wholesalePrice
-        } else if (prod) {
-          existing.price = item.originalPrice || prod.price
-        }
-      }
-      existing.lineTotal = existing.qty * existing.price
     } else { cart.push({ ...item, qty: 1, lineTotal: item.price, originalPrice: item.price }) }
-    set({ cart }); return true
+    set({ cart: applyWholesale(cart, get().products) }); return true
   },
   updateCartQty: (index, delta) => {
     const cart = [...get().cart]; const item = cart[index]; if (!item) return
@@ -106,18 +124,12 @@ export const useStore = create((set, get) => ({
       if (!item.isBundle) {
         const prod = get().products.find(p => p.id === item.productId)
         if (prod && newQty > prod.quantity) return false
-        // Auto-switch price based on wholesale min qty
-        if (prod && prod.wholesalePrice > 0 && prod.wholesaleMinQty > 0 && newQty >= prod.wholesaleMinQty) {
-          item.price = prod.wholesalePrice
-        } else if (prod) {
-          item.price = item.originalPrice || prod.price
-        }
       }
-      item.qty = newQty; item.lineTotal = newQty * item.price
+      item.qty = newQty
     }
-    set({ cart }); return true
+    set({ cart: applyWholesale(cart, get().products) }); return true
   },
-  removeFromCart: index => { const cart = [...get().cart]; cart.splice(index, 1); set({ cart }) },
+  removeFromCart: index => { const cart = [...get().cart]; cart.splice(index, 1); set({ cart: applyWholesale(cart, get().products) }) },
   clearCart: () => set({ cart: [] }),
 
   // PHASE 1: Load only essential data (products, staff, sales, bundles)
@@ -127,7 +139,7 @@ export const useStore = create((set, get) => ({
     try {
       // PHASE 1: Only what POS needs immediately
       const [prodData, staffData, bunData, promoData] = await Promise.all([
-        q(sb, 'products', { select: 'id,name,category,cost_price,price,wholesale_price,wholesale_min_qty,quantity,image', order: 'name', asc: true }),
+        q(sb, 'products', { select: 'id,name,category,cost_price,price,wholesale_price,wholesale_min_qty,quantity,image,group_tag', order: 'name', asc: true }),
         q(sb, 'staff', { select: 'id,name,role,active' }),
         q(sb, 'bundles', { select: 'id,name,products,bundle_price,active' }),
         q(sb, 'promos', { select: 'id,name,start_date,end_date,items,active', limit: 50 }),
