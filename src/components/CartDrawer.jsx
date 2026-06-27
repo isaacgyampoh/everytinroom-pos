@@ -9,7 +9,7 @@ import toast from 'react-hot-toast'
 const CHARGE_URL = 'https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo'
 
 export default function CartDrawer({ open, onClose, onReceipt }) {
-  const { cart, updateCartQty, removeFromCart, clearCart, deductStock, user, mode } = useStore()
+  const { cart, updateCartQty, removeFromCart, clearCart, deductStock, user, mode, products } = useStore()
   const [discount, setDiscount] = useState(0)
   const [phone, setPhone] = useState('')
   const [payOpen, setPayOpen] = useState(false)
@@ -233,6 +233,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                 <div key={i} className="cart-item flex items-center gap-3 p-3 rounded-xl bg-gray-50/80 border border-gray-100 hover:bg-gray-50 transition">
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold text-gray-900 leading-tight">{c.name}</div>
+                    {(() => { const p = products.find(pr => pr.id === c.productId); return p ? <div className="text-[9px] text-blue-500 font-mono">grp:{p.groupTag || 'NONE'} min:{p.wholesaleMinQty} ws:{p.wholesalePrice}</div> : null })()}
                     <div className="text-xs text-gray-400 mt-0.5">
                       {money(c.price)} each
                       {c.isPromo && <span className="ml-1 text-orange-500 font-bold">• Promo </span>}
