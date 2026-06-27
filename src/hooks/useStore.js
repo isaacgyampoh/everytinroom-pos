@@ -23,6 +23,20 @@ function baseName(name) {
 // if one is set. When the group total reaches the wholesale min qty, every
 // item in that group gets the wholesale price.
 function applyWholesale(cart, products) {
+  // TEMPORARILY DISABLED — everything stays at retail price.
+  // Auto-wholesale grouping is turned off until the dedup/grouping bug is
+  // fully resolved. Each line uses its original retail price.
+  const prodById = {}
+  for (const p of products) prodById[p.id] = p
+  return cart.map(c => {
+    if (c.isBundle) return { ...c, lineTotal: c.qty * c.price }
+    const prod = prodById[c.productId]
+    const retail = c.originalPrice || (prod ? prod.price : c.price)
+    return { ...c, price: retail, lineTotal: c.qty * retail }
+  })
+}
+
+function applyWholesale_DISABLED(cart, products) {
   const prodById = {}
   for (const p of products) prodById[p.id] = p
   const groupKey = (prod) => prod.groupTag ? 'g:' + prod.groupTag : 'n:' + baseName(prod.name)

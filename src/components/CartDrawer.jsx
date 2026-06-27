@@ -233,7 +233,6 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                 <div key={i} className="cart-item flex items-center gap-3 p-3 rounded-xl bg-gray-50/80 border border-gray-100 hover:bg-gray-50 transition">
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold text-gray-900 leading-tight">{c.name}</div>
-                    <div className="text-[9px] text-red-500 font-mono">id:{String(c.productId).slice(-6)} p:{c.price} o:{c.originalPrice ?? '?'} q:{c.qty}</div>
                     <div className="text-xs text-gray-400 mt-0.5">
                       {money(c.price)} each
                       {c.isPromo && <span className="ml-1 text-orange-500 font-bold">• Promo </span>}
