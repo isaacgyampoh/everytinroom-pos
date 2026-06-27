@@ -4,27 +4,40 @@ import { num } from '../lib/utils'
 
 const mapProduct = p => ({ id: p.id, name: p.name, category: p.category || '', costPrice: num(p.cost_price), price: num(p.price), wholesalePrice: num(p.wholesale_price), wholesaleMinQty: num(p.wholesale_min_qty) || 0, quantity: num(p.quantity), image: p.image || '', groupTag: (p.group_tag || '').trim().toLowerCase() })
 
+// Derive a product's base name by stripping the variant suffix
+// e.g. "2 in 1 coloured curtains(type16)" -> "2 in 1 coloured curtains"
+//      "10pcs granite cookware set (ash)" -> "10pcs granite cookware set"
+function baseName(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/\(\s*type\s*\d+\s*\)/g, '')   // (type1), (type 12)
+    .replace(/\btype\s*\d+\b/g, '')          // type1 without brackets
+    .replace(/\(\s*[^)]*\)/g, '')            // any other (...) e.g. (ash), (sky blue)
+    .replace(/[\s_-]+/g, ' ')
+    .trim()
+}
+
 // Recalculate wholesale pricing across the whole cart.
-// Variants that share a product's group_tag have their quantities SUMMED;
-// if the group total reaches the wholesale min qty, every item in that group
-// gets the wholesale price. Ungrouped products fall back to their own qty.
+// Variants of the same product POOL their quantities — grouped automatically
+// by base product name (variant suffix stripped), or by an explicit group_tag
+// if one is set. When the group total reaches the wholesale min qty, every
+// item in that group gets the wholesale price.
 function applyWholesale(cart, products) {
   const prodById = {}
   for (const p of products) prodById[p.id] = p
-  // total qty per group key (group_tag if set, else the product id)
+  const groupKey = (prod) => prod.groupTag ? 'g:' + prod.groupTag : 'n:' + baseName(prod.name)
   const groupQty = {}
   for (const c of cart) {
     if (c.isBundle) continue
     const prod = prodById[c.productId]; if (!prod) continue
-    const key = prod.groupTag ? 'g:' + prod.groupTag : 'p:' + c.productId
+    const key = groupKey(prod)
     groupQty[key] = (groupQty[key] || 0) + c.qty
   }
   return cart.map(c => {
     if (c.isBundle) { c.lineTotal = c.qty * c.price; return c }
     const prod = prodById[c.productId]
     if (!prod) { c.lineTotal = c.qty * c.price; return c }
-    const key = prod.groupTag ? 'g:' + prod.groupTag : 'p:' + c.productId
-    const totalQty = groupQty[key] || c.qty
+    const totalQty = groupQty[groupKey(prod)] || c.qty
     const wholesaleOn = prod.wholesalePrice > 0 && prod.wholesaleMinQty > 0 && totalQty >= prod.wholesaleMinQty
     c.price = wholesaleOn ? prod.wholesalePrice : (c.originalPrice || prod.price)
     c.lineTotal = c.qty * c.price
