@@ -34,14 +34,13 @@ function applyWholesale(cart, products) {
     groupQty[key] = (groupQty[key] || 0) + c.qty
   }
   return cart.map(c => {
-    if (c.isBundle) { c.lineTotal = c.qty * c.price; return c }
+    if (c.isBundle) return { ...c, lineTotal: c.qty * c.price }
     const prod = prodById[c.productId]
-    if (!prod) { c.lineTotal = c.qty * c.price; return c }
+    if (!prod) return { ...c, lineTotal: c.qty * c.price }
     const totalQty = groupQty[groupKey(prod)] || c.qty
     const wholesaleOn = prod.wholesalePrice > 0 && prod.wholesaleMinQty > 0 && totalQty >= prod.wholesaleMinQty
-    c.price = wholesaleOn ? prod.wholesalePrice : (c.originalPrice || prod.price)
-    c.lineTotal = c.qty * c.price
-    return c
+    const newPrice = wholesaleOn ? prod.wholesalePrice : (c.originalPrice || prod.price)
+    return { ...c, price: newPrice, lineTotal: c.qty * newPrice }
   })
 }
 const mapBundle = b => ({ id: b.id, name: b.name, products: typeof b.products === 'string' ? JSON.parse(b.products) : (b.products || []), bundlePrice: num(b.bundle_price), active: b.active })
@@ -121,16 +120,17 @@ export const useStore = create((set, get) => ({
   },
 
   addToCart: (item) => {
-    const cart = [...get().cart]
-    const existing = cart.find(c => c.isBundle ? c.bundleId === item.bundleId : c.productId === item.productId)
-    if (existing) {
+    let cart = [...get().cart]
+    const idx = cart.findIndex(c => c.isBundle ? c.bundleId === item.bundleId : c.productId === item.productId)
+    if (idx >= 0) {
+      const existing = cart[idx]
       if (!item.isBundle) { const prod = get().products.find(p => p.id === item.productId); if (prod && existing.qty >= prod.quantity) return false }
-      existing.qty++
+      cart[idx] = { ...existing, qty: existing.qty + 1 }
     } else { cart.push({ ...item, qty: 1, lineTotal: item.price, originalPrice: item.price }) }
     set({ cart: applyWholesale(cart, get().products) }); return true
   },
   updateCartQty: (index, delta) => {
-    const cart = [...get().cart]; const item = cart[index]; if (!item) return
+    let cart = [...get().cart]; const item = cart[index]; if (!item) return
     const newQty = item.qty + delta
     if (newQty < 1) { cart.splice(index, 1) }
     else {
@@ -138,7 +138,7 @@ export const useStore = create((set, get) => ({
         const prod = get().products.find(p => p.id === item.productId)
         if (prod && newQty > prod.quantity) return false
       }
-      item.qty = newQty
+      cart[index] = { ...item, qty: newQty }
     }
     set({ cart: applyWholesale(cart, get().products) }); return true
   },
