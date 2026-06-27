@@ -11,7 +11,7 @@ export const fmtDateTime = d => d ? new Date(d).toLocaleDateString('en-GB', { da
 // through ImageKit (faster, auto WebP/AVIF, 20GB/mo free). Leave '' to keep
 // using the raw image URLs / Cloudinary transforms as before.
 // Example: 'https://ik.imagekit.io/everytinroom'
-export const IMAGEKIT_ENDPOINT = ''
+export const IMAGEKIT_ENDPOINT = 'https://ik.imagekit.io/bqikvsp59'
 
 export const thumb = (url, w) => {
   if (!url) return ''
@@ -21,7 +21,10 @@ export const thumb = (url, w) => {
   // resize/compress/auto-format. Non-Cloudinary URLs are left as-is.
   if (IMAGEKIT_ENDPOINT && url.includes('res.cloudinary.com/')) {
     const ep = IMAGEKIT_ENDPOINT.replace(/\/+$/, '')
-    const path = url.split('res.cloudinary.com/')[1] // e.g. dls9fai0i/image/upload/.../abc.jpg
+    let path = url.split('res.cloudinary.com/')[1] // e.g. dls9fai0i/image/upload/[transforms/]v123/folder/file.jpg
+    // Remove any Cloudinary transform segment after /upload/ (e.g. w_300,c_fill,q_auto,f_auto/)
+    // so only the clean image path remains — ImageKit applies its own ?tr= transform.
+    path = path.replace(/(\/upload\/)[^/]*[,_][^/]*\//, '$1')
     return `${ep}/${path}?tr=w-${w},q-70,f-auto`
   }
   // Fallback: Cloudinary on-the-fly transform (original behaviour).
