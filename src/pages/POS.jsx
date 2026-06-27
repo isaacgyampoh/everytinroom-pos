@@ -69,7 +69,7 @@ export default function POS() {
 
   return (
     <div >
-      <h1 className="text-[19px] md:text-[22px] font-bold tracking-tight">Point of Sale</h1>
+      <h1 className="text-[19px] md:text-[22px] font-bold tracking-tight">Point of Sale <span className="text-[10px] font-normal text-gray-300 align-middle">v-ws2</span></h1>
 
       {promoCount > 0 && (
         <div className="bg-gray-900 rounded-xl px-4 py-2.5 mt-3 flex items-center gap-3 text-white ">
