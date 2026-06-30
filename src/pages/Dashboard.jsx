@@ -30,7 +30,6 @@ export default function Dashboard() {
   const todayExp = expenses.filter(e => isoDate(e.date) === t).reduce((a, e) => a + e.amount, 0)
   const monthExp = expenses.filter(e => isoDate(e.date) >= ms).reduce((a, e) => a + e.amount, 0)
   const lowStock = products.filter(p => p.quantity <= 5)
-  const outOfStock = products.filter(p => p.quantity === 0)
   const recentSales = sales.filter(s => !s.voided).slice(0, 6)
 
   // Last 7 days trend
@@ -94,13 +93,7 @@ export default function Dashboard() {
       </div>
 
       {/* Alerts */}
-      {outOfStock.length > 0 && (
-        <div onClick={() => setPage('stocktakes')} className="bg-red-50 border border-red-100 rounded-xl p-3 mb-4 flex items-center gap-3 cursor-pointer hover:bg-red-100 transition">
-          <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center text-red-500 text-xs font-bold">{outOfStock.length}</div>
-          <div className="flex-1 text-sm text-red-600 font-medium">Products out of stock</div>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
-        </div>
-      )}
+
 
       {/* Revenue Cards — Cleara style: light, airy, one teal feature card */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 mb-3.5">
