@@ -69,10 +69,10 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-7">
         <div>
-          <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight text-gray-900">{greet}, {user?.name || 'Boss'}</h1>
-          <p className="text-gray-400 text-[13px] mt-0.5">{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+          <h1 className="text-[26px] md:text-[30px] font-bold tracking-tight text-gray-900">{greet}, {user?.name || 'Boss'}</h1>
+          <p className="text-gray-400 text-sm mt-1">Here's what's happening in your shop today</p>
         </div>
       </div>
 
@@ -102,33 +102,33 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Revenue Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+      {/* Revenue Cards — Cleara style: light, airy, one teal feature card */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 mb-3.5">
         {[
-          { label: "Today", value: money(todayRev), sub: todaySales.length + ' sales', color: 'bg-gray-900' },
-          { label: "This Week", value: money(weekRev), sub: weekSales.length + ' sales', color: 'bg-gray-800' },
-          { label: "This Month", value: money(monthRev), sub: monthSales.length + ' sales', color: 'bg-gray-700' },
-          { label: "All Time", value: money(allRev), sub: allSales.length + ' total', color: 'bg-[#111]' },
+          { label: "Today", value: money(todayRev), sub: todaySales.length + ' sales', feature: true },
+          { label: "This Week", value: money(weekRev), sub: weekSales.length + ' sales', feature: false },
+          { label: "This Month", value: money(monthRev), sub: monthSales.length + ' sales', feature: false },
+          { label: "All Time", value: money(allRev), sub: allSales.length + ' total', feature: false },
         ].map((c, i) => (
-          <div key={i} className={`${c.color} rounded-2xl p-4 md:p-5 text-white`}>
-              <div className="text-[11px] md:text-xs font-medium text-white/60">{c.label}</div>
-              <div className="text-[20px] md:text-[22px] font-bold mt-1 tracking-tight">{c.value}</div>
-              <div className="text-[10px] md:text-[11px] font-medium text-white/40 mt-0.5">{c.sub}</div>
+          <div key={i} className={`rounded-2xl p-5 ${c.feature ? 'bg-[#0e7c86] text-white' : 'bg-white border border-gray-200/70 text-gray-900'}`}>
+              <div className={`text-xs font-medium ${c.feature ? 'text-white/70' : 'text-gray-400'}`}>{c.label}</div>
+              <div className="text-[24px] md:text-[26px] font-bold mt-2 tracking-tight">{c.value}</div>
+              <div className={`text-[11px] font-medium mt-1 ${c.feature ? 'text-white/50' : 'text-gray-400'}`}>{c.sub}</div>
           </div>
         ))}
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 mb-5">
         {[
-          { label: "Today's Profit", value: money(todayProfit), color: 'text-gray-900', bg: 'bg-gray-200' },
-          { label: 'Net Today', value: money(todayProfit - todayExp), color: todayProfit - todayExp >= 0 ? 'text-gray-900' : 'text-red-500', bg: 'bg-gray-200' },
-          { label: 'Profit Margin', value: profitMargin + '%', color: Number(profitMargin) >= 30 ? 'text-green-600' : Number(profitMargin) >= 15 ? 'text-amber-500' : 'text-red-500', bg: 'bg-gray-400' },
-          { label: 'Stock Value', value: money(stockValue), color: 'text-gray-900', bg: 'bg-gray-200' },
+          { label: "Today's Profit", value: money(todayProfit), color: 'text-gray-900' },
+          { label: 'Net Today', value: money(todayProfit - todayExp), color: todayProfit - todayExp >= 0 ? 'text-gray-900' : 'text-red-500' },
+          { label: 'Profit Margin', value: profitMargin + '%', color: Number(profitMargin) >= 30 ? 'text-[#0e7c86]' : Number(profitMargin) >= 15 ? 'text-amber-500' : 'text-red-500' },
+          { label: 'Stock Value', value: money(stockValue), color: 'text-gray-900' },
         ].map((s, i) => (
-          <div key={i} className="bg-white rounded-2xl p-3.5 md:p-4 border border-gray-100/80">
-              <div className="text-[10px] md:text-[11px] text-gray-400 font-medium">{s.label}</div>
-              <div className={`text-[18px] md:text-[20px] font-bold mt-0.5 tracking-tight ${s.color}`}>{s.value}</div>
+          <div key={i} className="bg-white rounded-2xl p-4 border border-gray-200/70">
+              <div className="text-[11px] text-gray-400 font-medium">{s.label}</div>
+              <div className={`text-[20px] font-bold mt-1 tracking-tight ${s.color}`}>{s.value}</div>
           </div>
         ))}
       </div>
@@ -142,7 +142,7 @@ export default function Dashboard() {
               <div key={i} className="flex-1 flex flex-col items-center gap-1">
                 <div className="text-[10px] font-bold text-gray-500">{d.revenue > 0 ? money(d.revenue).replace('GHS ', '') : ''}</div>
                 <div className="w-full rounded-t-lg bg-gray-200 relative overflow-hidden" style={{ height: Math.max(4, (d.revenue / maxRev) * 100) + '%' }}>
-                  <div className="absolute inset-0 bg-gray-800 rounded-t-lg" style={{ opacity: d.date === t ? 1 : 0.5 }} />
+                  <div className="absolute inset-0 bg-[#0e7c86] rounded-t-lg" style={{ opacity: d.date === t ? 1 : 0.35 }} />
                 </div>
                 <div className={`text-[10px] font-bold ${d.date === t ? 'text-gray-900' : 'text-gray-400'}`}>{d.label}</div>
               </div>
@@ -155,9 +155,9 @@ export default function Dashboard() {
           <h3 className="text-sm font-bold text-gray-800 mb-4">Payment Split (This Month)</h3>
           <div className="space-y-3">
             {[
-              { label: 'Cash', amount: monthCash, color: 'bg-gray-800', pct: monthRev ? (monthCash / monthRev * 100) : 0 },
-              { label: 'Momo', amount: monthMomo, color: 'bg-gray-500', pct: monthRev ? (monthMomo / monthRev * 100) : 0 },
-              { label: 'Split', amount: monthSplit, color: 'bg-gray-300', pct: monthRev ? (monthSplit / monthRev * 100) : 0 },
+              { label: 'Cash', amount: monthCash, color: 'bg-[#0e7c86]', pct: monthRev ? (monthCash / monthRev * 100) : 0 },
+              { label: 'Momo', amount: monthMomo, color: 'bg-[#5bb3b9]', pct: monthRev ? (monthMomo / monthRev * 100) : 0 },
+              { label: 'Split', amount: monthSplit, color: 'bg-[#b3dcdf]', pct: monthRev ? (monthSplit / monthRev * 100) : 0 },
             ].map((p, i) => (
               <div key={i}>
                 <div className="flex justify-between text-xs mb-1">
@@ -185,13 +185,13 @@ export default function Dashboard() {
         {/* Today's Hourly Activity */}
         {todaySales.length > 0 && (
           <div className="bg-white rounded-2xl p-5 border border-gray-100">
-            <h3 className="text-sm font-bold text-gray-800 mb-4">🕐 Today's Peak Hours</h3>
+            <h3 className="text-sm font-bold text-gray-800 mb-4">Today's Peak Hours</h3>
             <div className="flex items-end gap-1 h-20">
               {Array.from({ length: 14 }, (_, i) => i + 7).map(h => {
                 const count = hourMap[h] || 0
                 return (
                   <div key={h} className="flex-1 flex flex-col items-center gap-0.5">
-                    <div className="w-full rounded-t bg-gray-900" style={{ height: Math.max(2, (count / maxHour) * 100) + '%', opacity: count > 0 ? 0.4 + (count / maxHour) * 0.6 : 0.1 }} />
+                    <div className="w-full rounded-t bg-[#0e7c86]" style={{ height: Math.max(2, (count / maxHour) * 100) + '%', opacity: count > 0 ? 0.4 + (count / maxHour) * 0.6 : 0.1 }} />
                     <div className="text-[8px] text-gray-400">{h > 12 ? (h - 12) + 'p' : h + 'a'}</div>
                   </div>
                 )
@@ -226,7 +226,7 @@ export default function Dashboard() {
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <div className="flex justify-between items-center p-4 border-b border-gray-50">
             <h3 className="text-sm font-bold text-gray-800">Recent Sales</h3>
-            <button onClick={() => setPage('receipts')} className="text-xs font-semibold text-gray-900">View all →</button>
+            <button onClick={() => setPage('receipts')} className="text-xs font-semibold text-[#0e7c86]">View all →</button>
           </div>
           <div className="divide-y divide-gray-50">
             {recentSales.length === 0 && <div className="p-8 text-center text-gray-300 text-sm">No sales yet</div>}
@@ -252,7 +252,7 @@ export default function Dashboard() {
             <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-lg text-[10px] font-bold">{lowStock.length}</span>
           </div>
           <div className="divide-y divide-gray-50">
-            {lowStock.length === 0 && <div className="p-8 text-center text-gray-300 text-sm">All stocked up! </div>}
+            {lowStock.length === 0 && <div className="p-8 text-center text-gray-300 text-sm">All stocked up</div>}
             {lowStock.slice(0, 6).map(p => (
               <div key={p.id} className="flex items-center gap-3 px-4 py-3">
                 <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
