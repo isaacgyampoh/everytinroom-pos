@@ -126,23 +126,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4 mb-5">
-        {/* 7-Day Sales Trend Chart */}
-        <div className="bg-white rounded-2xl p-5 border border-gray-100 relative overflow-hidden">
-          <h3 className="text-sm font-bold text-gray-800 mb-4">Last 7 Days Revenue</h3>
-          <div className="flex items-end gap-2 h-32">
-            {last7.map((d, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                <div className="text-[10px] font-bold text-gray-500">{d.revenue > 0 ? money(d.revenue).replace('GHS ', '') : ''}</div>
-                <div className="w-full rounded-t-lg bg-gray-200 relative overflow-hidden" style={{ height: Math.max(4, (d.revenue / maxRev) * 100) + '%' }}>
-                  <div className="absolute inset-0 bg-[#0e7c86] rounded-t-lg" style={{ opacity: d.date === t ? 1 : 0.35 }} />
-                </div>
-                <div className={`text-[10px] font-bold ${d.date === t ? 'text-gray-900' : 'text-gray-400'}`}>{d.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
+      <div className="mb-5">
         {/* Payment Split */}
         <div className="bg-white rounded-2xl p-5 border border-gray-100">
           <h3 className="text-sm font-bold text-gray-800 mb-4">Payment Split (This Month)</h3>
@@ -174,25 +158,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4 mb-5">
-        {/* Today's Hourly Activity */}
-        {todaySales.length > 0 && (
-          <div className="bg-white rounded-2xl p-5 border border-gray-100">
-            <h3 className="text-sm font-bold text-gray-800 mb-4">Today's Peak Hours</h3>
-            <div className="flex items-end gap-1 h-20">
-              {Array.from({ length: 14 }, (_, i) => i + 7).map(h => {
-                const count = hourMap[h] || 0
-                return (
-                  <div key={h} className="flex-1 flex flex-col items-center gap-0.5">
-                    <div className="w-full rounded-t bg-[#0e7c86]" style={{ height: Math.max(2, (count / maxHour) * 100) + '%', opacity: count > 0 ? 0.4 + (count / maxHour) * 0.6 : 0.1 }} />
-                    <div className="text-[8px] text-gray-400">{h > 12 ? (h - 12) + 'p' : h + 'a'}</div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
+      <div className="mb-5">
         {/* Quick Actions */}
         <div className="bg-white rounded-2xl p-5 border border-gray-100">
           <h3 className="text-sm font-bold text-gray-800 mb-3">Quick Actions</h3>
@@ -214,7 +180,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="mb-1">
         {/* Recent Sales */}
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <div className="flex justify-between items-center p-4 border-b border-gray-50">
@@ -233,31 +199,6 @@ export default function Dashboard() {
                   <div className="text-[10px] text-gray-400">{s.cashier}</div>
                 </div>
                 <span className="text-sm font-bold text-gray-800">{money(s.total)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Low Stock */}
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <div className="flex justify-between items-center p-4 border-b border-gray-50">
-            <h3 className="text-sm font-bold text-gray-800">Low Stock</h3>
-            <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-lg text-[10px] font-bold">{lowStock.length}</span>
-          </div>
-          <div className="divide-y divide-gray-50">
-            {lowStock.length === 0 && <div className="p-8 text-center text-gray-300 text-sm">All stocked up</div>}
-            {lowStock.slice(0, 6).map(p => (
-              <div key={p.id} className="flex items-center gap-3 px-4 py-3">
-                <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
-                  {p.image ? <img src={p.image} alt="" className="w-full h-full object-cover" /> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-30"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold text-gray-800">{p.name}</div>
-                  <div className="text-[10px] text-gray-400">{p.category || '-'}</div>
-                </div>
-                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${p.quantity === 0 ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-700'}`}>
-                  {p.quantity === 0 ? 'OUT' : p.quantity}
-                </span>
               </div>
             ))}
           </div>
