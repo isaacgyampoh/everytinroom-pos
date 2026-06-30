@@ -125,6 +125,36 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* Payment Split */}
+      <div className="bg-white rounded-2xl p-5 border border-gray-200/70 mb-5">
+        <h3 className="text-sm font-bold text-gray-800 mb-4">Payment Split (This Month)</h3>
+        <div className="space-y-3">
+          {[
+            { label: 'Cash', amount: monthCash, color: 'bg-[#0e7c86]', pct: monthRev ? (monthCash / monthRev * 100) : 0 },
+            { label: 'Momo', amount: monthMomo, color: 'bg-[#5bb3b9]', pct: monthRev ? (monthMomo / monthRev * 100) : 0 },
+            { label: 'Split', amount: monthSplit, color: 'bg-[#b3dcdf]', pct: monthRev ? (monthSplit / monthRev * 100) : 0 },
+          ].map((p, i) => (
+            <div key={i}>
+              <div className="flex justify-between text-xs mb-1">
+                <span className="font-semibold text-gray-600">{p.label}</span>
+                <span className="font-bold text-gray-800">{money(p.amount)} ({p.pct.toFixed(0)}%)</span>
+              </div>
+              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full ${p.color}`} style={{ width: Math.max(1, p.pct) + '%' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between text-xs">
+          <span className="text-gray-400">Month Expenses</span>
+          <span className="font-bold text-red-500">{money(monthExp)}</span>
+        </div>
+        <div className="flex justify-between text-xs mt-1">
+          <span className="text-gray-400">Net Profit</span>
+          <span className={`font-bold ${monthProfit - monthExp >= 0 ? 'text-[#0e7c86]' : 'text-red-500'}`}>{money(monthProfit - monthExp)}</span>
+        </div>
+      </div>
     </div>
   )
 }
