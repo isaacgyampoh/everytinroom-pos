@@ -136,17 +136,20 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
       } catch {}
 
       // MOOLRE: push the instant approve-with-PIN prompt straight to the customer's phone.
-      // Toggle on by setting localStorage 'use-moolre' = '1' (lets you test without removing NaloPay).
+      // ON by default now (we've switched from NaloPay to Moolre). If a charge fails,
+      // we fall through to the USSD-code flow below so a sale is never blocked.
+      // Emergency off: set localStorage 'no-moolre' = '1'.
       let moolrePrompt = false
-      if (localStorage.getItem('use-moolre') === '1') {
+      let moolreError = ''
+      if (localStorage.getItem('no-moolre') !== '1') {
         try {
           const mr = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=moolre-charge', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ phone: phone.trim(), amount, orderNo, externalref: orderNo })
           })
           const mj = await mr.json(); moolrePrompt = !!mj.success
-          if (!moolrePrompt) console.warn('Moolre charge failed:', mj.error)
-        } catch (e) { console.warn('Moolre charge error:', e) }
+          if (!moolrePrompt) { moolreError = mj.error || 'unknown'; console.warn('Moolre charge failed:', mj.error) }
+        } catch (e) { moolreError = String(e); console.warn('Moolre charge error:', e) }
       }
 
       // Record the cash portion of split immediately
