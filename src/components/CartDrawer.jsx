@@ -20,6 +20,9 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
   const [heldCarts, setHeldCarts] = useState(() => { try { return JSON.parse(localStorage.getItem('heldCarts') || '[]') } catch { return [] } })
   const [showHeld, setShowHeld] = useState(false)
   const [momoStep, setMomoStep] = useState('idle')
+  const [otpValue, setOtpValue] = useState('')
+  const [moolreCtx, setMoolreCtx] = useState(null)
+  const [otpSubmitting, setOtpSubmitting] = useState(false)
   const [momoMessage, setMomoMessage] = useState('')
   const pollRef = useRef(null)
   const autoCloseRef = useRef(null)
@@ -72,6 +75,30 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
 
 
   const cancelPaystack = () => { if (pollRef.current) clearInterval(pollRef.current); if (autoCloseRef.current) clearTimeout(autoCloseRef.current); setMomoStep('idle'); setMomoMessage('') }
+
+  // Submit the OTP the customer received to complete a Moolre payment.
+  const submitOtp = async () => {
+    if (!moolreCtx || !otpValue.trim()) return
+    setOtpSubmitting(true)
+    try {
+      const mr = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=moolre-charge', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: moolreCtx.phone, amount: moolreCtx.amount, orderNo: moolreCtx.orderNo, externalref: moolreCtx.orderNo, otpcode: otpValue.trim() })
+      })
+      const mj = await mr.json()
+      if (mj.success) {
+        toast.success('Payment prompt sent to customer')
+        setMomoStep('waiting')
+        setMomoMessage(`Payment approved by OTP.\nAmount: ${money(moolreCtx.amount)}\n\nWaiting for the customer to complete on their phone.`)
+      } else if (mj.otpRequired) {
+        toast.error('That code was not accepted. Check the SMS and try again.')
+      } else {
+        toast.error(mj.error || 'OTP verification failed')
+      }
+    } catch (e) {
+      toast.error('Network error verifying OTP')
+    } finally { setOtpSubmitting(false) }
+  }
 
   const holdCart = () => {
     if (!cart.length) return
@@ -135,11 +162,13 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
         const j = await r.json(); smsOk = !!j.success
       } catch {}
 
-      // MOOLRE: push the instant approve-with-PIN prompt straight to the customer's phone.
-      // ON by default now (we've switched from NaloPay to Moolre). If a charge fails,
-      // we fall through to the USSD-code flow below so a sale is never blocked.
+      // MOOLRE: push the approve-with-PIN prompt to the customer's phone.
+      // ON by default. If OTP is required, Moolre SMSes a code to the customer and
+      // we show an OTP box (handled below). If the charge fails entirely, we fall
+      // through to the USSD-code flow so a sale is never blocked.
       // Emergency off: set localStorage 'no-moolre' = '1'.
       let moolrePrompt = false
+      let moolreOtp = false
       let moolreError = ''
       if (localStorage.getItem('no-moolre') !== '1') {
         try {
@@ -147,9 +176,28 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ phone: phone.trim(), amount, orderNo, externalref: orderNo })
           })
-          const mj = await mr.json(); moolrePrompt = !!mj.success
-          if (!moolrePrompt) { moolreError = mj.error || 'unknown'; console.warn('Moolre charge failed:', mj.error) }
+          const mj = await mr.json(); moolrePrompt = !!mj.success; moolreOtp = !!mj.otpRequired
+          if (!moolrePrompt && !moolreOtp) { moolreError = mj.error || 'unknown'; console.warn('Moolre charge failed:', mj.error) }
         } catch (e) { moolreError = String(e); console.warn('Moolre charge error:', e) }
+      }
+
+      // OTP required: stash what we need and show the OTP entry step.
+      if (moolreOtp) {
+        setMoolreCtx({ phone: phone.trim(), amount, orderNo, uc })
+        setOtpValue('')
+        setMomoStep('otp')
+        setMomoMessage(`An OTP was sent by SMS to ${phone.trim()}.\nEnter the code the customer received to complete the GHS ${money(amount)} payment.`)
+        // keep polling too, in case the callback confirms independently
+        if (pollRef.current) clearInterval(pollRef.current)
+        pollRef.current = setInterval(async () => {
+          const { data } = await sb.from('whatsapp_orders').select('status').eq('ussd_code', uc).limit(1)
+          if (data?.[0]?.status === 'Paid' || data?.[0]?.status === 'Completed') {
+            clearInterval(pollRef.current)
+            const saleData = await recordSale('Momo')
+            if (saleData) { toast.success('Payment confirmed! ' + saleData.receiptNo); finishSale(saleData) }
+          }
+        }, 5000)
+        return
       }
 
       // Record the cash portion of split immediately
@@ -354,6 +402,27 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
           </>)}
 
           {momoStep === 'charging' && <div className="text-center py-10"><div className="w-14 h-14 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" /><h3 className="text-lg font-bold mb-1">Creating Invoice...</h3><p className="text-gray-400 text-sm">{momoMessage}</p></div>}
+          {momoStep === 'otp' && (
+            <div className="text-center py-6">
+              <div className="bg-[#f6f6f5] border-2 border-gray-200 rounded-2xl p-6 mb-4">
+                <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-2">Enter OTP</p>
+                <p className="text-sm text-gray-600 mb-4" style={{ whiteSpace: 'pre-line' }}>{momoMessage}</p>
+                <input
+                  value={otpValue}
+                  onChange={e => setOtpValue(e.target.value.replace(/\D/g, ''))}
+                  inputMode="numeric"
+                  placeholder="Enter code from SMS"
+                  className="w-full h-14 px-4 text-center text-2xl font-bold tracking-widest bg-white border-2 border-gray-300 rounded-xl focus:outline-none focus:border-[#0e7c86]"
+                  autoFocus
+                />
+                <button onClick={submitOtp} disabled={otpSubmitting || !otpValue.trim()} className="mt-4 w-full h-12 bg-[#0e7c86] text-white rounded-xl font-bold disabled:opacity-40">
+                  {otpSubmitting ? 'Verifying...' : 'Complete Payment'}
+                </button>
+              </div>
+              <button onClick={() => { if (pollRef.current) clearInterval(pollRef.current); if (autoCloseRef.current) clearTimeout(autoCloseRef.current); clearCart(); setDiscount(0); setPhone(''); setPayOpen(false); setSplitMode(false); setSplitCash(''); setMomoStep('idle'); setMomoMessage(''); setMoolreCtx(null); setOtpValue('') }} className="text-xs font-semibold text-gray-500 hover:text-gray-800">Cancel & start new order</button>
+            </div>
+          )}
+
           {momoStep === 'waiting' && (
             <div className="text-center py-6">
               <div className="bg-[#f6f6f5] border-2 border-gray-200 rounded-2xl p-6 mb-4">
