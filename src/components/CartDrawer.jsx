@@ -162,15 +162,14 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
         const j = await r.json(); smsOk = !!j.success
       } catch {}
 
-      // MOOLRE: push the approve-with-PIN prompt to the customer's phone.
-      // ON by default. If OTP is required, Moolre SMSes a code to the customer and
-      // we show an OTP box (handled below). If the charge fails entirely, we fall
-      // through to the USSD-code flow so a sale is never blocked.
-      // Emergency off: set localStorage 'no-moolre' = '1'.
+      // MOOLRE: temporarily OFF by default while Moolre completes our merchant
+      // setup + disables OTP. Falls through to the USSD-code flow (NaloPay) below.
+      // Re-enable Moolre by setting localStorage 'use-moolre' = '1' (for testing),
+      // and we'll make it the default again once Moolre activates the account.
       let moolrePrompt = false
       let moolreOtp = false
       let moolreError = ''
-      if (localStorage.getItem('no-moolre') !== '1') {
+      if (localStorage.getItem('use-moolre') === '1') {
         try {
           const mr = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=moolre-charge', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
