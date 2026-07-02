@@ -107,37 +107,41 @@ export async function openCustomerScreenAuto() {
   const isTouchOnly = (navigator.maxTouchPoints || 0) > 0 && !window.matchMedia('(pointer: fine)').matches
   if (isTouchOnly) return null
 
-  // ONLY auto-open when a genuine second physical display exists (the POS).
-  // Phones and single-screen laptops have one screen -> do nothing.
-  let hasSecondScreen = false
-  try {
-    if ('getScreenDetails' in window) {
-      const sd = await window.getScreenDetails()
-      hasSecondScreen = sd.screens.length > 1
-    } else if (window.screen && window.screen.isExtended === true) {
-      // Some browsers expose screen.isExtended without full screen details.
-      hasSecondScreen = true
-    }
-  } catch (e) { console.warn('screen detect:', e); hasSecondScreen = false }
-  if (!hasSecondScreen) return null // single screen (phone/laptop) -> never auto-open
-
   const reg = getRegisterId()
   const url = window.location.origin + '/#/customer-display?reg=' + reg
   const winName = 'customer-display-' + reg
 
-  // Place it on the second display in fullscreen.
   try {
+    if (!('getScreenDetails' in window)) return null
     const sd = await window.getScreenDetails()
-    const other = sd.screens.find(s => s !== sd.currentScreen) || sd.screens.find(s => !s.isPrimary)
-    if (other) {
-      const feat = `left=${other.availLeft},top=${other.availTop},width=${other.availWidth},height=${other.availHeight},fullscreen=yes`
-      const w = window.open(url, winName, feat)
-      if (w) { customerWin = w; return w }
-    }
-  } catch (e) { console.warn('auto-place fallback:', e) }
+    if (!sd || sd.screens.length < 2) return null // single screen -> never auto-open
 
-  // Rare fallback (second screen reported but placement failed): plain window.
-  const w = window.open(url, winName, 'width=1280,height=800')
-  if (w) customerWin = w
-  return w
+    // Deterministically choose the CUSTOMER screen:
+    //  1) the non-primary screen (the cashier keeps the primary), else
+    //  2) the physically smaller screen (customer display is the small one).
+    // This never depends on where the POS window currently sits, so the two
+    // screens can't get swapped.
+    const primary = sd.screens.find(s => s.isPrimary) || sd.currentScreen
+    let customer = sd.screens.find(s => !s.isPrimary && s !== primary)
+    if (!customer) {
+      const sorted = [...sd.screens].sort((a, b) => (a.width * a.height) - (b.width * b.height))
+      customer = sorted[0] !== primary ? sorted[0] : sorted[1]
+    }
+    if (!customer) return null
+
+    const feat = `left=${customer.availLeft},top=${customer.availTop},width=${customer.availWidth},height=${customer.availHeight},fullscreen=yes`
+    const w = window.open(url, winName, feat)
+    if (w) {
+      customerWin = w
+      // Nudge it onto the customer screen + fullscreen once it has loaded,
+      // in case the browser ignored the initial placement.
+      try {
+        w.addEventListener('load', () => {
+          try { w.moveTo(customer.availLeft, customer.availTop); w.resizeTo(customer.availWidth, customer.availHeight) } catch {}
+        })
+      } catch {}
+      return w
+    }
+  } catch (e) { console.warn('auto-place customer screen:', e) }
+  return null
 }

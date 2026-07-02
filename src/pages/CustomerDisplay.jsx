@@ -24,6 +24,30 @@ export default function CustomerDisplay() {
   useEffect(() => {
     document.body.classList.remove('dark')
     document.body.style.background = '#ffffff'
+
+    // Self-correct: make sure THIS window sits on the customer (non-primary /
+    // smaller) screen, fullscreen. This runs even if the cashier reopened the
+    // app and Windows placed windows on the wrong monitors, so the screens
+    // can't stay swapped.
+    ;(async () => {
+      try {
+        if (!('getScreenDetails' in window)) return
+        const sd = await window.getScreenDetails()
+        if (!sd || sd.screens.length < 2) return
+        const primary = sd.screens.find(s => s.isPrimary) || sd.currentScreen
+        let customer = sd.screens.find(s => !s.isPrimary && s !== primary)
+        if (!customer) {
+          const sorted = [...sd.screens].sort((a, b) => (a.width * a.height) - (b.width * b.height))
+          customer = sorted[0] !== primary ? sorted[0] : sorted[1]
+        }
+        if (!customer) return
+        // If we're not already on the customer screen, move there.
+        if (sd.currentScreen !== customer) {
+          try { window.moveTo(customer.availLeft, customer.availTop); window.resizeTo(customer.availWidth, customer.availHeight) } catch {}
+        }
+      } catch {}
+    })()
+
     return () => { document.body.style.background = '' }
   }, [])
 
