@@ -213,8 +213,9 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
       // delivery-details link so the customer can fill their address (no payment link).
       if (isWhatsApp) {
         const detailsLink = `${window.location.origin}/#/details/${orderNo}`
-        const waMsg = `Hello! Your EVERYTINROOM order is ready.\n\nAmount: GHS ${money(amount)}\n\n1) To PAY, dial: *920*141*${uc}#\n2) To get it DELIVERED, add your address here:\n${detailsLink}\n\nThank you! EVERYTINROOM & BEDTIME`
-        setWaCtx({ phone: phone.trim(), msg: waMsg, link: detailsLink, code: `*920*141*${uc}#` })
+        const payMsg = `Hello! Your EVERYTINROOM order is GHS ${money(amount)}.\n\nTo PAY, simply dial:\n*920*141*${uc}#\n\nEnter your MoMo PIN to approve. Thank you!\nEVERYTINROOM & BEDTIME · 024 531 5581`
+        const addrMsg = `To get your order DELIVERED, please add your delivery address here:\n${detailsLink}\n\nIt only takes a moment. Thank you!\nEVERYTINROOM & BEDTIME`
+        setWaCtx({ phone: phone.trim(), payMsg, addrMsg, link: detailsLink, code: `*920*141*${uc}#` })
       } else {
         setWaCtx(null)
       }
@@ -457,17 +458,22 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
 
               {waCtx && (
                 <div className="bg-[#0e7c86]/5 border-2 border-[#0e7c86]/30 rounded-2xl p-4 mb-4 text-left">
-                  <p className="text-xs font-bold text-[#0e7c86] mb-2 uppercase tracking-wide">WhatsApp delivery order</p>
-                  <p className="text-xs text-gray-600 mb-3">Send the customer the pay code <b>and</b> the address-details link in one message:</p>
+                  <p className="text-xs font-bold text-[#0e7c86] mb-1 uppercase tracking-wide">WhatsApp delivery order</p>
+                  <p className="text-xs text-gray-600 mb-3">Send the customer two quick messages — the pay code, then the address link:</p>
                   <button onClick={() => {
                     let wp = waCtx.phone.replace(/\D/g, ''); if (wp.startsWith('0')) wp = '233' + wp.slice(1); if (!wp.startsWith('233')) wp = '233' + wp
-                    const url = `https://wa.me/${wp}?text=${encodeURIComponent(waCtx.msg)}`
-                    window.open(url, '_blank')
-                  }} className="w-full h-11 bg-[#0e7c86] text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2">
+                    window.open(`https://wa.me/${wp}?text=${encodeURIComponent(waCtx.payMsg)}`, '_blank')
+                  }} className="w-full h-11 bg-[#0e7c86] text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 mb-2">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 00-8.7 15l-1.3 4.7L7 20.4A10 10 0 1012 2zm5.8 14.2c-.2.7-1.4 1.3-2 1.4-.5.1-1.1.1-1.8-.1-.4-.1-1-.3-1.6-.6-2.9-1.3-4.8-4.2-5-4.4-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.3.5-.3.3c-.2.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.4 2.4 1.5.2.1.4.1.5-.1l.7-.8c.2-.2.3-.2.6-.1l1.9.9c.3.1.5.2.5.4.1.2.1.8-.1 1.3z"/></svg>
-                    Send on WhatsApp
+                    1. Send pay code
                   </button>
-                  <button onClick={() => { navigator.clipboard?.writeText(waCtx.link); toast.success('Address link copied') }} className="w-full h-9 mt-2 text-xs font-semibold text-[#0e7c86]">Copy address link only</button>
+                  <button onClick={() => {
+                    let wp = waCtx.phone.replace(/\D/g, ''); if (wp.startsWith('0')) wp = '233' + wp.slice(1); if (!wp.startsWith('233')) wp = '233' + wp
+                    window.open(`https://wa.me/${wp}?text=${encodeURIComponent(waCtx.addrMsg)}`, '_blank')
+                  }} className="w-full h-11 bg-white border-2 border-[#0e7c86] text-[#0e7c86] rounded-xl font-bold text-sm flex items-center justify-center gap-2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 00-8.7 15l-1.3 4.7L7 20.4A10 10 0 1012 2zm5.8 14.2c-.2.7-1.4 1.3-2 1.4-.5.1-1.1.1-1.8-.1-.4-.1-1-.3-1.6-.6-2.9-1.3-4.8-4.2-5-4.4-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.3.5-.3.3c-.2.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.4 2.4 1.5.2.1.4.1.5-.1l.7-.8c.2-.2.3-.2.6-.1l1.9.9c.3.1.5.2.5.4.1.2.1.8-.1 1.3z"/></svg>
+                    2. Send address link
+                  </button>
                 </div>
               )}
 
