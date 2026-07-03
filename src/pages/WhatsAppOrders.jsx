@@ -336,7 +336,13 @@ export default function WhatsAppOrders() {
             <div className="p-4">
               <div className="flex items-center justify-between mb-2.5">
                 <div>
-                  <div className="text-sm font-bold">{order.customerName || 'Customer'}</div>
+                  <div className="text-sm font-bold flex items-center gap-2">
+                    {order.customerName || 'Customer'}
+                    {order.source === 'web' && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-600">WEB</span>}
+                    {order.source === 'whatsapp' && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#0e7c86]/10 text-[#0e7c86]">WHATSAPP</span>}
+                    {order.source === 'walkin' && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-stone-100 text-stone-500">WALK-IN</span>}
+                    {order.source === 'whatsapp' && !order.detailsFilled && !order.address && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-600">NO ADDRESS</span>}
+                  </div>
                   <div className="text-xs text-stone-400 mt-0.5">{order.orderNo} · {fmtDateTime(order.date)}</div>
                 </div>
                 <span className={`px-3 py-1.5 rounded-lg text-[11px] font-bold ${statusColor(order.status)}`}>{order.status}</span>

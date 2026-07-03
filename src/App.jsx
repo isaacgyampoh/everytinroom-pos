@@ -31,6 +31,7 @@ const RestockPage = lazy(() => import('./pages/RestockPage'))
 const InvoicePay = lazy(() => import('./pages/InvoicePay'))
 const Catalog = lazy(() => import('./pages/Catalog'))
 const DeliveryConfirm = lazy(() => import('./pages/DeliveryConfirm'))
+const DeliveryDetails = lazy(() => import('./pages/DeliveryDetails'))
 const CustomerDisplay = lazy(() => import('./pages/CustomerDisplay'))
 
 const INACTIVITY_TIMEOUT = 60 * 1000 // 1 minute
@@ -171,6 +172,7 @@ export default function App() {
   if (window.location.hash.includes('/customer-display')) return <Suspense fallback={<Loader />}><CustomerDisplay /></Suspense>
   if (window.location.hash.includes('/pay/')) return <Suspense fallback={<Loader />}><InvoicePay /></Suspense>
   if (window.location.hash.includes('/deliver/')) return <Suspense fallback={<Loader />}><DeliveryConfirm /></Suspense>
+  if (window.location.hash.includes('/details/')) return <Suspense fallback={<Loader />}><DeliveryDetails /></Suspense>
   if (window.location.hash.includes('/catalog')) return <Suspense fallback={<Loader />}><Catalog /></Suspense>
 
   if (loading) return <><Loader /><Toaster /></>

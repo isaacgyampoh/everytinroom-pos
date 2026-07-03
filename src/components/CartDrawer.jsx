@@ -12,6 +12,8 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
   const { cart, updateCartQty, removeFromCart, clearCart, deductStock, user, mode, products } = useStore()
   const [discount, setDiscount] = useState(0)
   const [phone, setPhone] = useState('')
+  const [isWhatsApp, setIsWhatsApp] = useState(false)
+  const [waCtx, setWaCtx] = useState(null)
   const [payOpen, setPayOpen] = useState(false)
   const [payMethod, setPayMethod] = useState('Cash')
   const [processing, setProcessing] = useState(false)
@@ -136,7 +138,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
     setMomoStep('charging'); setMomoMessage('Creating USSD invoice...')
     try {
       const sb = getSupabase()
-      const orderNo = 'POS-' + Date.now().toString(36).toUpperCase()
+      const orderNo = (isWhatsApp ? 'WA-' : 'POS-') + Date.now().toString(36).toUpperCase()
       const items = cart.map(c => ({ name: c.name, qty: c.qty, price: c.price, lineTotal: c.lineTotal }))
       
       // Get next USSD code
@@ -148,8 +150,8 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
         order_no: orderNo, date: new Date().toISOString(),
         customer_name: phone.trim(), customer_phone: phone.trim(),
         items: JSON.stringify(items), subtotal: total, total: amount,
-        notes: isSplit ? `Split: Cash ${money(num(splitCash))}, USSD ${money(amount)}` : 'POS USSD Payment',
-        status: 'Pending', ussd_code: uc, paystack_ref: orderNo,
+        notes: isSplit ? `Split: Cash ${money(num(splitCash))}, USSD ${money(amount)}` : (isWhatsApp ? 'WhatsApp order' : 'POS USSD Payment'),
+        status: 'Pending', ussd_code: uc, paystack_ref: orderNo, source: isWhatsApp ? 'whatsapp' : 'walkin', details_filled: false,
       })
 
       // Auto-send the USSD code to the customer by SMS (server-side; key stays on backend)
@@ -206,6 +208,16 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
 
       setMomoStep('waiting')
       setMomoMessage(moolrePrompt ? `Payment prompt sent to ${phone.trim()}.\nAmount: ${money(amount)}\n\nCustomer approves with their MoMo PIN on their phone.` : (smsOk ? `USSD code sent to ${phone.trim()} by SMS.\nCode: *920*141*${uc}#\nAmount: ${money(amount)}\n\nCustomer dials it to pay via MoMo.` : `USSD Code: *920*141*${uc}#\nAmount: ${money(amount)}\n\nTell customer to dial this code to pay via MoMo.`))
+
+      // WhatsApp order: prepare a ready-to-send message with the pay code + the
+      // delivery-details link so the customer can fill their address (no payment link).
+      if (isWhatsApp) {
+        const detailsLink = `${window.location.origin}/#/details/${orderNo}`
+        const waMsg = `Hello! Your EVERYTINROOM order is ready.\n\nAmount: GHS ${money(amount)}\n\n1) To PAY, dial: *920*141*${uc}#\n2) To get it DELIVERED, add your address here:\n${detailsLink}\n\nThank you! EVERYTINROOM & BEDTIME`
+        setWaCtx({ phone: phone.trim(), msg: waMsg, link: detailsLink, code: `*920*141*${uc}#` })
+      } else {
+        setWaCtx(null)
+      }
       
       // Poll for payment
       if (pollRef.current) clearInterval(pollRef.current)
@@ -230,12 +242,14 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
       // shows in the Orders list. We stop polling here to avoid completing a
       // sale against an empty cart.
       if (autoCloseRef.current) clearTimeout(autoCloseRef.current)
-      autoCloseRef.current = setTimeout(() => {
-        if (pollRef.current) clearInterval(pollRef.current)
-        toast.success('Code sent — ready for next customer')
-        clearCart(); setDiscount(0); setPhone(''); setPayOpen(false)
-        setSplitMode(false); setSplitCash(''); setMomoStep('idle'); setMomoMessage('')
-      }, 20000)
+      if (!isWhatsApp) {
+        autoCloseRef.current = setTimeout(() => {
+          if (pollRef.current) clearInterval(pollRef.current)
+          toast.success('Code sent — ready for next customer')
+          clearCart(); setDiscount(0); setPhone(''); setPayOpen(false)
+          setSplitMode(false); setSplitCash(''); setMomoStep('idle'); setMomoMessage('')
+        }, 20000)
+      }
     } catch (e) {
       setMomoStep('failed'); setMomoMessage('Error: ' + e.message)
     }
@@ -323,6 +337,15 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             {phoneValid && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 text-sm">✓</span>}
           </div>
           {!phoneValid && phone.length > 0 && <p className="text-red-500 text-xs font-medium mb-2 -mt-1">Enter at least 9 digits</p>}
+
+          {/* WhatsApp order toggle — tags the order + prepares an address-form link to send */}
+          <button onClick={() => setIsWhatsApp(v => !v)} className={`w-full flex items-center gap-3 h-11 px-4 rounded-xl border mb-3 transition ${isWhatsApp ? 'border-[#0e7c86] bg-[#0e7c86]/5' : 'border-gray-200 bg-gray-50'}`}>
+            <div className={`w-5 h-5 rounded-md flex items-center justify-center ${isWhatsApp ? 'bg-[#0e7c86]' : 'border-2 border-gray-300'}`}>
+              {isWhatsApp && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>}
+            </div>
+            <span className={`text-sm font-semibold ${isWhatsApp ? 'text-[#0e7c86]' : 'text-gray-500'}`}>WhatsApp delivery order</span>
+            <span className="ml-auto text-[10px] text-gray-400">{isWhatsApp ? 'address link will be sent' : 'walk-in'}</span>
+          </button>
 
           <button onClick={handleOpenPayment} disabled={cnt === 0 || !phoneValid}
             className="w-full h-12 bg-gray-900 hover:bg-gray-800 rounded-xl text-white text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all ">
@@ -428,14 +451,31 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                 <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-2">USSD Payment Code</p>
                 <p className="text-3xl font-bold text-[#16181d] font-mono tracking-wider mb-2" style={{ whiteSpace: 'pre-line' }}>{momoMessage.split('\n')[0]?.replace('USSD Code: ', '')}</p>
                 <p className="text-sm text-gray-500 font-semibold">{momoMessage.split('\n')[1]}</p>
-                <button onClick={() => { navigator.clipboard?.writeText(momoMessage.split('\n')[0]?.replace('USSD Code: ', '')); toast.success('Code copied'); if (pollRef.current) clearInterval(pollRef.current); if (autoCloseRef.current) clearTimeout(autoCloseRef.current); clearCart(); setDiscount(0); setPhone(''); setPayOpen(false); setSplitMode(false); setSplitCash(''); setMomoStep('idle'); setMomoMessage('') }} className="mt-3 px-5 py-2.5 bg-[#16181d] text-white rounded-lg text-xs font-bold">Copy & Done</button>
+                <button onClick={() => { navigator.clipboard?.writeText(momoMessage.split('\n')[0]?.replace('USSD Code: ', '')); toast.success('Code copied'); if (pollRef.current) clearInterval(pollRef.current); if (autoCloseRef.current) clearTimeout(autoCloseRef.current); clearCart(); setDiscount(0); setPhone(''); setPayOpen(false); setSplitMode(false); setSplitCash(''); setMomoStep('idle'); setMomoMessage(''); setIsWhatsApp(false); setWaCtx(null) }} className="mt-3 px-5 py-2.5 bg-[#16181d] text-white rounded-lg text-xs font-bold">Copy & Done</button>
               </div>
               <p className="text-sm text-gray-600 font-medium mb-2">Read the code to the customer — they also get an SMS</p>
+
+              {waCtx && (
+                <div className="bg-[#0e7c86]/5 border-2 border-[#0e7c86]/30 rounded-2xl p-4 mb-4 text-left">
+                  <p className="text-xs font-bold text-[#0e7c86] mb-2 uppercase tracking-wide">WhatsApp delivery order</p>
+                  <p className="text-xs text-gray-600 mb-3">Send the customer the pay code <b>and</b> the address-details link in one message:</p>
+                  <button onClick={() => {
+                    let wp = waCtx.phone.replace(/\D/g, ''); if (wp.startsWith('0')) wp = '233' + wp.slice(1); if (!wp.startsWith('233')) wp = '233' + wp
+                    const url = `https://wa.me/${wp}?text=${encodeURIComponent(waCtx.msg)}`
+                    window.open(url, '_blank')
+                  }} className="w-full h-11 bg-[#0e7c86] text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 00-8.7 15l-1.3 4.7L7 20.4A10 10 0 1012 2zm5.8 14.2c-.2.7-1.4 1.3-2 1.4-.5.1-1.1.1-1.8-.1-.4-.1-1-.3-1.6-.6-2.9-1.3-4.8-4.2-5-4.4-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.3.5-.3.3c-.2.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.4 2.4 1.5.2.1.4.1.5-.1l.7-.8c.2-.2.3-.2.6-.1l1.9.9c.3.1.5.2.5.4.1.2.1.8-.1 1.3z"/></svg>
+                    Send on WhatsApp
+                  </button>
+                  <button onClick={() => { navigator.clipboard?.writeText(waCtx.link); toast.success('Address link copied') }} className="w-full h-9 mt-2 text-xs font-semibold text-[#0e7c86]">Copy address link only</button>
+                </div>
+              )}
+
               <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
                 <div className="w-3 h-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
                 Closes automatically — ready for the next customer
               </div>
-              <button onClick={() => { if (pollRef.current) clearInterval(pollRef.current); if (autoCloseRef.current) clearTimeout(autoCloseRef.current); clearCart(); setDiscount(0); setPhone(''); setPayOpen(false); setSplitMode(false); setSplitCash(''); setMomoStep('idle'); setMomoMessage('') }} className="mt-4 text-xs font-semibold text-gray-500 hover:text-gray-800">Close & start new order</button>
+              <button onClick={() => { if (pollRef.current) clearInterval(pollRef.current); if (autoCloseRef.current) clearTimeout(autoCloseRef.current); clearCart(); setDiscount(0); setPhone(''); setPayOpen(false); setSplitMode(false); setSplitCash(''); setMomoStep('idle'); setMomoMessage(''); setIsWhatsApp(false); setWaCtx(null) }} className="mt-4 text-xs font-semibold text-gray-500 hover:text-gray-800">Close & start new order</button>
             </div>
           )}
           {momoStep === 'success' && <div className="text-center py-10"><div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div><h3 className="text-lg font-bold text-green-600 mb-1">Payment Confirmed!</h3><p className="text-gray-400 text-sm">Recording sale...</p></div>}
