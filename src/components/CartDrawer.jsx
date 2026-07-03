@@ -123,6 +123,9 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
     // PHONE IS REQUIRED
     if (!phoneValid) { toast.error('Phone number is required'); return }
 
+    // WhatsApp orders are USSD-only (delivery, remote payment).
+    if (isWhatsApp) { createUssdInvoice(total, false); return }
+
     if (splitMode) {
       if (num(splitCash) < 0 || num(splitCash) > total) { toast.error('Invalid cash amount'); return }
       if (splitRemainder > 0) createUssdInvoice(splitRemainder, true) // USSD for momo portion of split
@@ -214,7 +217,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
       if (isWhatsApp) {
         const detailsLink = `${window.location.origin}/#/details/${orderNo}`
         const payMsg = `Hello! Your EVERYTINROOM order is GHS ${money(amount)}.\n\nTo PAY, simply dial:\n*920*141*${uc}#\n\nEnter your MoMo PIN to approve. Thank you!\nEVERYTINROOM & BEDTIME · 024 531 5581`
-        const addrMsg = `To get your order DELIVERED, please add your delivery address here:\n${detailsLink}\n\nIt only takes a moment. Thank you!\nEVERYTINROOM & BEDTIME`
+        const addrMsg = `Hi, please when you're done with the payment, just tap the link below to fill in your delivery details so we can deliver to you. Thank you.\n\n${detailsLink}`
         setWaCtx({ phone: phone.trim(), payMsg, addrMsg, link: detailsLink, code: `*920*141*${uc}#` })
       } else {
         setWaCtx(null)
@@ -340,7 +343,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
           {!phoneValid && phone.length > 0 && <p className="text-red-500 text-xs font-medium mb-2 -mt-1">Enter at least 9 digits</p>}
 
           {/* WhatsApp order toggle — tags the order + prepares an address-form link to send */}
-          <button onClick={() => setIsWhatsApp(v => !v)} className={`w-full flex items-center gap-3 h-11 px-4 rounded-xl border mb-3 transition ${isWhatsApp ? 'border-[#0e7c86] bg-[#0e7c86]/5' : 'border-gray-200 bg-gray-50'}`}>
+          <button onClick={() => setIsWhatsApp(v => { const nv = !v; if (nv) { setPayMethod('USSD'); setSplitMode(false); setSplitCash('') } return nv })} className={`w-full flex items-center gap-3 h-11 px-4 rounded-xl border mb-3 transition ${isWhatsApp ? 'border-[#0e7c86] bg-[#0e7c86]/5' : 'border-gray-200 bg-gray-50'}`}>
             <div className={`w-5 h-5 rounded-md flex items-center justify-center ${isWhatsApp ? 'bg-[#0e7c86]' : 'border-2 border-gray-300'}`}>
               {isWhatsApp && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>}
             </div>
@@ -367,10 +370,10 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
               <div className="text-xs text-gray-400 mt-1">{phone}</div>
             </div>
 
-            {/* Payment Methods — Split, Cash, USSD */}
+            {/* Payment Methods — WhatsApp orders are USSD-only */}
             <div>
-              <label className="block text-xs font-semibold text-gray-400 mb-2.5">Payment Method</label>
-              <div className="grid grid-cols-3 gap-2.5">
+              <label className="block text-xs font-semibold text-gray-400 mb-2.5">Payment Method {isWhatsApp && <span className="text-[#0e7c86] font-bold">· USSD only (WhatsApp)</span>}</label>
+              <div className={`grid gap-2.5 ${isWhatsApp ? 'grid-cols-1' : 'grid-cols-3'}`}>
                 {[
                   { id: 'Split', label: 'Split', sub: 'Cash + USSD',
                     icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h18M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg> },
@@ -378,8 +381,8 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                     icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg> },
                   { id: 'USSD', label: 'USSD', sub: 'MoMo prompt',
                     icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M11 18h2"/></svg> },
-                ].map(m => {
-                  const active = m.id === 'Split' ? splitMode : (!splitMode && payMethod === m.id)
+                ].filter(m => !isWhatsApp || m.id === 'USSD').map(m => {
+                  const active = isWhatsApp ? true : (m.id === 'Split' ? splitMode : (!splitMode && payMethod === m.id))
                   return (
                     <button key={m.id} onClick={() => { if (m.id === 'Split') { setSplitMode(true); setSplitCash('') } else { setPayMethod(m.id); setSplitMode(false) } }}
                       className={`h-24 rounded-2xl text-sm font-bold border-2 flex flex-col items-center justify-center gap-1.5 transition-all ${active ? 'bg-[#16181d] text-white border-[#16181d] shadow-md' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
