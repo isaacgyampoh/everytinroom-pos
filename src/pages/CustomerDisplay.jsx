@@ -46,16 +46,28 @@ export default function CustomerDisplay() {
           }
         }
         if (!customer) return
-        // If we're not already on the customer screen, move there + fullscreen.
-        if (sd.currentScreen !== customer) {
-          try { window.moveTo(customer.availLeft, customer.availTop); window.resizeTo(customer.availWidth, customer.availHeight) } catch {}
-        }
-        // Go fullscreen so the customer sees only the welcome, never the desktop.
-        try { if (!document.fullscreenElement && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen() } catch {}
+        // Fill the ENTIRE customer screen (full width/height, covering taskbar).
+        try { window.moveTo(customer.left, customer.top); window.resizeTo(customer.width, customer.height) } catch {}
+        // Try true fullscreen (may be blocked without a gesture — the tap
+        // handler below is the reliable fallback).
+        try { if (!document.fullscreenElement && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen({ navigationUI: 'hide' }) } catch {}
       } catch {}
     })()
 
-    return () => { document.body.style.background = '' }
+    // Reliable fallback: a single tap/click anywhere on the customer screen
+    // puts it into true fullscreen (browsers allow fullscreen on a user gesture).
+    // Lets the installer fullscreen it with one touch, no keyboard.
+    const goFs = () => {
+      try { if (!document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {}) } catch {}
+    }
+    window.addEventListener('click', goFs)
+    window.addEventListener('touchend', goFs)
+
+    return () => {
+      document.body.style.background = ''
+      window.removeEventListener('click', goFs)
+      window.removeEventListener('touchend', goFs)
+    }
   }, [])
 
   useEffect(() => {

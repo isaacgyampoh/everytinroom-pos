@@ -140,11 +140,29 @@ async function openOnCustomerScreen({ requireSecondScreen, fallbackPopup }) {
   try {
     const customer = await pickCustomerScreen()
     if (customer) {
-      const feat = `left=${customer.availLeft},top=${customer.availTop},width=${customer.availWidth},height=${customer.availHeight},fullscreen=yes`
+      // Fill the ENTIRE screen (use full width/height, not availWidth which
+      // excludes the taskbar) and strip chrome. left/top = screen origin.
+      const L = customer.left, T = customer.top, W = customer.width, H = customer.height
+      const feat = `left=${L},top=${T},width=${W},height=${H},fullscreen=yes,menubar=no,toolbar=no,location=no,status=no,resizable=yes`
       const w = window.open(url, winName, feat)
       if (w) {
         customerWin = w
-        try { w.addEventListener('load', () => { try { w.moveTo(customer.availLeft, customer.availTop); w.resizeTo(customer.availWidth, customer.availHeight) } catch {} }) } catch {}
+        // Re-assert placement + try true fullscreen once loaded. The customer
+        // window was opened during the login gesture, so this fullscreen request
+        // is still allowed by the browser for a short window.
+        const place = () => {
+          try { w.moveTo(L, T); w.resizeTo(W, H) } catch {}
+          try {
+            const el = w.document && w.document.documentElement
+            if (el && el.requestFullscreen && !w.document.fullscreenElement) {
+              // Prefer placing fullscreen on the specific customer screen.
+              if ('getScreenDetails' in w) { el.requestFullscreen({ navigationUI: 'hide' }).catch(() => {}) }
+              else el.requestFullscreen({ navigationUI: 'hide' }).catch(() => {})
+            }
+          } catch {}
+        }
+        try { w.addEventListener('load', place) } catch {}
+        setTimeout(place, 800)
         return w
       }
     } else if (requireSecondScreen) {
