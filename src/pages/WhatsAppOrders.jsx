@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 export default function WhatsAppOrders() {
   const { waOrders, waFilter, setWAFilter, refreshWAOrders, user, setLoading, loadAll } = useStore()
   const [search, setSearch] = useState('')
+  const [srcFilter, setSrcFilter] = useState('all')
   const [selected, setSelected] = useState(null)
   const [editDelivery, setEditDelivery] = useState(false)
   const [editName, setEditName] = useState('')
@@ -20,9 +21,12 @@ export default function WhatsAppOrders() {
   const completed = waOrders.filter(o => o.status === 'Completed').length
 
   const filtered = waFilter === 'all' ? waOrders : waOrders.filter(o => o.status === waFilter)
+  const bySource = srcFilter === 'all' ? filtered
+    : srcFilter === 'needs-address' ? filtered.filter(o => o.source === 'whatsapp' && !o.address)
+    : filtered.filter(o => o.source === srcFilter)
   const searched = search.trim()
-    ? filtered.filter(o => (o.customerName || '').toLowerCase().includes(search.toLowerCase()) || (o.customerPhone || '').includes(search) || (o.orderNo || '').toLowerCase().includes(search.toLowerCase()))
-    : filtered
+    ? bySource.filter(o => (o.customerName || '').toLowerCase().includes(search.toLowerCase()) || (o.customerPhone || '').includes(search) || (o.orderNo || '').toLowerCase().includes(search.toLowerCase()))
+    : bySource
   const sorted = [...searched].sort((a, b) => new Date(b.date) - new Date(a.date))
 
   const complete = async (id) => {
@@ -314,11 +318,26 @@ export default function WhatsAppOrders() {
       {/* Search + Filters */}
       <input className="w-full h-10 px-4 bg-white rounded-xl text-sm placeholder:text-stone-300 border border-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400/30 mb-4" placeholder="Search by name, phone, or order #..." value={search} onChange={e => setSearch(e.target.value)} />
 
-      <div className="flex gap-1.5 mb-5 overflow-x-auto scrollbar-hide">
+      <div className="flex gap-1.5 mb-3 overflow-x-auto scrollbar-hide">
         {['Pending', 'Paid', 'Completed', 'Cancelled', 'all'].map(f => (
           <button key={f} onClick={() => setWAFilter(f)}
             className={`h-8 px-4 rounded-full text-xs font-semibold whitespace-nowrap transition ${waFilter === f ? ('bg-gray-900 text-white') : 'bg-white text-stone-400'}`}>
             {f === 'all' ? 'All' : f}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-1.5 mb-5 overflow-x-auto scrollbar-hide">
+        {[
+          { k: 'all', label: 'All sources' },
+          { k: 'whatsapp', label: 'WhatsApp' },
+          { k: 'web', label: 'Website' },
+          { k: 'walkin', label: 'Walk-in' },
+          { k: 'needs-address', label: 'Needs address' },
+        ].map(f => (
+          <button key={f.k} onClick={() => setSrcFilter(f.k)}
+            className={`h-8 px-4 rounded-full text-xs font-semibold whitespace-nowrap transition ${srcFilter === f.k ? (f.k === 'needs-address' ? 'bg-amber-500 text-white' : 'bg-[#0e7c86] text-white') : 'bg-white text-stone-400'}`}>
+            {f.label}
           </button>
         ))}
       </div>
