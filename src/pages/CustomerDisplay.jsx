@@ -34,14 +34,19 @@ export default function CustomerDisplay() {
         if (!('getScreenDetails' in window)) return
         const sd = await window.getScreenDetails()
         if (!sd || sd.screens.length < 2) return
-        const primary = sd.screens.find(s => s.isPrimary) || sd.currentScreen
-        let customer = sd.screens.find(s => !s.isPrimary && s !== primary)
+        // Same deterministic pick as the opener (with manual override support).
+        let customer = null
+        try { const v = localStorage.getItem('customer-screen-index'); if (v != null && v !== '' && sd.screens[parseInt(v)]) customer = sd.screens[parseInt(v)] } catch {}
         if (!customer) {
-          const sorted = [...sd.screens].sort((a, b) => (a.width * a.height) - (b.width * b.height))
-          customer = sorted[0] !== primary ? sorted[0] : sorted[1]
+          const primary = sd.screens.find(s => s.isPrimary) || sd.currentScreen
+          customer = sd.screens.find(s => !s.isPrimary && s !== primary)
+          if (!customer) {
+            const sorted = [...sd.screens].sort((a, b) => (a.width * a.height) - (b.width * b.height))
+            customer = sorted[0] !== primary ? sorted[0] : sorted[1]
+          }
         }
         if (!customer) return
-        // If we're not already on the customer screen, move there.
+        // If we're not already on the customer screen, move there + fullscreen.
         if (sd.currentScreen !== customer) {
           try { window.moveTo(customer.availLeft, customer.availTop); window.resizeTo(customer.availWidth, customer.availHeight) } catch {}
         }

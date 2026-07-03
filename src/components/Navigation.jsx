@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '../hooks/useStore'
 import { LogoMark } from './Logo'
-import { getRegisterId } from '../hooks/useCustomerDisplay'
+import { getRegisterId, openCustomerScreenManual } from '../hooks/useCustomerDisplay'
 import toast from 'react-hot-toast'
 
 // Clean minimal SVG icons
@@ -70,30 +70,9 @@ export default function Navigation({ onOpenCart }) {
   // Open the customer screen — on a dual-screen POS (e.g. GS-3063) put it on
   // the SECOND physical display in fullscreen. Falls back to a popup window.
   const openCustomerScreen = async () => {
-    const reg = getRegisterId()
-    const url = window.location.origin + '/#/customer-display?reg=' + reg
-    const winName = 'customer-display-' + reg
-    try {
-      // Window Management API (Chrome/Edge) — can detect the 2nd monitor.
-      if ('getScreenDetails' in window) {
-        // ask permission if needed
-        let perm
-        try { perm = await navigator.permissions.query({ name: 'window-management' }) } catch {}
-        try { perm = perm || await navigator.permissions.query({ name: 'window-placement' }) } catch {}
-        const sd = await window.getScreenDetails()
-        // pick a screen that isn't the current/primary one = the customer display
-        const other = sd.screens.find(s => s !== sd.currentScreen) || sd.screens.find(s => !s.isPrimary)
-        if (other) {
-          const feat = `left=${other.availLeft},top=${other.availTop},width=${other.availWidth},height=${other.availHeight}`
-          const w = window.open(url, winName, feat)
-          if (w) { toast.success('Customer screen opened on the second display'); return }
-        }
-      }
-    } catch (e) { console.warn('screen-placement fallback:', e) }
-    // Fallback: regular popup (laptop / single screen / unsupported browser)
-    const w = window.open(url, winName, 'width=1280,height=800')
-    if (!w) toast.error('Popup blocked — allow popups for this site, then tap again')
-    else toast.success('Customer screen opened')
+    const w = await openCustomerScreenManual()
+    if (w) toast.success('Customer screen opened')
+    else toast.error('Could not open — check the second display is connected and popups are allowed')
   }
   const wa = waOrders.filter(o => o.status === 'Pending' || o.status === 'Paid').length
   const cc = cart.reduce((a, c) => a + c.qty, 0)

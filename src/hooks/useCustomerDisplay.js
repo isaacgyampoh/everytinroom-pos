@@ -93,55 +93,92 @@ export function isCustomerScreenOpen() {
   return !!(customerWin && !customerWin.closed)
 }
 
-/**
- * Auto-open the customer screen on the SECOND physical display.
- * Built for non-technical use: after the cashier logs in, this fires and
- * places the customer screen on the 2nd monitor in fullscreen. If the window
- * is already open, it does nothing. Safe to call repeatedly.
- */
-export async function openCustomerScreenAuto() {
-  // already open? leave it.
-  if (customerWin && !customerWin.closed) return customerWin
+// Optional manual override: if a specific machine's driver reports screens
+// oddly, the installer can pin which screen index is the customer display.
+// Stored per-device. Value is the screen index (0-based) or '' for auto.
+export function setCustomerScreenIndex(i) {
+  try { if (i === '' || i == null) localStorage.removeItem('customer-screen-index'); else localStorage.setItem('customer-screen-index', String(i)) } catch {}
+}
+export function getCustomerScreenIndex() {
+  try { const v = localStorage.getItem('customer-screen-index'); return v == null || v === '' ? null : parseInt(v) } catch { return null }
+}
 
-  // Touch devices (phones/tablets) never auto-open — they're single-screen.
-  const isTouchOnly = (navigator.maxTouchPoints || 0) > 0 && !window.matchMedia('(pointer: fine)').matches
-  if (isTouchOnly) return null
+/**
+ * Decide WHICH physical screen is the customer display — the single source of
+ * truth used everywhere. Deterministic so the two screens can never swap:
+ *   0) manual override index if the installer set one, else
+ *   1) the non-primary screen (cashier keeps the primary), else
+ *   2) the physically smaller screen.
+ * Returns the ScreenDetailed for the customer, or null if only one screen.
+ */
+async function pickCustomerScreen() {
+  if (!('getScreenDetails' in window)) return null
+  const sd = await window.getScreenDetails()
+  if (!sd || sd.screens.length < 2) return null
+
+  const override = getCustomerScreenIndex()
+  if (override != null && sd.screens[override]) return sd.screens[override]
+
+  const primary = sd.screens.find(s => s.isPrimary) || sd.currentScreen
+  let customer = sd.screens.find(s => !s.isPrimary && s !== primary)
+  if (!customer) {
+    const sorted = [...sd.screens].sort((a, b) => (a.width * a.height) - (b.width * b.height))
+    customer = sorted[0] !== primary ? sorted[0] : sorted[1]
+  }
+  return customer || null
+}
+
+// Shared opener. Places the customer window on the customer screen, fullscreen,
+// and nudges it there again on load in case the browser ignored placement.
+async function openOnCustomerScreen({ requireSecondScreen, fallbackPopup }) {
+  if (customerWin && !customerWin.closed) { try { customerWin.focus() } catch {}; return customerWin }
 
   const reg = getRegisterId()
   const url = window.location.origin + '/#/customer-display?reg=' + reg
   const winName = 'customer-display-' + reg
 
   try {
-    if (!('getScreenDetails' in window)) return null
-    const sd = await window.getScreenDetails()
-    if (!sd || sd.screens.length < 2) return null // single screen -> never auto-open
-
-    // Deterministically choose the CUSTOMER screen:
-    //  1) the non-primary screen (the cashier keeps the primary), else
-    //  2) the physically smaller screen (customer display is the small one).
-    // This never depends on where the POS window currently sits, so the two
-    // screens can't get swapped.
-    const primary = sd.screens.find(s => s.isPrimary) || sd.currentScreen
-    let customer = sd.screens.find(s => !s.isPrimary && s !== primary)
-    if (!customer) {
-      const sorted = [...sd.screens].sort((a, b) => (a.width * a.height) - (b.width * b.height))
-      customer = sorted[0] !== primary ? sorted[0] : sorted[1]
+    const customer = await pickCustomerScreen()
+    if (customer) {
+      const feat = `left=${customer.availLeft},top=${customer.availTop},width=${customer.availWidth},height=${customer.availHeight},fullscreen=yes`
+      const w = window.open(url, winName, feat)
+      if (w) {
+        customerWin = w
+        try { w.addEventListener('load', () => { try { w.moveTo(customer.availLeft, customer.availTop); w.resizeTo(customer.availWidth, customer.availHeight) } catch {} }) } catch {}
+        return w
+      }
+    } else if (requireSecondScreen) {
+      return null // no 2nd screen -> auto-open does nothing (phones/laptops)
     }
-    if (!customer) return null
+  } catch (e) { console.warn('customer screen placement:', e) }
 
-    const feat = `left=${customer.availLeft},top=${customer.availTop},width=${customer.availWidth},height=${customer.availHeight},fullscreen=yes`
-    const w = window.open(url, winName, feat)
-    if (w) {
-      customerWin = w
-      // Nudge it onto the customer screen + fullscreen once it has loaded,
-      // in case the browser ignored the initial placement.
-      try {
-        w.addEventListener('load', () => {
-          try { w.moveTo(customer.availLeft, customer.availTop); w.resizeTo(customer.availWidth, customer.availHeight) } catch {}
-        })
-      } catch {}
-      return w
-    }
-  } catch (e) { console.warn('auto-place customer screen:', e) }
+  // Manual fallback: a normal popup (single-screen laptop / unsupported browser).
+  if (fallbackPopup) {
+    const w = window.open(url, winName, 'width=1280,height=800')
+    if (w) customerWin = w
+    return w
+  }
   return null
+}
+
+/**
+ * AUTO open — fires after login on the POS. Only opens when a genuine 2nd
+ * physical display exists (so phones/single-screen laptops never spawn a
+ * customer window). Safe to call repeatedly.
+ */
+export async function openCustomerScreenAuto() {
+  if (customerWin && !customerWin.closed) return customerWin
+  // Touch-only devices (phones/tablets) never auto-open.
+  const isTouchOnly = (navigator.maxTouchPoints || 0) > 0 && !window.matchMedia('(pointer: fine)').matches
+  if (isTouchOnly) return null
+  return openOnCustomerScreen({ requireSecondScreen: true, fallbackPopup: false })
+}
+
+/**
+ * MANUAL open — the sidebar "Customer Screen" button. Works anywhere: uses the
+ * 2nd screen if present, otherwise opens a normal window so it can still be
+ * used/tested on a single-screen laptop.
+ */
+export async function openCustomerScreenManual() {
+  return openOnCustomerScreen({ requireSecondScreen: false, fallbackPopup: true })
 }

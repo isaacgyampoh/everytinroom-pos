@@ -53,7 +53,6 @@ export default function App() {
     if (!user) return
     if (window.location.hash.includes('/customer-display')) return // don't spawn from the customer window itself
     let cancelled = false
-    const KEY = 'customer-window-open'
     const launch = async () => {
       try {
         const { openCustomerScreenAuto } = await import('./hooks/useCustomerDisplay')
