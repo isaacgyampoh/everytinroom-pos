@@ -3,7 +3,11 @@
 @tailwind utilities;
 
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+html, body, #root { min-height: 100vh; min-height: 100dvh; }
 body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 15px; background: #f6f6f5; color: #16181d; letter-spacing: -0.011em; transition: background .2s ease, color .2s ease; }
+/* Fill correctly in fullscreen/kiosk and on mobile browsers (handles the address bar). */
+.fill-screen { height: 100vh; height: 100dvh; }
+:fullscreen, :-webkit-full-screen { width: 100vw; height: 100vh; }
 h1, h2, h3, h4, h5, h6 { font-family: 'Inter', -apple-system, system-ui, sans-serif; letter-spacing: -0.022em; font-weight: 700; }
 @media (min-width: 768px) { body { font-size: 16px; } }
 

@@ -33,7 +33,7 @@ const Catalog = lazy(() => import('./pages/Catalog'))
 const DeliveryConfirm = lazy(() => import('./pages/DeliveryConfirm'))
 const CustomerDisplay = lazy(() => import('./pages/CustomerDisplay'))
 
-const INACTIVITY_TIMEOUT = 30 * 60 * 1000 // 30 minutes
+const INACTIVITY_TIMEOUT = 60 * 1000 // 1 minute
 const ADMIN_PAGES = ['products', 'staff', 'promos', 'invoices', 'stocktakes', 'stockadjustments', 'restock']
 
 export default function App() {
@@ -87,9 +87,9 @@ export default function App() {
     const timer = setInterval(() => {
       if (Date.now() - lastActivity > INACTIVITY_TIMEOUT) {
         logout()
-        toast('Session expired — please log in again', { icon: '' })
+        toast('Logged out — enter your PIN to continue')
       }
-    }, 60000) // Check every minute
+    }, 10000) // check every 10s
     return () => {
       events.forEach(e => window.removeEventListener(e, resetActivity))
       clearInterval(timer)

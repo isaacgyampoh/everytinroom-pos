@@ -103,8 +103,29 @@ export const useStore = create((set, get) => ({
   setMode: mode => set({ mode }), setCat: cat => set({ selectedCat: cat }),
   setWAFilter: f => set({ waFilter: f }), setPerfPeriod: p => set({ perfPeriod: p }),
   setLoading: (loading, text) => set({ loading, loadingText: text || 'Loading...' }),
-  login: (user, isAdmin) => set({ user, isAdmin }),
-  logout: () => set({ user: null, isAdmin: false }),
+  // Per-cashier carts: when a cashier logs out (incl. auto-logout), their cart
+  // is stashed under their id. When they log back in, it's restored. A DIFFERENT
+  // cashier logging in gets their own cart (fresh if none saved). Kept in memory
+  // + localStorage so it survives the session.
+  login: (user, isAdmin) => {
+    let restored = []
+    try {
+      const saved = JSON.parse(localStorage.getItem('carts-by-cashier') || '{}')
+      restored = Array.isArray(saved[user.id]) ? saved[user.id] : []
+    } catch {}
+    set({ user, isAdmin, cart: restored })
+  },
+  logout: () => {
+    const { user, cart } = get()
+    if (user) {
+      try {
+        const saved = JSON.parse(localStorage.getItem('carts-by-cashier') || '{}')
+        saved[user.id] = cart || []
+        localStorage.setItem('carts-by-cashier', JSON.stringify(saved))
+      } catch {}
+    }
+    set({ user: null, isAdmin: false, cart: [] })
+  },
 
   // Shop on/off switch (shared with the e-commerce site via store_settings)
   shopOpen: true,
@@ -157,7 +178,11 @@ export const useStore = create((set, get) => ({
     set({ cart: applyWholesale(cart, get().products) }); return true
   },
   removeFromCart: index => { const cart = [...get().cart]; cart.splice(index, 1); set({ cart: applyWholesale(cart, get().products) }) },
-  clearCart: () => set({ cart: [] }),
+  clearCart: () => {
+    const { user } = get()
+    if (user) { try { const saved = JSON.parse(localStorage.getItem('carts-by-cashier') || '{}'); delete saved[user.id]; localStorage.setItem('carts-by-cashier', JSON.stringify(saved)) } catch {} }
+    set({ cart: [] })
+  },
 
   // PHASE 1: Load only essential data (products, staff, sales, bundles)
   loadAll: async () => {
