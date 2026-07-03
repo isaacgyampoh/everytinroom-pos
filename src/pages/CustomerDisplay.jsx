@@ -50,6 +50,8 @@ export default function CustomerDisplay() {
         if (sd.currentScreen !== customer) {
           try { window.moveTo(customer.availLeft, customer.availTop); window.resizeTo(customer.availWidth, customer.availHeight) } catch {}
         }
+        // Go fullscreen so the customer sees only the welcome, never the desktop.
+        try { if (!document.fullscreenElement && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen() } catch {}
       } catch {}
     })()
 

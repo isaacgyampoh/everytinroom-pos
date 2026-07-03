@@ -30,6 +30,10 @@ export default function Login() {
       const { data } = await sb.rpc('verify_pin', { p_pin: pin })
       if (data?.success) {
         const isAdmin = data.role === 'Admin'
+        // Go fullscreen on the cashier screen — the login tap is the user
+        // gesture browsers require. Removes the title bar / close button so the
+        // POS runs like a kiosk until the machine is powered off. No keyboard needed.
+        try { if (!document.fullscreenElement && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen() } catch {}
         login({ id: data.id, name: data.name, role: data.role }, isAdmin)
         setPage(isAdmin ? 'dash' : 'pos')
         return
