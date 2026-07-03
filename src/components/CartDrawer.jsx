@@ -157,15 +157,20 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
         status: 'Pending', ussd_code: uc, paystack_ref: orderNo, source: isWhatsApp ? 'whatsapp' : 'walkin', details_filled: false,
       })
 
-      // Auto-send the USSD code to the customer by SMS (server-side; key stays on backend)
+      // USSD code SMS is PAUSED for now — it delayed the cashier at the counter.
+      // Walk-in: cashier reads the code aloud from the screen.
+      // WhatsApp: the code goes out via the WhatsApp "Send pay code" button.
+      // To re-enable later, set localStorage 'ussd-sms' = '1'.
       let smsOk = false
-      try {
-        const r = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=send-ussd-code', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderNo })
-        })
-        const j = await r.json(); smsOk = !!j.success
-      } catch {}
+      if (localStorage.getItem('ussd-sms') === '1') {
+        try {
+          const r = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=send-ussd-code', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderNo })
+          })
+          const j = await r.json(); smsOk = !!j.success
+        } catch {}
+      }
 
       // MOOLRE: temporarily OFF by default while Moolre completes our merchant
       // setup + disables OTP. Falls through to the USSD-code flow (NaloPay) below.
