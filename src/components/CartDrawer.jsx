@@ -85,7 +85,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
     try {
       const mr = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=moolre-charge', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: moolreCtx.phone, amount: moolreCtx.amount, orderNo: moolreCtx.orderNo, externalref: moolreCtx.orderNo, otpcode: otpValue.trim() })
+        body: JSON.stringify({ phone: moolreCtx.phone, amount: moolreCtx.amount, orderNo: moolreCtx.orderNo, externalref: moolreCtx.externalref || moolreCtx.orderNo, otpcode: otpValue.trim() })
       })
       const mj = await mr.json()
       if (mj.success) {
@@ -181,6 +181,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
       let moolrePrompt = false
       let moolreOtp = false
       let moolreError = ''
+      let moolreRef = orderNo
       if (localStorage.getItem('no-moolre') !== '1') {
         try {
           const mr = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=moolre-charge', {
@@ -188,13 +189,14 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             body: JSON.stringify({ phone: phone.trim(), amount, orderNo, externalref: orderNo })
           })
           const mj = await mr.json(); moolrePrompt = !!mj.success; moolreOtp = !!mj.otpRequired
+          if (mj.reference) moolreRef = mj.reference
           if (!moolrePrompt && !moolreOtp) { moolreError = mj.error || 'unknown'; console.warn('Moolre charge failed:', mj.error) }
         } catch (e) { moolreError = String(e); console.warn('Moolre charge error:', e) }
       }
 
       // OTP required: stash what we need and show the OTP entry step.
       if (moolreOtp) {
-        setMoolreCtx({ phone: phone.trim(), amount, orderNo, uc })
+        setMoolreCtx({ phone: phone.trim(), amount, orderNo, uc, externalref: moolreRef })
         setOtpValue('')
         setMomoStep('otp')
         setMomoMessage(`An OTP was sent by SMS to ${phone.trim()}.\nEnter the code the customer received to complete the GHS ${money(amount)} payment.`)
