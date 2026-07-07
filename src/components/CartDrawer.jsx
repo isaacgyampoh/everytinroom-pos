@@ -173,14 +173,14 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
       }
 
       // MOOLRE is now the DEFAULT payment (account verified + new account number).
-      // Moolre is used ONLY for walk-in orders (the flow we're testing/fixing).
-      // WhatsApp orders use the USSD code (NaloPay) — skip Moolre entirely.
-      // Emergency off / fall back to NaloPay for walk-in too: localStorage 'no-moolre'='1'.
+      // Moolre is DISABLED for now — the OTP flow wasn't reliable. Everything
+      // (walk-in, WhatsApp, website) uses the USSD code flow (NaloPay). To try
+      // Moolre again later, set localStorage 'use-moolre' = '1'.
       let moolrePrompt = false
       let moolreOtp = false
       let moolreError = ''
       let moolreRef = orderNo
-      if (!isWhatsApp && localStorage.getItem('no-moolre') !== '1') {
+      if (!isWhatsApp && localStorage.getItem('use-moolre') === '1') {
         try {
           const mr = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=moolre-charge', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
