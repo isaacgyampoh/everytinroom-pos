@@ -57,16 +57,16 @@ export default function Products() {
     if (!form.name.trim()) { toast.error('Enter name'); return }
     setLoading(true, 'Saving...'); const sb = getSupabase(); let imageUrl = form.existingImage || ''
     if (form.file) {
-      // Upload to Cloudinary
+      // Upload to Supabase storage (permanent, owned by us — no third-party
+      // free-tier deactivation risk). ImageKit still optimizes on delivery.
       try {
-        const fd = new FormData()
-        fd.append('file', form.file)
-        fd.append('upload_preset', 'everytinroom')
-        fd.append('folder', 'everytinroom')
-        const res = await fetch('https://api.cloudinary.com/v1_1/dls9fai0i/image/upload', { method: 'POST', body: fd })
-        const data = await res.json()
-        if (data.secure_url) imageUrl = data.secure_url
-      } catch (e) { toast.error('Image upload failed') }
+        const ext = (form.file.name.split('.').pop() || 'jpg').toLowerCase()
+        const path = `products/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+        const { error: upErr } = await sb.storage.from('product-images').upload(path, form.file, { cacheControl: '31536000', upsert: false })
+        if (upErr) throw upErr
+        const { data: urlData } = sb.storage.from('product-images').getPublicUrl(path)
+        if (urlData?.publicUrl) imageUrl = urlData.publicUrl
+      } catch (e) { console.error('Image upload failed:', e); toast.error('Image upload failed') }
     }
     const data = { name: form.name.trim(), category: form.category.trim(), cost_price: num(form.costPrice), price: num(form.price), wholesale_price: num(form.wholesalePrice), wholesale_min_qty: num(form.wholesaleMinQty), quantity: num(form.quantity), group_tag: form.groupTag.trim().toLowerCase(), image: imageUrl }
     if (form.id) await sb.from('products').update(data).eq('id', form.id); else await sb.from('products').insert(data)
