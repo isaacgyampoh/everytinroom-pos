@@ -14,39 +14,51 @@ export default function Products() {
   const [migrating, setMigrating] = useState(false)
   const filtered = products.filter(p => p.name.toLowerCase().includes(query.toLowerCase()))
 
-  // Migrate all Supabase images to Cloudinary
+  // Migrate ALL Cloudinary images -> Supabase storage (permanent, owned by us).
+  // Fetches each image's bytes from Cloudinary and re-uploads to the
+  // 'product-images' bucket, then points the product at the new Supabase URL.
   const migrateImages = async () => {
-    const toMigrate = products.filter(p => p.image && p.image.includes('supabase') && !p.image.includes('cloudinary'))
-    if (toMigrate.length === 0) { toast.success('All images already on Cloudinary'); return }
-    if (!confirm(`Migrate ${toMigrate.length} images to Cloudinary? This may take a few minutes.`)) return
-    setMigrating(true)
     const sb = getSupabase()
+    const toMigrate = products.filter(p => p.image && p.image.includes('res.cloudinary.com'))
+    if (toMigrate.length === 0) { toast.success('No Cloudinary images left — all moved'); return }
+    if (!confirm(`Move ${toMigrate.length} images from Cloudinary to Supabase? Keep Cloudinary active until this finishes.`)) return
+    setMigrating(true)
     let done = 0, failed = 0
     for (const p of toMigrate) {
       try {
-        // Send Supabase URL directly to Cloudinary (no CORS issues)
-        const fd = new FormData()
-        fd.append('file', p.image)
-        fd.append('upload_preset', 'everytinroom')
-        fd.append('folder', 'everytinroom')
-        const res = await fetch('https://api.cloudinary.com/v1_1/dls9fai0i/image/upload', { method: 'POST', body: fd })
-        const data = await res.json()
-        if (data.secure_url) {
-          await sb.from('products').update({ image: data.secure_url }).eq('id', p.id)
-          done++
-        } else {
-          console.error('Cloudinary error:', data)
-          failed++
+        // 1. Fetch the image bytes. Try Cloudinary directly; if CORS blocks it,
+        // fall back to the ImageKit URL (ImageKit fetches from Cloudinary
+        // server-side and serves with open CORS).
+        let blob = null
+        try {
+          const resp = await fetch(p.image, { mode: 'cors' })
+          if (resp.ok) blob = await resp.blob()
+        } catch {}
+        if (!blob) {
+          const ikUrl = thumb(p.image, 1200)
+          const resp2 = await fetch(ikUrl, { mode: 'cors' })
+          if (!resp2.ok) throw new Error('fetch failed both sources')
+          blob = await resp2.blob()
         }
+        // 2. Upload to Supabase storage.
+        const ext = (p.image.split('.').pop() || 'jpg').split(/[?#]/)[0].toLowerCase()
+        const path = `products/${p.id}-${Date.now()}.${ext}`
+        const { error: upErr } = await sb.storage.from('product-images').upload(path, blob, { cacheControl: '31536000', upsert: true, contentType: blob.type || 'image/jpeg' })
+        if (upErr) throw upErr
+        // 3. Point the product at the new Supabase URL.
+        const { data: urlData } = sb.storage.from('product-images').getPublicUrl(path)
+        if (!urlData?.publicUrl) throw new Error('no public url')
+        await sb.from('products').update({ image: urlData.publicUrl }).eq('id', p.id)
+        done++
       } catch (e) {
-        console.error('Migration error for', p.name, e)
+        console.error('Migration failed for', p.name, e)
         failed++
       }
     }
     await refreshProducts()
     setMigrating(false)
-    if (done > 0) toast.success(`${done} images migrated to Cloudinary`)
-    if (failed > 0) toast.error(`${failed} images failed - check Cloudinary upload preset`)
+    if (done > 0) toast.success(`${done} images moved to Supabase`)
+    if (failed > 0) toast.error(`${failed} failed — try again (keep Cloudinary active)`)
   }
 
   const openNew = () => { setForm({ id: '', name: '', category: '', costPrice: '', price: '', wholesalePrice: '', wholesaleMinQty: '', quantity: '', groupTag: '', file: null, existingImage: '' }); setPreview(''); setModal(true) }
@@ -76,7 +88,7 @@ export default function Products() {
 
   return (
     <div >
-      <div className="flex justify-between items-start flex-wrap gap-4 mb-6"><h1 className="text-[22px] md:text-[26px] font-bold">Products</h1><div className="flex gap-2">{products.some(p => p.image && p.image.includes('supabase')) && <button onClick={migrateImages} disabled={migrating} className="h-12 px-4 border border-stone-300 rounded-xl text-xs font-semibold text-stone-600 disabled:opacity-50">{migrating ? 'Migrating...' : 'Move images to Cloudinary'}</button>}<button onClick={openNew} className="h-12 px-5 bg-gray-700 text-white rounded-xl text-sm font-semibold">Add</button></div></div>
+      <div className="flex justify-between items-start flex-wrap gap-4 mb-6"><h1 className="text-[22px] md:text-[26px] font-bold">Products</h1><div className="flex gap-2">{products.some(p => p.image && p.image.includes('res.cloudinary.com')) && <button onClick={migrateImages} disabled={migrating} className="h-12 px-4 border border-[#0e7c86] bg-[#0e7c86]/5 text-[#0e7c86] rounded-xl text-xs font-semibold disabled:opacity-50">{migrating ? 'Moving images...' : `Move ${products.filter(p => p.image && p.image.includes('res.cloudinary.com')).length} images to Supabase`}</button>}<button onClick={openNew} className="h-12 px-5 bg-gray-700 text-white rounded-xl text-sm font-semibold">Add</button></div></div>
       <div className="bg-white rounded-2xl p-6 shadow-md">
         <input className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base mb-5" placeholder="Search..." value={query} onChange={e => setQuery(e.target.value)} />
         <div className="overflow-x-auto"><table className="w-full min-w-[600px]"><thead><tr><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Product</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Price</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Margin</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Stock</th><th className="p-3 bg-gray-50 text-[11px] font-bold text-gray-500 uppercase">Actions</th></tr></thead>
