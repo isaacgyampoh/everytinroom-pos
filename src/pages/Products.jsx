@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../hooks/useStore'
 import { getSupabase } from '../lib/supabase'
 import { money, num, thumb } from '../lib/utils'
@@ -14,51 +14,45 @@ export default function Products() {
   const [migrating, setMigrating] = useState(false)
   const filtered = products.filter(p => p.name.toLowerCase().includes(query.toLowerCase()))
 
-  // Migrate ALL Cloudinary images -> Supabase storage (permanent, owned by us).
-  // Fetches each image's bytes from Cloudinary and re-uploads to the
-  // 'product-images' bucket, then points the product at the new Supabase URL.
-  const migrateImages = async () => {
-    const sb = getSupabase()
-    const toMigrate = products.filter(p => p.image && p.image.includes('res.cloudinary.com'))
-    if (toMigrate.length === 0) { toast.success('No Cloudinary images left — all moved'); return }
-    if (!confirm(`Move ${toMigrate.length} images from Cloudinary to Supabase? Keep Cloudinary active until this finishes.`)) return
-    setMigrating(true)
-    let done = 0, failed = 0
-    for (const p of toMigrate) {
-      try {
-        // 1. Fetch the image bytes. Try Cloudinary directly; if CORS blocks it,
-        // fall back to the ImageKit URL (ImageKit fetches from Cloudinary
-        // server-side and serves with open CORS).
-        let blob = null
+  // Auto-migrate Cloudinary images -> Supabase, SERVER-SIDE, silently in the
+  // background. No button needed. Fires batches until none remain. Runs once
+  // per page load if any Cloudinary images exist.
+  const migratedRef = useRef(false)
+  useEffect(() => {
+    if (migratedRef.current) return
+    const hasCloudinary = products.some(p => p.image && p.image.includes('res.cloudinary.com'))
+    if (!hasCloudinary) return
+    migratedRef.current = true
+    ;(async () => {
+      let guard = 0
+      while (guard++ < 50) {
         try {
-          const resp = await fetch(p.image, { mode: 'cors' })
-          if (resp.ok) blob = await resp.blob()
-        } catch {}
-        if (!blob) {
-          const ikUrl = thumb(p.image, 1200)
-          const resp2 = await fetch(ikUrl, { mode: 'cors' })
-          if (!resp2.ok) throw new Error('fetch failed both sources')
-          blob = await resp2.blob()
-        }
-        // 2. Upload to Supabase storage.
-        const ext = (p.image.split('.').pop() || 'jpg').split(/[?#]/)[0].toLowerCase()
-        const path = `products/${p.id}-${Date.now()}.${ext}`
-        const { error: upErr } = await sb.storage.from('product-images').upload(path, blob, { cacheControl: '31536000', upsert: true, contentType: blob.type || 'image/jpeg' })
-        if (upErr) throw upErr
-        // 3. Point the product at the new Supabase URL.
-        const { data: urlData } = sb.storage.from('product-images').getPublicUrl(path)
-        if (!urlData?.publicUrl) throw new Error('no public url')
-        await sb.from('products').update({ image: urlData.publicUrl }).eq('id', p.id)
-        done++
-      } catch (e) {
-        console.error('Migration failed for', p.name, e)
-        failed++
+          const r = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=migrate-images', { method: 'POST' })
+          const j = await r.json()
+          if (!j.success) break
+          if (j.done > 0) { try { await refreshProducts() } catch {} }
+          if (!j.remaining || j.remaining === 0) { toast.success('Images moved to Supabase'); break }
+          if (j.done === 0 && j.failed > 0) { console.error('Migration stuck:', j.errors); break }
+        } catch (e) { console.error('Migration error:', e); break }
       }
-    }
-    await refreshProducts()
+    })()
+  }, [products]) // eslint-disable-line
+
+  // Manual fallback (kept, but migration is automatic above)
+  const migrateImages = async () => {
+    setMigrating(true)
+    try {
+      let guard = 0
+      while (guard++ < 50) {
+        const r = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=migrate-images', { method: 'POST' })
+        const j = await r.json()
+        if (!j.success) { toast.error('Migration failed'); break }
+        if (j.done > 0) await refreshProducts()
+        if (!j.remaining || j.remaining === 0) { toast.success('All images moved to Supabase'); break }
+        if (j.done === 0 && j.failed > 0) { toast.error(`${j.failed} failed: ${(j.errors||[])[0] || ''}`); break }
+      }
+    } catch (e) { toast.error('Migration error') }
     setMigrating(false)
-    if (done > 0) toast.success(`${done} images moved to Supabase`)
-    if (failed > 0) toast.error(`${failed} failed — try again (keep Cloudinary active)`)
   }
 
   const openNew = () => { setForm({ id: '', name: '', category: '', costPrice: '', price: '', wholesalePrice: '', wholesaleMinQty: '', quantity: '', groupTag: '', file: null, existingImage: '' }); setPreview(''); setModal(true) }
