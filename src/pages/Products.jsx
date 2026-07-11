@@ -68,11 +68,12 @@ export default function Products() {
       try {
         const ext = (form.file.name.split('.').pop() || 'jpg').toLowerCase()
         const path = `products/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
-        const { error: upErr } = await sb.storage.from('product-images').upload(path, form.file, { cacheControl: '31536000', upsert: false })
-        if (upErr) throw upErr
+        const { error: upErr } = await sb.storage.from('product-images').upload(path, form.file, { cacheControl: '31536000', upsert: true, contentType: form.file.type || 'image/jpeg' })
+        if (upErr) { console.error('Upload error:', upErr); toast.error('Upload: ' + (upErr.message || 'failed')); setLoading(false); return }
         const { data: urlData } = sb.storage.from('product-images').getPublicUrl(path)
         if (urlData?.publicUrl) imageUrl = urlData.publicUrl
-      } catch (e) { console.error('Image upload failed:', e); toast.error('Image upload failed') }
+        else { toast.error('Could not get image URL'); setLoading(false); return }
+      } catch (e) { console.error('Image upload failed:', e); toast.error('Image upload failed: ' + (e?.message || '')); setLoading(false); return }
     }
     const data = { name: form.name.trim(), category: form.category.trim(), cost_price: num(form.costPrice), price: num(form.price), wholesale_price: num(form.wholesalePrice), wholesale_min_qty: num(form.wholesaleMinQty), quantity: num(form.quantity), group_tag: form.groupTag.trim().toLowerCase(), image: imageUrl }
     if (form.id) await sb.from('products').update(data).eq('id', form.id); else await sb.from('products').insert(data)
