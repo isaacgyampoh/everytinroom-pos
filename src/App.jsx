@@ -78,6 +78,23 @@ export default function App() {
 
   useEffect(() => { loadAll(); setupRealtime() }, [])
 
+  // App-wide payment auto-confirm: every 20s (from ANY screen, while logged in)
+  // ask NaloPay which recent pending orders actually paid, and mark them Paid.
+  // This means orders confirm themselves — staff shouldn't need to mark manually.
+  useEffect(() => {
+    if (!user) return
+    const run = async () => {
+      try {
+        const r = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=reconcile-payments', { method: 'POST' })
+        const j = await r.json()
+        if (j?.confirmed > 0) { try { loadAll() } catch {} }
+      } catch {}
+    }
+    run()
+    const iv = setInterval(run, 20000)
+    return () => clearInterval(iv)
+  }, [user]) // eslint-disable-line
+
   // Auto-logout on inactivity
   const resetActivity = useCallback(() => setLastActivity(Date.now()), [])
 
