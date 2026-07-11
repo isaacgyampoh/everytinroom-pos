@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../hooks/useStore'
 import { getSupabase } from '../lib/supabase'
 import { money, fmtDateTime } from '../lib/utils'
@@ -8,6 +8,23 @@ import toast from 'react-hot-toast'
 export default function WhatsAppOrders() {
   const { waOrders, waFilter, setWAFilter, refreshWAOrders, user, setLoading, loadAll } = useStore()
   const [search, setSearch] = useState('')
+  const reconcileRef = useRef(false)
+
+  // Auto-reconcile: check recent pending orders against NaloPay and confirm any
+  // that actually paid (covers payments where NaloPay's callback never arrived).
+  // Runs on load and every 30s while the orders page is open.
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const r = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=reconcile-payments', { method: 'POST' })
+        const j = await r.json()
+        if (j?.confirmed > 0) { refreshWAOrders(); toast.success(`${j.confirmed} payment(s) confirmed`) }
+      } catch {}
+    }
+    run()
+    const iv = setInterval(run, 30000)
+    return () => clearInterval(iv)
+  }, []) // eslint-disable-line
   const [srcFilter, setSrcFilter] = useState('all')
   const [selected, setSelected] = useState(null)
   const [editDelivery, setEditDelivery] = useState(false)
