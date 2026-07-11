@@ -41,6 +41,21 @@ export default function WhatsAppOrders() {
     } catch (e) { setLoading(false); toast.error('Error') }
   }
 
+  // Manually confirm a payment the gateway didn't auto-confirm (customer showed proof).
+  const markPaid = async (o) => {
+    if (!confirm(`Mark ${o.orderNo} as PAID? Only do this if you've CONFIRMED the payment was received (${money(o.total)}).`)) return
+    setLoading(true, 'Marking paid...')
+    try {
+      const sb = getSupabase()
+      // Walk-in -> Completed, web/whatsapp -> Paid, matching the auto flow.
+      const isWalkin = o.source === 'walkin' || (o.orderNo || '').startsWith('POS-')
+      const { error } = await sb.from('whatsapp_orders').update({ status: isWalkin ? 'Completed' : 'Paid', paid_at: new Date().toISOString(), processed_by: user?.name || '' }).eq('id', o.id)
+      setLoading(false)
+      if (error) { toast.error(error.message || 'Error'); return }
+      toast.success('Marked as paid'); setSelected(null); refreshWAOrders()
+    } catch (e) { setLoading(false); toast.error('Error') }
+  }
+
   const cancel = async (id) => {
     const reason = prompt('Reason for cancellation:')
     if (reason === null) return
@@ -540,6 +555,7 @@ export default function WhatsAppOrders() {
             {/* Actions */}
             {o.status === 'Pending' && (
               <div className="space-y-2 pt-2">
+                <button onClick={() => markPaid(o)} className="w-full h-12 bg-[#0e7c86] text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Mark as Paid (payment received)</button>
                 <button onClick={() => resendInvoice(o)} className="w-full h-12 bg-[#25d366] text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Resend Invoice</button>
                 <div className="flex gap-2">
                   <button onClick={() => copyLink(o)} className="flex-1 h-11 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold active:scale-[.98] transition">Copy Link</button>
