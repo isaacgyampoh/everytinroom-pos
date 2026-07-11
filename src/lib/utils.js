@@ -15,19 +15,19 @@ export const IMAGEKIT_ENDPOINT = 'https://ik.imagekit.io/bqikvsp59'
 
 export const thumb = (url, w) => {
   if (!url) return ''
-  // Route through ImageKit (external origin -> res.cloudinary.com).
-  // ImageKit serves the path AFTER the origin domain, so we strip the
-  // Cloudinary host and append the rest to the ImageKit endpoint, then add
-  // resize/compress/auto-format. Non-Cloudinary URLs are left as-is.
+  // Supabase storage URLs (our permanent home) are served DIRECTLY — public
+  // bucket, no third-party dependency, most reliable. No transform needed.
+  if (url.includes('/storage/v1/object/public/')) return url
+  // Cloudinary images route through ImageKit for optimization + because
+  // Cloudinary's free tier is unreliable. If ImageKit ever fails, these are
+  // being migrated to Supabase anyway.
   if (IMAGEKIT_ENDPOINT && url.includes('res.cloudinary.com/')) {
     const ep = IMAGEKIT_ENDPOINT.replace(/\/+$/, '')
-    let path = url.split('res.cloudinary.com/')[1] // e.g. dls9fai0i/image/upload/[transforms/]v123/folder/file.jpg
-    // Remove any Cloudinary transform segment after /upload/ (e.g. w_300,c_fill,q_auto,f_auto/)
-    // so only the clean image path remains — ImageKit applies its own ?tr= transform.
+    let path = url.split('res.cloudinary.com/')[1]
     path = path.replace(/(\/upload\/)[^/]*[,_][^/]*\//, '$1')
     return `${ep}/${path}?tr=w-${w},q-70,f-auto`
   }
-  // Fallback: Cloudinary on-the-fly transform (original behaviour).
+  // Fallback: Cloudinary on-the-fly transform.
   if (url.includes('/upload/')) return url.replace(/\/upload\//, `/upload/w_${w},c_fill,q_auto,f_auto/`)
   return url
 }
