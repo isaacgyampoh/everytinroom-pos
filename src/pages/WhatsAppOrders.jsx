@@ -78,6 +78,8 @@ export default function WhatsAppOrders() {
     if (reason === null) return
     setLoading(true, 'Cancelling...')
     const sb = getSupabase()
+    // Restore stock if this order had already deducted it (was Paid). Safe/idempotent.
+    try { await sb.rpc('restore_order_stock', { p_order_id: id }) } catch (e) { console.error('restore_order_stock:', e) }
     await sb.from('whatsapp_orders').update({ status: 'Cancelled', processed_by: user?.name || '', processed_at: new Date().toISOString(), notes: reason }).eq('id', id)
     setLoading(false); setSelected(null); toast('Cancelled'); refreshWAOrders()
   }
