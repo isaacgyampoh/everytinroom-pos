@@ -78,6 +78,21 @@ export default function App() {
 
   useEffect(() => { loadAll(); setupRealtime() }, [])
 
+  // Global image fallback: any product image that fails to load (e.g. dead
+  // Cloudinary links) is swapped for a clean neutral placeholder instead of
+  // the browser's broken-image icon. Applies app-wide via error capture.
+  useEffect(() => {
+    const PLACEHOLDER = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><rect width="96" height="96" fill="#f1f0ee"/><path d="M30 62l12-14 8 9 6-7 10 12H30z" fill="#d6d3ce"/><circle cx="38" cy="36" r="6" fill="#d6d3ce"/></svg>'
+    )
+    const onErr = (e) => {
+      const t = e.target
+      if (t && t.tagName === 'IMG' && t.src !== PLACEHOLDER) { t.src = PLACEHOLDER; t.style.objectFit = 'cover' }
+    }
+    window.addEventListener('error', onErr, true) // capture phase catches img errors
+    return () => window.removeEventListener('error', onErr, true)
+  }, [])
+
   // App-wide payment auto-confirm: every 20s (from ANY screen, while logged in)
   // ask NaloPay which recent pending orders actually paid, and mark them Paid.
   // This means orders confirm themselves — staff shouldn't need to mark manually.

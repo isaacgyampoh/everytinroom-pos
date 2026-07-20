@@ -12,48 +12,12 @@ export default function Products() {
   const [form, setForm] = useState({ id: '', name: '', category: '', costPrice: '', price: '', wholesalePrice: '', wholesaleMinQty: '', quantity: '', groupTag: '', file: null, existingImage: '' })
   const [preview, setPreview] = useState('')
   const [migrating, setMigrating] = useState(false)
-  const filtered = products.filter(p => p.name.toLowerCase().includes(query.toLowerCase()))
+  const [photoFilter, setPhotoFilter] = useState(false)
+  const filtered = products.filter(p => p.name.toLowerCase().includes(query.toLowerCase())).filter(p => !photoFilter || needsPhoto(p))
 
-  // Auto-migrate Cloudinary images -> Supabase, SERVER-SIDE, silently in the
-  // background. No button needed. Fires batches until none remain. Runs once
-  // per page load if any Cloudinary images exist.
-  const migratedRef = useRef(false)
-  useEffect(() => {
-    if (migratedRef.current) return
-    const hasCloudinary = products.some(p => p.image && p.image.includes('res.cloudinary.com'))
-    if (!hasCloudinary) return
-    migratedRef.current = true
-    ;(async () => {
-      let guard = 0
-      while (guard++ < 50) {
-        try {
-          const r = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=migrate-images', { method: 'POST' })
-          const j = await r.json()
-          if (!j.success) break
-          if (j.done > 0) { try { await refreshProducts() } catch {} }
-          if (!j.remaining || j.remaining === 0) { toast.success('Images moved to Supabase'); break }
-          if (j.done === 0 && j.failed > 0) { console.error('Migration stuck:', j.errors); break }
-        } catch (e) { console.error('Migration error:', e); break }
-      }
-    })()
-  }, [products]) // eslint-disable-line
-
-  // Manual fallback (kept, but migration is automatic above)
-  const migrateImages = async () => {
-    setMigrating(true)
-    try {
-      let guard = 0
-      while (guard++ < 50) {
-        const r = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=migrate-images', { method: 'POST' })
-        const j = await r.json()
-        if (!j.success) { toast.error('Migration failed'); break }
-        if (j.done > 0) await refreshProducts()
-        if (!j.remaining || j.remaining === 0) { toast.success('All images moved to Supabase'); break }
-        if (j.done === 0 && j.failed > 0) { toast.error(`${j.failed} failed: ${(j.errors||[])[0] || ''}`); break }
-      }
-    } catch (e) { toast.error('Migration error') }
-    setMigrating(false)
-  }
+  // Old Cloudinary images are unrecoverable (account blocked); those products
+  // need a fresh photo. This flags them so staff can work through re-uploads.
+  const needsPhoto = (p) => !p.image || p.image.includes('res.cloudinary.com')
 
   const openNew = () => { setForm({ id: '', name: '', category: '', costPrice: '', price: '', wholesalePrice: '', wholesaleMinQty: '', quantity: '', groupTag: '', file: null, existingImage: '' }); setPreview(''); setModal(true) }
   const openEdit = (p) => { setForm({ id: p.id, name: p.name, category: p.category, costPrice: p.costPrice, price: p.price, wholesalePrice: p.wholesalePrice, wholesaleMinQty: p.wholesaleMinQty || '', quantity: p.quantity, groupTag: p.groupTag || '', file: null, existingImage: p.image }); setPreview(p.image || ''); setModal(true) }
@@ -83,7 +47,7 @@ export default function Products() {
 
   return (
     <div >
-      <div className="flex justify-between items-start flex-wrap gap-4 mb-6"><h1 className="text-[22px] md:text-[26px] font-bold">Products</h1><div className="flex gap-2">{products.some(p => p.image && p.image.includes('res.cloudinary.com')) && <button onClick={migrateImages} disabled={migrating} className="h-12 px-4 border border-[#0e7c86] bg-[#0e7c86]/5 text-[#0e7c86] rounded-xl text-xs font-semibold disabled:opacity-50">{migrating ? 'Moving images...' : `Move ${products.filter(p => p.image && p.image.includes('res.cloudinary.com')).length} images to Supabase`}</button>}<button onClick={openNew} className="h-12 px-5 bg-gray-700 text-white rounded-xl text-sm font-semibold">Add</button></div></div>
+      <div className="flex justify-between items-start flex-wrap gap-4 mb-6"><h1 className="text-[22px] md:text-[26px] font-bold">Products</h1><div className="flex gap-2">{products.some(needsPhoto) && <button onClick={() => setPhotoFilter(v => !v)} className={`h-12 px-4 rounded-xl text-xs font-semibold border transition ${photoFilter ? 'bg-amber-500 border-amber-500 text-white' : 'border-amber-400 bg-amber-50 text-amber-700'}`}>{photoFilter ? 'Showing: needs photo' : `${products.filter(needsPhoto).length} need new photos`}</button>}<button onClick={openNew} className="h-12 px-5 bg-gray-700 text-white rounded-xl text-sm font-semibold">Add</button></div></div>
       <div className="bg-white rounded-2xl p-6 shadow-md">
         <input className="w-full h-13 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-base mb-5" placeholder="Search..." value={query} onChange={e => setQuery(e.target.value)} />
         <div className="overflow-x-auto"><table className="w-full min-w-[600px]"><thead><tr><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Product</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Price</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Margin</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Stock</th><th className="p-3 bg-gray-50 text-[11px] font-bold text-gray-500 uppercase">Actions</th></tr></thead>
