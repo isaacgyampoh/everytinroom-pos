@@ -22,6 +22,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
   const [heldCarts, setHeldCarts] = useState(() => { try { return JSON.parse(localStorage.getItem('heldCarts') || '[]') } catch { return [] } })
   const [showHeld, setShowHeld] = useState(false)
   const [momoStep, setMomoStep] = useState('idle')
+  const [waitMode, setWaitMode] = useState('ussd') // 'ussd' | 'prompt'
   const [otpValue, setOtpValue] = useState('')
   const [moolreCtx, setMoolreCtx] = useState(null)
   const [otpSubmitting, setOtpSubmitting] = useState(false)
@@ -165,6 +166,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
       const j = await r.json()
       if (!j.success) { setMomoStep('failed'); setMomoMessage(j.error || 'Could not send prompt. Try again.'); setProcessing(false); return }
       const naloId = j.nalopayOrderId
+      setWaitMode('prompt')
       setMomoStep('waiting')
       setMomoMessage(`Prompt sent to ${phone.trim()}.\nAmount: ${money(amount)}\n\nCustomer approves with their MoMo PIN.`)
 
@@ -184,6 +186,8 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
           if (['PAID', 'SUCCESS', 'SUCCESSFUL', 'COMPLETED'].includes(st)) {
             clearInterval(pollRef.current)
             const saleData = await recordSale(isSplit ? 'Split' : 'Momo', isSplit ? { splitCash: num(splitCash), splitMomo: amount } : {})
+            // Thank-you SMS (only after payment succeeds).
+            try { fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=thankyou-sms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: phone.trim() }) }) } catch {}
             if (saleData) { toast.success('Paid! ' + saleData.receiptNo); finishSale(saleData) }
           }
         } catch {}
@@ -273,6 +277,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
         await recordSale('Split', { splitCash: num(splitCash), splitMomo: amount })
       }
 
+      setWaitMode('ussd')
       setMomoStep('waiting')
       setMomoMessage(moolrePrompt ? `Payment prompt sent to ${phone.trim()}.\nAmount: ${money(amount)}\n\nCustomer approves with their MoMo PIN on their phone.` : (smsOk ? `USSD code sent to ${phone.trim()} by SMS.\nCode: *920*141*${uc}#\nAmount: ${money(amount)}\n\nCustomer dials it to pay via MoMo.` : `USSD Code: *920*141*${uc}#\nAmount: ${money(amount)}\n\nTell customer to dial this code to pay via MoMo.`))
 
@@ -539,7 +544,17 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             </div>
           )}
 
-          {momoStep === 'waiting' && (
+          {momoStep === 'waiting' && waitMode === 'prompt' && (
+            <div className="text-center py-8">
+              <div className="w-14 h-14 border-4 border-gray-200 border-t-gray-700 rounded-full animate-spin mx-auto mb-5" />
+              <h3 className="text-lg font-bold text-gray-900 mb-1">Waiting for payment</h3>
+              <p className="text-sm text-gray-500 mb-1" style={{ whiteSpace: 'pre-line' }}>{momoMessage}</p>
+              <p className="text-xs text-gray-400 mb-6">The receipt prints automatically once the customer approves on their phone.</p>
+              <button onClick={() => { if (pollRef.current) clearInterval(pollRef.current); setMomoStep('idle'); setMomoMessage('') }} className="px-6 py-3 border border-gray-300 rounded-xl text-sm font-semibold text-gray-600">Cancel order</button>
+            </div>
+          )}
+
+          {momoStep === 'waiting' && waitMode === 'ussd' && (
             <div className="text-center py-6">
               <div className="bg-[#f6f6f5] border-2 border-gray-200 rounded-2xl p-6 mb-4">
                 <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-2">USSD Payment Code</p>
