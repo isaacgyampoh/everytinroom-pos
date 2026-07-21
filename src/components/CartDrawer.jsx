@@ -120,19 +120,76 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
   const deleteHeld = (id) => { setHeldCarts(prev => prev.filter(h => h.id !== id)) }
 
   const handleCompleteSale = () => {
-    // PHONE IS REQUIRED
-    if (!phoneValid) { toast.error('Phone number is required'); return }
-
-    // WhatsApp orders are USSD-only (delivery, remote payment).
-    if (isWhatsApp) { createUssdInvoice(total, false); return }
+    // WhatsApp order: needs phone, then prepares USSD code + delivery link.
+    if (isWhatsApp) {
+      if (!phoneValid) { toast.error('Enter the customer phone number'); return }
+      createUssdInvoice(total, false); return
+    }
 
     if (splitMode) {
       if (num(splitCash) < 0 || num(splitCash) > total) { toast.error('Invalid cash amount'); return }
-      if (splitRemainder > 0) createUssdInvoice(splitRemainder, true) // USSD for momo portion of split
-      else completeDirectSale('Cash') // All cash in split
-    } else if (payMethod === 'Cash') completeDirectSale('Cash')
-    else if (payMethod === 'Momo') completeDirectSale('Momo') // Manual momo — just record it
-    else createUssdInvoice(total, false) // USSD payment
+      if (splitRemainder > 0) {
+        // MoMo portion -> direct prompt to the customer's number.
+        if (!phoneValid) { toast.error('Enter the customer MoMo number'); return }
+        directPromptCharge(splitRemainder, true)
+      } else {
+        completeDirectSale('Cash') // all cash
+      }
+      return
+    }
+
+    if (payMethod === 'Cash') {
+      if (!phoneValid) { toast.error('Enter the customer phone number'); return }
+      completeDirectSale('Cash'); return
+    }
+    if (payMethod === 'Momo') {
+      // Walk-in MoMo = direct prompt (no shortcode).
+      if (!phoneValid) { toast.error('Enter the customer MoMo number'); return }
+      directPromptCharge(total, false); return
+    }
+    toast.error('Select a payment method')
+  }
+
+  // WALK-IN DIRECT PROMPT: send a NaloPay prompt straight to the customer's MoMo
+  // number (no shortcode). This is a pure POS sale — we do NOT create a
+  // whatsapp_orders row. We poll NaloPay for the payment, then record the sale
+  // ONCE (record_sale handles stock + receipt). `isSplit` = MoMo part of a split.
+  const directPromptCharge = async (amount, isSplit) => {
+    setProcessing(true); setMomoStep('charging'); setMomoMessage('Sending prompt to ' + phone.trim() + '...')
+    try {
+      const ref = 'POS-' + Date.now().toString(36).toUpperCase()
+      const r = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=nalopay-charge', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phone.trim(), amount, reference: ref, customerName: 'Customer', description: 'POS sale' })
+      })
+      const j = await r.json()
+      if (!j.success) { setMomoStep('failed'); setMomoMessage(j.error || 'Could not send prompt. Try again.'); setProcessing(false); return }
+      const naloId = j.nalopayOrderId
+      setMomoStep('waiting')
+      setMomoMessage(`Prompt sent to ${phone.trim()}.\nAmount: ${money(amount)}\n\nCustomer approves with their MoMo PIN.`)
+
+      // Poll NaloPay directly for this charge's status.
+      let tries = 0
+      if (pollRef.current) clearInterval(pollRef.current)
+      pollRef.current = setInterval(async () => {
+        tries++
+        if (tries > 40) { clearInterval(pollRef.current); return } // ~2 min then stop polling
+        try {
+          const sr = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=nalopay-status', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nalopayOrderId: naloId })
+          })
+          const sj = await sr.json()
+          const st = String(sj.status || sj.data?.status || '').toUpperCase()
+          if (['PAID', 'SUCCESS', 'SUCCESSFUL', 'COMPLETED'].includes(st)) {
+            clearInterval(pollRef.current)
+            const saleData = await recordSale(isSplit ? 'Split' : 'Momo', isSplit ? { splitCash: num(splitCash), splitMomo: amount } : {})
+            if (saleData) { toast.success('Paid! ' + saleData.receiptNo); finishSale(saleData) }
+          }
+        } catch {}
+      }, 3000)
+      setProcessing(false)
+    } catch (e) { setMomoStep('failed'); setMomoMessage('Error: ' + (e?.message || '')); setProcessing(false) }
   }
 
   // Create a WhatsApp order with USSD code for payment
@@ -269,8 +326,10 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
 
   // Block "Complete Sale" if no phone
   const handleOpenPayment = () => {
-    if (!phoneValid) { toast.error('Enter phone number first'); return }
     if (cnt === 0) return
+    // Reset selection each time the payment sheet opens.
+    setSplitMode(false); setSplitCash(''); setPhone('')
+    setPayMethod(isWhatsApp ? 'WhatsApp' : '') // no method pre-selected for walk-in
     setPayOpen(true)
   }
 
@@ -341,24 +400,16 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             </div>
           </div>
 
-          {/* Phone - REQUIRED */}
-          <div className="relative mb-3">
-            <input type="tel" className={`w-full h-11 px-4 bg-gray-50 border rounded-xl text-sm font-medium focus:outline-none placeholder:text-gray-300 ${phoneValid ? 'border-green-300 bg-green-50/30' : 'border-red-300 bg-red-50/30'}`}
-              placeholder="Customer phone number (required)" value={phone} onChange={e => setPhone(e.target.value)} />
-            {phoneValid && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 text-sm">✓</span>}
-          </div>
-          {!phoneValid && phone.length > 0 && <p className="text-red-500 text-xs font-medium mb-2 -mt-1">Enter at least 9 digits</p>}
-
           {/* WhatsApp order toggle — tags the order + prepares an address-form link to send */}
-          <button onClick={() => setIsWhatsApp(v => { const nv = !v; if (nv) { setPayMethod('USSD'); setSplitMode(false); setSplitCash('') } return nv })} className={`w-full flex items-center gap-3 h-11 px-4 rounded-xl border mb-3 transition ${isWhatsApp ? 'border-[#0e7c86] bg-[#0e7c86]/5' : 'border-gray-200 bg-gray-50'}`}>
+          <button onClick={() => setIsWhatsApp(v => !v)} className={`w-full flex items-center gap-3 h-11 px-4 rounded-xl border mb-3 transition ${isWhatsApp ? 'border-[#0e7c86] bg-[#0e7c86]/5' : 'border-gray-200 bg-gray-50'}`}>
             <div className={`w-5 h-5 rounded-md flex items-center justify-center ${isWhatsApp ? 'bg-[#0e7c86]' : 'border-2 border-gray-300'}`}>
               {isWhatsApp && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>}
             </div>
             <span className={`text-sm font-semibold ${isWhatsApp ? 'text-[#0e7c86]' : 'text-gray-500'}`}>WhatsApp delivery order</span>
-            <span className="ml-auto text-[10px] text-gray-400">{isWhatsApp ? 'address link will be sent' : 'walk-in'}</span>
+            <span className="ml-auto text-[10px] text-gray-400">{isWhatsApp ? 'send code + address link' : 'walk-in'}</span>
           </button>
 
-          <button onClick={handleOpenPayment} disabled={cnt === 0 || !phoneValid}
+          <button onClick={handleOpenPayment} disabled={cnt === 0}
             className="w-full h-12 bg-gray-900 hover:bg-gray-800 rounded-xl text-white text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all ">
             Complete Sale · {money(total)}
           </button>
@@ -377,60 +428,92 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
               <div className="text-xs text-gray-400 mt-1">{phone}</div>
             </div>
 
-            {/* Payment Methods — WhatsApp orders are USSD-only */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-400 mb-2.5">Payment Method {isWhatsApp && <span className="text-[#0e7c86] font-bold">· USSD only (WhatsApp)</span>}</label>
-              <div className={`grid gap-2.5 ${isWhatsApp ? 'grid-cols-1' : 'grid-cols-3'}`}>
-                {[
-                  { id: 'Split', label: 'Split', sub: 'Cash + USSD',
-                    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h18M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg> },
-                  { id: 'Cash', label: 'Cash', sub: 'At counter',
-                    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg> },
-                  { id: 'USSD', label: 'USSD', sub: 'MoMo prompt',
-                    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M11 18h2"/></svg> },
-                ].filter(m => !isWhatsApp || m.id === 'USSD').map(m => {
-                  const active = isWhatsApp ? true : (m.id === 'Split' ? splitMode : (!splitMode && payMethod === m.id))
-                  return (
-                    <button key={m.id} onClick={() => { if (m.id === 'Split') { setSplitMode(true); setSplitCash('') } else { setPayMethod(m.id); setSplitMode(false) } }}
-                      className={`h-24 rounded-2xl text-sm font-bold border-2 flex flex-col items-center justify-center gap-1.5 transition-all ${active ? 'bg-[#16181d] text-white border-[#16181d] shadow-md' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
-                      <span>{m.icon}</span>
-                      <span>{m.label}</span>
-                      <span className={`text-[10px] font-medium ${active ? 'opacity-70' : 'opacity-40'}`}>{m.sub}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* USSD Info */}
-            {!splitMode && payMethod === 'USSD' && (
-              <div className="bg-[#f1f5f2] rounded-xl p-3.5 border border-[#bcd1c5]">
-                <div className="text-sm font-bold text-[#16181d] mb-1">USSD Payment</div>
-                <div className="text-xs text-gray-500">A USSD code is generated and sent to the customer by SMS. They dial it to pay via MoMo. The receipt prints once payment is confirmed.</div>
+            {/* WALK-IN: pick a payment method (Split / Cash / Momo direct prompt) */}
+            {!isWhatsApp && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-2.5">Payment Method</label>
+                <div className="grid gap-2.5 grid-cols-3">
+                  {[
+                    { id: 'Split', label: 'Split', sub: 'Cash + MoMo',
+                      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h18M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg> },
+                    { id: 'Cash', label: 'Cash', sub: 'At counter',
+                      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg> },
+                    { id: 'Momo', label: 'MoMo', sub: 'Direct prompt',
+                      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M11 18h2"/></svg> },
+                  ].map(m => {
+                    const active = m.id === 'Split' ? splitMode : (!splitMode && payMethod === m.id)
+                    return (
+                      <button key={m.id} onClick={() => { if (m.id === 'Split') { setSplitMode(true); setSplitCash('') } else { setPayMethod(m.id); setSplitMode(false) } }}
+                        className={`h-24 rounded-2xl text-sm font-bold border-2 flex flex-col items-center justify-center gap-1.5 transition-all ${active ? 'bg-[#16181d] text-white border-[#16181d] shadow-md' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                        <span>{m.icon}</span>
+                        <span>{m.label}</span>
+                        <span className={`text-[10px] font-medium ${active ? 'opacity-70' : 'opacity-40'}`}>{m.sub}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             )}
 
-            {/* Split Details — Cash + USSD (MoMo) */}
-            {splitMode && (
+            {/* CASH: ask for phone (needed for the receipt) */}
+            {!isWhatsApp && !splitMode && payMethod === 'Cash' && (
+              <div className="bg-[#f6f6f5] rounded-xl p-4 border border-gray-200 space-y-2">
+                <label className="block text-xs font-semibold text-gray-500">Customer phone number</label>
+                <input type="tel" inputMode="tel" autoFocus className="w-full h-12 px-4 bg-white border-2 border-gray-200 rounded-xl text-base font-semibold focus:outline-none focus:border-gray-400" placeholder="024 000 0000" value={phone} onChange={e => setPhone(e.target.value)} />
+                <p className="text-xs text-gray-400">Required for the receipt.</p>
+              </div>
+            )}
+
+            {/* MOMO: ask for the customer's MoMo number — direct prompt goes here */}
+            {!isWhatsApp && !splitMode && payMethod === 'Momo' && (
+              <div className="bg-[#0e7c86]/5 rounded-xl p-4 border border-[#0e7c86]/30 space-y-2">
+                <label className="block text-xs font-semibold text-[#0e7c86]">Customer MoMo number</label>
+                <input type="tel" inputMode="tel" autoFocus className="w-full h-12 px-4 bg-white border-2 border-[#0e7c86]/40 rounded-xl text-base font-bold focus:outline-none focus:border-[#0e7c86]" placeholder="024 000 0000" value={phone} onChange={e => setPhone(e.target.value)} />
+                <p className="text-xs text-gray-500">A payment prompt is sent straight to this number. The customer approves with their MoMo PIN — no code to dial.</p>
+              </div>
+            )}
+
+            {/* SPLIT: cash amount + phone for the MoMo portion (direct prompt) */}
+            {!isWhatsApp && splitMode && (
               <div className="bg-[#f6f6f5] rounded-xl p-4 border border-gray-200 space-y-3">
                 <div className="text-sm font-bold text-[#16181d]">Split Payment · {money(total)}</div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1.5">Cash Amount</label>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1.5">Cash Amount received</label>
                   <input type="number" inputMode="decimal" className="w-full h-11 px-4 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-gray-400" placeholder="0.00" value={splitCash} min={0} max={total} onChange={e => setSplitCash(e.target.value)} />
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                  <span className="text-sm font-semibold text-gray-500">USSD (MoMo) portion</span>
+                  <span className="text-sm font-semibold text-gray-500">MoMo (prompt) portion</span>
                   <span className="text-lg font-bold text-[#16181d]">{money(Math.max(0, splitRemainder))}</span>
                 </div>
-                <div className="text-xs text-gray-400">Cash collected at the counter. A USSD code is sent for the MoMo portion.</div>
+                {splitRemainder > 0 && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1.5">Customer MoMo number</label>
+                    <input type="tel" inputMode="tel" className="w-full h-11 px-4 bg-white border-2 border-[#0e7c86]/40 rounded-xl text-sm font-bold focus:outline-none focus:border-[#0e7c86]" placeholder="024 000 0000" value={phone} onChange={e => setPhone(e.target.value)} />
+                    <p className="text-xs text-gray-400 mt-1">A prompt is sent to this number for the MoMo portion.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* WHATSAPP: ask for phone, then Complete gives Copy code + delivery link */}
+            {isWhatsApp && (
+              <div className="bg-[#0e7c86]/5 rounded-xl p-4 border border-[#0e7c86]/30 space-y-2">
+                <label className="block text-xs font-semibold text-[#0e7c86]">Customer phone number</label>
+                <input type="tel" inputMode="tel" autoFocus className="w-full h-12 px-4 bg-white border-2 border-[#0e7c86]/40 rounded-xl text-base font-bold focus:outline-none focus:border-[#0e7c86]" placeholder="024 000 0000" value={phone} onChange={e => setPhone(e.target.value)} />
+                <p className="text-xs text-gray-500">A USSD code + delivery-details link will be prepared to send to the customer.</p>
               </div>
             )}
 
             {momoStep === 'failed' && <div className="bg-red-50 rounded-xl p-3.5 text-red-600 text-sm font-medium border border-red-100"> {momoMessage}</div>}
 
-            <button onClick={handleCompleteSale} disabled={processing}
+            <button onClick={handleCompleteSale} disabled={processing || (!isWhatsApp && !splitMode && !payMethod)}
               className="w-full h-12 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm">
-              {processing ? 'Processing...' : splitMode ? 'Confirm Split · Send USSD' : payMethod === 'Cash' ? 'Confirm Cash Payment' : 'Generate & Send USSD Code'}
+              {processing ? 'Processing...'
+                : isWhatsApp ? 'Complete · Prepare WhatsApp'
+                : splitMode ? 'Confirm Split · Send Prompt'
+                : payMethod === 'Cash' ? 'Confirm Cash Payment'
+                : payMethod === 'Momo' ? 'Pay · Send Prompt'
+                : 'Select a payment method'}
             </button>
           </>)}
 
