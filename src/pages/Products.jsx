@@ -27,16 +27,31 @@ export default function Products() {
     if (!form.name.trim()) { toast.error('Enter name'); return }
     setLoading(true, 'Saving...'); const sb = getSupabase(); let imageUrl = form.existingImage || ''
     if (form.file) {
-      // Upload to Supabase storage (permanent, owned by us — no third-party
-      // free-tier deactivation risk). ImageKit still optimizes on delivery.
+      // Upload the image via the edge function (service role — always has write
+      // access, no dependency on browser RLS). Falls back to a direct browser
+      // upload if the edge call fails.
       try {
-        const ext = (form.file.name.split('.').pop() || 'jpg').toLowerCase()
-        const path = `products/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
-        const { error: upErr } = await sb.storage.from('product-images').upload(path, form.file, { cacheControl: '31536000', upsert: true, contentType: form.file.type || 'image/jpeg' })
-        if (upErr) { console.error('Upload error:', upErr); toast.error('Upload: ' + (upErr.message || 'failed')); setLoading(false); return }
-        const { data: urlData } = sb.storage.from('product-images').getPublicUrl(path)
-        if (urlData?.publicUrl) imageUrl = urlData.publicUrl
-        else { toast.error('Could not get image URL'); setLoading(false); return }
+        const file = form.file
+        if (file.size > 6 * 1024 * 1024) { toast.error('Image too large (max 6MB)'); setLoading(false); return }
+        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+        // file -> base64
+        const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(file) })
+        let ok = false
+        try {
+          const r = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=upload-image', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data: b64, contentType: file.type || 'image/jpeg', ext })
+          })
+          const j = await r.json()
+          if (j.success && j.url) { imageUrl = j.url; ok = true } else console.error('Edge upload failed:', j.error)
+        } catch (e) { console.error('Edge upload error:', e) }
+        // Fallback: direct browser upload.
+        if (!ok) {
+          const path = `products/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+          const { error: upErr } = await sb.storage.from('product-images').upload(path, file, { cacheControl: '31536000', upsert: true, contentType: file.type || 'image/jpeg' })
+          if (upErr) { toast.error('Upload failed: ' + (upErr.message || '')); setLoading(false); return }
+          imageUrl = `https://noiiuwkovoojkcwzupye.supabase.co/storage/v1/object/public/product-images/${path}`
+        }
       } catch (e) { console.error('Image upload failed:', e); toast.error('Image upload failed: ' + (e?.message || '')); setLoading(false); return }
     }
     const data = { name: form.name.trim(), category: form.category.trim(), cost_price: num(form.costPrice), price: num(form.price), wholesale_price: num(form.wholesalePrice), wholesale_min_qty: num(form.wholesaleMinQty), quantity: num(form.quantity), group_tag: form.groupTag.trim().toLowerCase(), image: imageUrl }
