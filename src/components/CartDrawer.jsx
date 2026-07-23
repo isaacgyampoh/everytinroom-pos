@@ -158,35 +158,45 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
   const directPromptCharge = async (amount, isSplit) => {
     setProcessing(true); setMomoStep('charging'); setMomoMessage('Sending prompt to ' + phone.trim() + '...')
     try {
+      const sb = getSupabase()
       const ref = 'POS-' + Date.now().toString(36).toUpperCase()
+      const items = cart.map(c => ({ name: c.name, qty: c.qty, price: c.price, lineTotal: c.lineTotal, productId: c.productId }))
+      // DURABLE order row FIRST — so NaloPay's callback and the 20s reconcile can
+      // always find and confirm this payment even if this screen dies mid-flow.
+      // stock_deducted=true because stock for POS sales is deducted by record_sale
+      // (once, at receipt time) — prevents double deduction by deduct_order_stock.
+      const { data: inserted, error: insErr } = await sb.from('whatsapp_orders').insert({
+        order_no: ref, date: new Date().toISOString(),
+        customer_name: phone.trim(), customer_phone: phone.trim(),
+        items: JSON.stringify(items), subtotal: total, total: amount,
+        notes: isSplit ? `Split: Cash ${money(num(splitCash))}, MoMo ${money(amount)} (direct prompt)` : 'POS direct prompt',
+        status: 'Pending', paystack_ref: ref, source: 'walkin', details_filled: false, stock_deducted: true,
+      }).select('id').single()
+      if (insErr || !inserted?.id) { setMomoStep('failed'); setMomoMessage('Could not create order: ' + (insErr?.message || '')); setProcessing(false); return }
+
       const r = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=nalopay-charge', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone.trim(), amount, reference: ref, customerName: 'Customer', description: 'POS sale' })
+        body: JSON.stringify({ phone: phone.trim(), amount, reference: ref, orderNo: ref, orderId: inserted.id, customerName: 'Customer', description: 'POS sale ' + ref })
       })
       const j = await r.json()
       if (!j.success) { setMomoStep('failed'); setMomoMessage(j.error || 'Could not send prompt. Try again.'); setProcessing(false); return }
-      const naloId = j.nalopayOrderId
       setWaitMode('prompt')
       setMomoStep('waiting')
       setMomoMessage(`Prompt sent to ${phone.trim()}.\nAmount: ${money(amount)}\n\nCustomer approves with their MoMo PIN.`)
 
-      // Poll NaloPay directly for this charge's status.
+      // Poll the ORDER (callback or reconcile flips it) — durable server truth.
+      // No auto-close: waits until paid or the cashier cancels (up to 10 min).
       let tries = 0
       if (pollRef.current) clearInterval(pollRef.current)
       pollRef.current = setInterval(async () => {
         tries++
-        if (tries > 40) { clearInterval(pollRef.current); return } // ~2 min then stop polling
+        if (tries > 200) { clearInterval(pollRef.current); return }
         try {
-          const sr = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=nalopay-status', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nalopayOrderId: naloId })
-          })
-          const sj = await sr.json()
-          const st = String(sj.status || sj.data?.status || '').toUpperCase()
-          if (['PAID', 'SUCCESS', 'SUCCESSFUL', 'COMPLETED'].includes(st)) {
+          const { data } = await sb.from('whatsapp_orders').select('status').eq('id', inserted.id).limit(1)
+          const st = data?.[0]?.status
+          if (st === 'Paid' || st === 'Completed') {
             clearInterval(pollRef.current)
             const saleData = await recordSale(isSplit ? 'Split' : 'Momo', isSplit ? { splitCash: num(splitCash), splitMomo: amount } : {})
-            // Thank-you SMS (only after payment succeeds).
             try { fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=thankyou-sms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: phone.trim() }) }) } catch {}
             if (saleData) { toast.success('Paid! ' + saleData.receiptNo); finishSale(saleData) }
           }
