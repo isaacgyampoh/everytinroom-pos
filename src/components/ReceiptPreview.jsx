@@ -14,7 +14,7 @@ export default function ReceiptPreview({ sale, onClose }) {
       body { width: 72mm; font-family: 'Arial', sans-serif; font-size: 12px; line-height: 1.4; padding: 3mm 2mm; margin: 0 auto; }
 
       .hdr { text-align: center; padding-bottom: 4mm; border-bottom: 1px dashed #000; }
-      .shop-name { font-size: 16px; font-weight: 900; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; }
+      .shop-name { font-size: 21px; font-weight: 900; letter-spacing: 1px; white-space: nowrap; overflow: hidden; -webkit-text-stroke: 0.4px #000; }
       .shop-info { font-size: 10px; margin-top: 1px; }
 
       .title { text-align: center; font-size: 13px; font-weight: 900; margin: 3mm 0; letter-spacing: 2px; }
@@ -45,7 +45,7 @@ export default function ReceiptPreview({ sale, onClose }) {
       .footer { text-align: center; border-top: 1px dashed #000; padding-top: 3mm; margin-top: 4mm; font-size: 10px; line-height: 1.6; }
 
       body { position: relative; }
-      .wm { position: absolute; inset: 0; z-index: 0; overflow: hidden; opacity: 0.07; font-weight: 700; font-size: 9px; letter-spacing: 1px; line-height: 20px; word-spacing: 8px; word-break: break-all; pointer-events: none; }
+      .wm { position: absolute; inset: 0; z-index: 0; overflow: hidden; opacity: 0.16; font-weight: 700; font-size: 9px; letter-spacing: 1px; line-height: 20px; word-spacing: 8px; word-break: break-all; pointer-events: none; }
       .rc { position: relative; z-index: 1; }
 
       @media print { @page { size: 80mm auto; margin: 0; } body { width: 72mm; } }
