@@ -44,11 +44,18 @@ export default function ReceiptPreview({ sale, onClose }) {
 
       .footer { text-align: center; border-top: 1px dashed #000; padding-top: 3mm; margin-top: 4mm; font-size: 10px; line-height: 1.6; }
 
+      body { position: relative; }
+      .wm { position: absolute; inset: 0; z-index: 0; overflow: hidden; opacity: 0.07; font-weight: 700; font-size: 9px; letter-spacing: 1px; line-height: 20px; word-spacing: 8px; word-break: break-all; pointer-events: none; }
+      .rc { position: relative; z-index: 1; }
+
       @media print { @page { size: 80mm auto; margin: 0; } body { width: 72mm; } }
     </style></head><body>
 
+      <div class="wm">${'everytinroom '.repeat(700)}</div>
+      <div class="rc">
+
       <div class="hdr">
-        <div class="shop-name">${SHOP.name}</div>
+        <div class="shop-name">EVERYTINROOM</div>
         <div class="shop-info">${SHOP.address}</div>
         <div class="shop-info">Tel: ${SHOP.phone}</div>
         <div class="shop-info">${SHOP.website}</div>
@@ -93,6 +100,8 @@ export default function ReceiptPreview({ sale, onClose }) {
         <p>Thank you for shopping with us!</p>
         <p>${SHOP.website}</p>
         <p style="color:#999!important;margin-top:2mm;">Goods sold are not returnable</p>
+      </div>
+
       </div>
 
     </body></html>`)
