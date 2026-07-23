@@ -23,6 +23,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
   const [showHeld, setShowHeld] = useState(false)
   const [momoStep, setMomoStep] = useState('idle')
   const [waitMode, setWaitMode] = useState('ussd') // 'ussd' | 'prompt'
+  const [promptOrderId, setPromptOrderId] = useState(null)
   const [otpValue, setOtpValue] = useState('')
   const [moolreCtx, setMoolreCtx] = useState(null)
   const [otpSubmitting, setOtpSubmitting] = useState(false)
@@ -63,6 +64,8 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
 
   const finishSale = (saleData) => {
     clearCart(); setDiscount(0); setPhone(''); setPayOpen(false); setSplitMode(false); setSplitCash(''); setMomoStep('idle'); setMomoMessage('')
+    setIsWhatsApp(false); setWaCtx(null); setWaitMode('ussd'); setPromptOrderId(null); setPayMethod('')
+    if (pollRef.current) clearInterval(pollRef.current)
     onClose()
     if (onReceipt) onReceipt(saleData)
   }
@@ -173,6 +176,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
         status: 'Pending', paystack_ref: ref, source: 'walkin', details_filled: false, stock_deducted: true,
       }).select('id').single()
       if (insErr || !inserted?.id) { setMomoStep('failed'); setMomoMessage('Could not create order: ' + (insErr?.message || '')); setProcessing(false); return }
+      setPromptOrderId(inserted.id)
 
       const r = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=nalopay-charge', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -302,20 +306,17 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
         setWaCtx(null)
       }
       
-      // Poll for payment
+      // Poll for payment. WhatsApp orders are DELIVERY orders: the sales record
+      // is created at packaging (complete_wa_order) — do NOT record a POS sale
+      // here or it would be double-counted. Just confirm and reset.
       if (pollRef.current) clearInterval(pollRef.current)
       pollRef.current = setInterval(async () => {
         const { data } = await sb.from('whatsapp_orders').select('status').eq('ussd_code', uc).limit(1)
         if (data?.[0]?.status === 'Paid' || data?.[0]?.status === 'Completed') {
           clearInterval(pollRef.current)
           if (autoCloseRef.current) clearTimeout(autoCloseRef.current)
-          if (!isSplit) {
-            const saleData = await recordSale('Momo')
-            if (saleData) { toast.success('USSD Payment confirmed! ' + saleData.receiptNo); finishSale(saleData) }
-          } else {
-            toast.success('USSD Payment confirmed!')
-            finishSale(null)
-          }
+          toast.success('Payment confirmed — order is Paid')
+          finishSale(null)
         }
       }, 5000)
 
@@ -560,7 +561,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
               <h3 className="text-lg font-bold text-gray-900 mb-1">Waiting for payment</h3>
               <p className="text-sm text-gray-500 mb-1" style={{ whiteSpace: 'pre-line' }}>{momoMessage}</p>
               <p className="text-xs text-gray-400 mb-6">The receipt prints automatically once the customer approves on their phone.</p>
-              <button onClick={() => { if (pollRef.current) clearInterval(pollRef.current); setMomoStep('idle'); setMomoMessage('') }} className="px-6 py-3 border border-gray-300 rounded-xl text-sm font-semibold text-gray-600">Cancel order</button>
+              <button onClick={async () => { if (pollRef.current) clearInterval(pollRef.current); if (promptOrderId) { try { await getSupabase().from('whatsapp_orders').update({ status: 'Cancelled', notes: 'Cancelled by cashier' }).eq('id', promptOrderId).eq('status', 'Pending') } catch {} } setPromptOrderId(null); setMomoStep('idle'); setMomoMessage('') }} className="px-6 py-3 border border-gray-300 rounded-xl text-sm font-semibold text-gray-600">Cancel order</button>
             </div>
           )}
 
