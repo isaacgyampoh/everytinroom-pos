@@ -24,6 +24,8 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
   const [momoStep, setMomoStep] = useState('idle')
   const [waitMode, setWaitMode] = useState('ussd') // 'ussd' | 'prompt'
   const [promptOrderId, setPromptOrderId] = useState(null)
+  const [cashReceived, setCashReceived] = useState('')
+  const [waitSecs, setWaitSecs] = useState(0)
   const [otpValue, setOtpValue] = useState('')
   const [moolreCtx, setMoolreCtx] = useState(null)
   const [otpSubmitting, setOtpSubmitting] = useState(false)
@@ -43,6 +45,13 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
   useEffect(() => {
     if (payOpen) broadcastDisplay({ status: 'paying', total, count: cnt, subtotal: sub, items: cart.map(c => ({ name: c.name, qty: c.qty, price: c.price, lineTotal: c.lineTotal, image: c.image || '' })) })
   }, [payOpen]) // eslint-disable-line
+
+  // Elapsed-seconds counter for the direct-prompt waiting screen.
+  useEffect(() => {
+    if (momoStep !== 'waiting' || waitMode !== 'prompt') { setWaitSecs(0); return }
+    const t = setInterval(() => setWaitSecs(x => x + 1), 1000)
+    return () => clearInterval(t)
+  }, [momoStep, waitMode])
   useEffect(() => { localStorage.setItem('heldCarts', JSON.stringify(heldCarts)) }, [heldCarts])
 
   const recordSale = async (paymentMethod, extraData = {}) => {
@@ -64,7 +73,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
 
   const finishSale = (saleData) => {
     clearCart(); setDiscount(0); setPhone(''); setPayOpen(false); setSplitMode(false); setSplitCash(''); setMomoStep('idle'); setMomoMessage('')
-    setIsWhatsApp(false); setWaCtx(null); setWaitMode('ussd'); setPromptOrderId(null); setPayMethod('')
+    setIsWhatsApp(false); setWaCtx(null); setWaitMode('ussd'); setPromptOrderId(null); setPayMethod(''); setCashReceived('')
     if (pollRef.current) clearInterval(pollRef.current)
     onClose()
     if (onReceipt) onReceipt(saleData)
@@ -344,7 +353,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
   const handleOpenPayment = () => {
     if (cnt === 0) return
     // Reset selection each time the payment sheet opens.
-    setSplitMode(false); setSplitCash(''); setPhone('')
+    setSplitMode(false); setSplitCash(''); setPhone(''); setCashReceived('')
     setPayMethod(isWhatsApp ? 'WhatsApp' : '') // no method pre-selected for walk-in
     setPayOpen(true)
   }
@@ -473,10 +482,25 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
 
             {/* CASH: ask for phone (needed for the receipt) */}
             {!isWhatsApp && !splitMode && payMethod === 'Cash' && (
-              <div className="bg-[#f6f6f5] rounded-xl p-4 border border-gray-200 space-y-2">
-                <label className="block text-xs font-semibold text-gray-500">Customer phone number</label>
-                <input type="tel" inputMode="tel" autoFocus className="w-full h-12 px-4 bg-white border-2 border-gray-200 rounded-xl text-base font-semibold focus:outline-none focus:border-gray-400" placeholder="024 000 0000" value={phone} onChange={e => setPhone(e.target.value)} />
-                <p className="text-xs text-gray-400">Required for the receipt.</p>
+              <div className="bg-[#f6f6f5] rounded-xl p-4 border border-gray-200 space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1.5">Customer phone number</label>
+                  <input type="tel" inputMode="tel" autoFocus className={`w-full h-12 px-4 bg-white border-2 rounded-xl text-base font-semibold focus:outline-none ${phoneValid ? 'border-green-400' : 'border-gray-200 focus:border-gray-400'}`} placeholder="024 000 0000" value={phone} onChange={e => setPhone(e.target.value)} />
+                  <p className="text-xs text-gray-400 mt-1">Required for the receipt.</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1.5">Amount received (optional)</label>
+                  <input type="number" inputMode="decimal" className="w-full h-11 px-4 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-gray-400" placeholder="0.00" value={cashReceived} onChange={e => setCashReceived(e.target.value)} />
+                  {num(cashReceived) >= total && num(cashReceived) > 0 && (
+                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-200">
+                      <span className="text-sm font-semibold text-gray-500">Change</span>
+                      <span className="text-xl font-bold text-[#16181d]">{money(num(cashReceived) - total)}</span>
+                    </div>
+                  )}
+                  {num(cashReceived) > 0 && num(cashReceived) < total && (
+                    <p className="text-xs text-red-500 font-medium mt-1.5">Short by {money(total - num(cashReceived))}</p>
+                  )}
+                </div>
               </div>
             )}
 
@@ -484,7 +508,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             {!isWhatsApp && !splitMode && payMethod === 'Momo' && (
               <div className="bg-[#0e7c86]/5 rounded-xl p-4 border border-[#0e7c86]/30 space-y-2">
                 <label className="block text-xs font-semibold text-[#0e7c86]">Customer MoMo number</label>
-                <input type="tel" inputMode="tel" autoFocus className="w-full h-12 px-4 bg-white border-2 border-[#0e7c86]/40 rounded-xl text-base font-bold focus:outline-none focus:border-[#0e7c86]" placeholder="024 000 0000" value={phone} onChange={e => setPhone(e.target.value)} />
+                <input type="tel" inputMode="tel" autoFocus className={`w-full h-12 px-4 bg-white border-2 rounded-xl text-base font-bold focus:outline-none ${phoneValid ? 'border-green-400' : 'border-[#0e7c86]/40 focus:border-[#0e7c86]'}`} placeholder="024 000 0000" value={phone} onChange={e => setPhone(e.target.value)} />
                 <p className="text-xs text-gray-500">A payment prompt is sent straight to this number. The customer approves with their MoMo PIN — no code to dial.</p>
               </div>
             )}
@@ -504,7 +528,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                 {splitRemainder > 0 && (
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1.5">Customer MoMo number</label>
-                    <input type="tel" inputMode="tel" className="w-full h-11 px-4 bg-white border-2 border-[#0e7c86]/40 rounded-xl text-sm font-bold focus:outline-none focus:border-[#0e7c86]" placeholder="024 000 0000" value={phone} onChange={e => setPhone(e.target.value)} />
+                    <input type="tel" inputMode="tel" className={`w-full h-11 px-4 bg-white border-2 rounded-xl text-sm font-bold focus:outline-none ${phoneValid ? 'border-green-400' : 'border-[#0e7c86]/40 focus:border-[#0e7c86]'}`} placeholder="024 000 0000" value={phone} onChange={e => setPhone(e.target.value)} />
                     <p className="text-xs text-gray-400 mt-1">A prompt is sent to this number for the MoMo portion.</p>
                   </div>
                 )}
@@ -515,7 +539,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             {isWhatsApp && (
               <div className="bg-[#0e7c86]/5 rounded-xl p-4 border border-[#0e7c86]/30 space-y-2">
                 <label className="block text-xs font-semibold text-[#0e7c86]">Customer phone number</label>
-                <input type="tel" inputMode="tel" autoFocus className="w-full h-12 px-4 bg-white border-2 border-[#0e7c86]/40 rounded-xl text-base font-bold focus:outline-none focus:border-[#0e7c86]" placeholder="024 000 0000" value={phone} onChange={e => setPhone(e.target.value)} />
+                <input type="tel" inputMode="tel" autoFocus className={`w-full h-12 px-4 bg-white border-2 rounded-xl text-base font-bold focus:outline-none ${phoneValid ? 'border-green-400' : 'border-[#0e7c86]/40 focus:border-[#0e7c86]'}`} placeholder="024 000 0000" value={phone} onChange={e => setPhone(e.target.value)} />
                 <p className="text-xs text-gray-500">A USSD code + delivery-details link will be prepared to send to the customer.</p>
               </div>
             )}
@@ -559,7 +583,8 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             <div className="text-center py-8">
               <div className="w-14 h-14 border-4 border-gray-200 border-t-gray-700 rounded-full animate-spin mx-auto mb-5" />
               <h3 className="text-lg font-bold text-gray-900 mb-1">Waiting for payment</h3>
-              <p className="text-sm text-gray-500 mb-1" style={{ whiteSpace: 'pre-line' }}>{momoMessage}</p>
+              <p className="text-3xl font-bold text-[#16181d] mb-2">{money(splitMode ? splitRemainder : total)}</p>
+              <p className="text-sm text-gray-500 mb-1">Prompt sent to {phone.trim()} · {waitSecs}s</p>
               <p className="text-xs text-gray-400 mb-6">The receipt prints automatically once the customer approves on their phone.</p>
               <button onClick={async () => { if (pollRef.current) clearInterval(pollRef.current); if (promptOrderId) { try { await getSupabase().from('whatsapp_orders').update({ status: 'Cancelled', notes: 'Cancelled by cashier' }).eq('id', promptOrderId).eq('status', 'Pending') } catch {} } setPromptOrderId(null); setMomoStep('idle'); setMomoMessage('') }} className="px-6 py-3 border border-gray-300 rounded-xl text-sm font-semibold text-gray-600">Cancel order</button>
             </div>
