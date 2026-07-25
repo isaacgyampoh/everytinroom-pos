@@ -33,7 +33,7 @@ export const thumb = (url, w) => {
 }
 
 export const SHOP = {
-  name: 'EVERYTINROOM&BEDTIME',
+  name: 'EVERYTINROOM',
   tagline: '',
   phone: '024 531 5581 / 024 936 5339',
   address: 'Adenta Aviation Road, Accra',

@@ -72,7 +72,7 @@ export default function DeliveryDetails() {
         <div className="text-sm font-semibold text-gray-900 mt-1">{form.name}</div>
         <div className="text-sm text-gray-600 whitespace-pre-line mt-0.5">{form.address}{form.landmark ? `\nLandmark: ${form.landmark}` : ''}</div>
       </div>
-      <p className="text-gray-400 text-xs mt-6">EVERYTINROOM & BEDTIME · 024 531 5581</p>
+      <p className="text-gray-400 text-xs mt-6">EVERYTINROOM · 024 531 5581</p>
     </div>
   )
 

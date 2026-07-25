@@ -308,7 +308,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
       // delivery-details link so the customer can fill their address (no payment link).
       if (isWhatsApp) {
         const detailsLink = `${window.location.origin}/#/details/${orderNo}`
-        const payMsg = `Hello! Your EVERYTINROOM order is GHS ${money(amount)}.\n\nTo PAY, simply dial:\n*920*141*${uc}#\n\nEnter your MoMo PIN to approve. Thank you!\nEVERYTINROOM & BEDTIME · 024 531 5581`
+        const payMsg = `Hello! Your EVERYTINROOM order is GHS ${money(amount)}.\n\nTo PAY, simply dial:\n*920*141*${uc}#\n\nEnter your MoMo PIN to approve. Thank you!\nEVERYTINROOM · 024 531 5581`
         const addrMsg = `Hi, please when you're done with the payment, just tap the link below to fill in your delivery details so we can deliver to you. Thank you.\n\n${detailsLink}`
         setWaCtx({ phone: phone.trim(), payMsg, addrMsg, link: detailsLink, code: `*920*141*${uc}#` })
       } else {

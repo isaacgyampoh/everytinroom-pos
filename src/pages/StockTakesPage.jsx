@@ -65,7 +65,7 @@ export default function StockTakesPage() {
         .sign { margin-top: 16px; }
       </style></head><body>
       <h1>STOCK COUNT SHEET</h1>
-      <div class="sub">EVERYTINROOM &amp; BEDTIME</div>
+      <div class="sub">EVERYTINROOM</div>
       <div class="meta"><span>${date}</span><span>${products.length} items</span></div>
       <table>
         <thead><tr><th>Product</th><th class="sys">Sys</th><th class="cnt">Count</th></tr></thead>

@@ -12,7 +12,7 @@ const GOLD = '#9a9da3'
 let _id = 0
 const uid = () => `arc${++_id}`
 
-export function Logo({ height = 96, color = INK, accent = GOLD, tagline = true, className = '' }) {
+export function Logo({ height = 96, color = INK, accent = GOLD, tagline = false, className = '' }) {
   const id = uid()
   // viewBox is wide; the arc path spans almost the full width so its arc-
   // length comfortably EXCEEDS the word — otherwise textPath clips the
@@ -24,7 +24,7 @@ export function Logo({ height = 96, color = INK, accent = GOLD, tagline = true, 
   const arcPath = `M ${pad} ${arcY} Q ${cx} ${arcY - arcLift} ${W - pad} ${arcY}`
   const ruleY = arcY + 22
   return (
-    <svg className={className} height={height} viewBox={`0 0 ${W} ${H}`} fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EVERYTINROOM & BEDTIME">
+    <svg className={className} height={height} viewBox={`0 0 ${W} ${H}`} fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EVERYTINROOM">
       <defs><path id={id} d={arcPath} /></defs>
       <text fill={color} fontFamily="'Inter', system-ui, sans-serif" fontWeight="700" fontSize="40" letterSpacing="3" style={{ fontOpticalSizing: 'auto' }}>
         <textPath href={`#${id}`} startOffset="50%" textAnchor="middle">EVERYTINROOM</textPath>
@@ -34,13 +34,13 @@ export function Logo({ height = 96, color = INK, accent = GOLD, tagline = true, 
       <line x1={cx + 14} y1={ruleY} x2={cx + 80} y2={ruleY} stroke={accent} strokeWidth="1.4" />
       {tagline && (
         <text x={cx} y={ruleY + 26} textAnchor="middle" fill={color} opacity="0.6"
-          fontFamily="'Inter', system-ui, sans-serif" fontWeight="600" fontSize="12" letterSpacing="6">&amp; BEDTIME</text>
+          fontFamily="'Inter', system-ui, sans-serif" fontWeight="600" fontSize="12" letterSpacing="6"></text>
       )}
     </svg>
   )
 }
 
-export function LogoFlat({ height = 44, color = INK, accent = GOLD, tagline = true, className = '' }) {
+export function LogoFlat({ height = 44, color = INK, accent = GOLD, tagline = false, className = '' }) {
   const id = uid()
   const W = 460, H = tagline ? 96 : 66
   const cx = W / 2
@@ -55,7 +55,7 @@ export function LogoFlat({ height = 44, color = INK, accent = GOLD, tagline = tr
       <line x1={cx + 14} y1={ruleY} x2={cx + 78} y2={ruleY} stroke={accent} strokeWidth="1.4" />
       {tagline && (
         <text x={cx} y={84} textAnchor="middle" fill={color} opacity="0.6"
-          fontFamily="'Inter', system-ui, sans-serif" fontWeight="600" fontSize="12" letterSpacing="6">&amp; BEDTIME</text>
+          fontFamily="'Inter', system-ui, sans-serif" fontWeight="600" fontSize="12" letterSpacing="6"></text>
       )}
     </svg>
   )
