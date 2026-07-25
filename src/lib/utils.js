@@ -35,7 +35,7 @@ export const thumb = (url, w) => {
 export const SHOP = {
   name: 'EVERYTINROOM',
   tagline: '',
-  phone: '024 531 5581 / 024 936 5339',
+  phone: '054 920 7471 / 024 531 5581',
   address: 'Adenta Aviation Road, Accra',
   addressFull: 'Aviation Road J382, Adenta, Accra, Ghana',
   mapsUrl: 'https://maps.google.com/?q=Everytinroom+Adenta+Aviation+Road+Accra+Ghana',
