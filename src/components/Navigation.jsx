@@ -29,6 +29,7 @@ const NAV = [
   { id: 'dash', label: 'Dashboard', admin: true },
   { id: 'pos', label: 'POS' },
   { id: 'whatsapp', label: 'WhatsApp', wa: true },
+  { id: 'wachats', label: 'WhatsApp AI', admin: true },
   { id: 'receipts', label: 'Receipts' },
   { id: 'refunds', label: 'Refunds' },
   { id: 'sep1', sep: true },

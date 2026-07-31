@@ -14,6 +14,7 @@ import toast from 'react-hot-toast'
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const POS = lazy(() => import('./pages/POS'))
 const WhatsAppOrders = lazy(() => import('./pages/WhatsAppOrders'))
+const WhatsAppChats = lazy(() => import('./pages/WhatsAppChats'))
 const Receipts = lazy(() => import('./pages/Receipts'))
 const Products = lazy(() => import('./pages/Products'))
 const StaffPage = lazy(() => import('./pages/StaffPage'))
@@ -214,6 +215,7 @@ export default function App() {
     dash: <Dashboard />,
     pos: <POS />,
     whatsapp: <WhatsAppOrders />,
+    wachats: <WhatsAppChats />,
     receipts: <Receipts onPrintReceipt={(s) => setReceipt({ receiptNo: s.receiptNo, date: s.date, customer: s.customer, cashier: s.cashier, payment: s.payment, type: s.type, items: s.items, total: s.total, discount: s.discount })} />,
     products: <Products />,
     staff: <StaffPage />,
