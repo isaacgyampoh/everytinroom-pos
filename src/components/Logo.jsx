@@ -1,7 +1,7 @@
 /**
  * EVERYTINROOM — typographic logo system (SVG, sharp at any size).
  *   <Logo />      arched "crest" wordmark (default) — EVERYTINROOM on a
- *                 gentle arc, "& BEDTIME" straight beneath.
+ *                 gentle arc.
  *   <LogoFlat />  straight one-line wordmark (clipping fixed).
  *   <LogoMark />  compact "E" monogram for square slots.
  */

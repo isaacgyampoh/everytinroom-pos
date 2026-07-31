@@ -375,10 +375,10 @@ serve(async (req) => {
               let custMsg = ''
               if (isPOS) {
                 // Walk-in customer — short and sweet
-                custMsg = `Thank you for shopping with us, ${firstName}!\n\nYour payment of GHS ${amount} has been received.\n\nWe appreciate your patronage.\n\nEVERYTINROOM & BEDTIME\nAviation Road J382, Adenta\n024 531 5581\nwww.erbliving.shop`
+                custMsg = `Thank you for shopping with us, ${firstName}!\n\nYour payment of GHS ${amount} has been received.\n\nWe appreciate your patronage.\n\nEVERYTINROOM\nAviation Road J382, Adenta\n024 531 5581\nwww.erbliving.shop`
               } else {
                 // Online customer — include order details and delivery info
-                custMsg = `Hi ${firstName}, thank you for your purchase of GHS ${amount}!\n\nOrder: ${order.order_no}\n\nYour order has been confirmed and is being processed. Our delivery team will contact you shortly.\n\nTrack your order: erbliving.shop/#/track\n\nEVERYTINROOM & BEDTIME\n024 531 5581\nwww.erbliving.shop`
+                custMsg = `Hi ${firstName}, thank you for your purchase of GHS ${amount}!\n\nOrder: ${order.order_no}\n\nYour order has been confirmed and is being processed. Our delivery team will contact you shortly.\n\nTrack your order: erbliving.shop/#/track\n\nEVERYTINROOM\n024 531 5581\nwww.erbliving.shop`
               }
               await sendSMS(order.customer_phone, custMsg)
               console.log('Customer SMS sent to:', order.customer_phone) 
