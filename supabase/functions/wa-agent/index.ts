@@ -11,7 +11,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://noiiuwkovoojkcwzup
 const SUPABASE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 const OPENAI_KEY = Deno.env.get('OPENAI_API_KEY') || ''
 const WASENDER_KEY = Deno.env.get('WASENDER_API_KEY') || ''
-const OWNER_PHONE = Deno.env.get('OWNER_PHONE') || '233533547740'  // owner alerts
+const OWNER_PHONE = Deno.env.get('OWNER_PHONE') || '233549207471'  // owner alerts (054 920 7471)
 
 const SHOP = 'EVERYTINROOM'
 const SHOP_PHONE = '054 920 7471'
@@ -19,10 +19,10 @@ const USSD_PREFIX = '*920*141*'   // NaloPay USSD; order code appended
 
 // Shop location (fill in real values). If SHOP_LAT/LNG are set, the agent sends
 // a native WhatsApp location pin; it always sends the Maps link + plain address.
-const SHOP_ADDRESS = Deno.env.get('SHOP_ADDRESS') || ''
-const SHOP_MAPS_LINK = Deno.env.get('SHOP_MAPS_LINK') || ''
-const SHOP_LAT = parseFloat(Deno.env.get('SHOP_LAT') || '0')
-const SHOP_LNG = parseFloat(Deno.env.get('SHOP_LNG') || '0')
+const SHOP_ADDRESS = Deno.env.get('SHOP_ADDRESS') || 'Aviation Road J382, Adenta, Accra'
+const SHOP_MAPS_LINK = Deno.env.get('SHOP_MAPS_LINK') || 'https://maps.google.com/?q=Everytinroom+Adenta+Aviation+Road+Accra+Ghana'
+const SHOP_LAT = parseFloat(Deno.env.get('SHOP_LAT') || '5.7089')
+const SHOP_LNG = parseFloat(Deno.env.get('SHOP_LNG') || '-0.1553')
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Content-Type': 'application/json' }
 
