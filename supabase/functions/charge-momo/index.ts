@@ -6,9 +6,8 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://noiiuwkovoojkcwzup
 const SUPABASE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 const SHOP = 'EVERYTINROOM'
 
-// NaloPay credentials (direct MoMo charge — no proxy needed)
-const NALOPAY_MERCHANT_ID = 'TimA4kiLJWoQ5cTXLf8EKh'
-// NaloPay credentials — read from Supabase secrets
+// NaloPay credentials — read from Supabase secrets (fallbacks are EVERYTINROOM's
+// own live keys, so nothing can route through another account).
 const NALOPAY_MERCHANT_ID = Deno.env.get('NALOPAY_MERCHANT_ID') || 'TimA4kiLJWoQ5cTXLf8EKh'
 const NALOPAY_API_KEY = Deno.env.get('NALOPAY_API_KEY') || '3b3c6f0e30ae457904167129b84d4595268e684921a930caa38695c2a3e28304'
 const NALOPAY_AUTH = Deno.env.get('NALOPAY_AUTH_HEADER') || 'Basic 2503ad8373e7fd5faea6fd18c9deb3d282e20c6b822d690465be37a23cf3396286092e17bdd86c0a7a0a8c1117542e5a2d751c4dc0f739597d59f8272871b171'
