@@ -37,6 +37,7 @@ const NAV = [
   { id: 'products', label: 'Products', perm: 'product_management' },
   { id: 'promos', label: 'Promos & Bundles', admin: true },
   { id: 'restock', label: 'Restock', perm: 'product_receiving' },
+  { id: 'receiving', label: 'Receiving', perm: 'product_receiving' },
   { id: 'stocktakes', label: 'Stock & Adjust', perm: 'stock_taking' },
   { id: 'sep2', sep: true },
   { id: 'invoices', label: 'Invoices', admin: true },

@@ -15,6 +15,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'))
 const POS = lazy(() => import('./pages/POS'))
 const WhatsAppOrders = lazy(() => import('./pages/WhatsAppOrders'))
 const WhatsAppChats = lazy(() => import('./pages/WhatsAppChats'))
+const ReceivingPage = lazy(() => import('./pages/ReceivingPage'))
 const Receipts = lazy(() => import('./pages/Receipts'))
 const Products = lazy(() => import('./pages/Products'))
 const StaffPage = lazy(() => import('./pages/StaffPage'))
@@ -41,6 +42,7 @@ const ADMIN_PAGES = ['products', 'staff', 'promos', 'invoices', 'stocktakes', 's
 const PAGE_PERMISSIONS = {
   products: 'product_management',
   restock: 'product_receiving',
+  receiving: 'product_receiving',
   stocktakes: 'stock_taking',
   stockadjustments: 'stock_taking',
   reports: 'reports',
@@ -227,6 +229,7 @@ export default function App() {
     pos: <POS />,
     whatsapp: <WhatsAppOrders />,
     wachats: <WhatsAppChats />,
+    receiving: <ReceivingPage />,
     receipts: <Receipts onPrintReceipt={(s) => setReceipt({ receiptNo: s.receiptNo, date: s.date, customer: s.customer, cashier: s.cashier, payment: s.payment, type: s.type, items: s.items, total: s.total, discount: s.discount })} />,
     products: <Products />,
     staff: <StaffPage />,
