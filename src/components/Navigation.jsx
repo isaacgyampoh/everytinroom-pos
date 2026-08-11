@@ -34,15 +34,15 @@ const NAV = [
   { id: 'refunds', label: 'Refunds' },
   { id: 'sep1', sep: true },
   { id: 'performance', label: 'Staff Sales', admin: true },
-  { id: 'products', label: 'Products', admin: true },
+  { id: 'products', label: 'Products', perm: 'product_management' },
   { id: 'promos', label: 'Promos & Bundles', admin: true },
-  { id: 'restock', label: 'Restock', admin: true },
-  { id: 'stocktakes', label: 'Stock & Adjust', admin: true },
+  { id: 'restock', label: 'Restock', perm: 'product_receiving' },
+  { id: 'stocktakes', label: 'Stock & Adjust', perm: 'stock_taking' },
   { id: 'sep2', sep: true },
   { id: 'invoices', label: 'Invoices', admin: true },
   { id: 'customers', label: 'Customers', admin: true },
   { id: 'expenses', label: 'Expenses', admin: true },
-  { id: 'reports', label: 'Reports', admin: true },
+  { id: 'reports', label: 'Reports', perm: 'reports' },
   { id: 'staff', label: 'Staff', admin: true },
 ]
 
@@ -59,7 +59,7 @@ const AP = ['dash','products','bundles','staff','expenses','reports','customers'
 export default function Navigation({ onOpenCart }) {
   const [expanded, setExpanded] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const { page, setPage, user, isAdmin, logout, waOrders, cart, darkMode, toggleDark, shopOpen, shopSettingLoaded, fetchShopOpen, setShopOpen } = useStore()
+  const { page, setPage, user, isAdmin, can, logout, waOrders, cart, darkMode, toggleDark, shopOpen, shopSettingLoaded, fetchShopOpen, setShopOpen } = useStore()
   useEffect(() => { if (isAdmin) fetchShopOpen() }, [isAdmin])
   const toggleShop = async () => {
     const next = !shopOpen
@@ -77,9 +77,14 @@ export default function Navigation({ onOpenCart }) {
   }
   const wa = waOrders.filter(o => o.status === 'Pending' || o.status === 'Paid').length
   const cc = cart.reduce((a, c) => a + c.qty, 0)
-  const go = (p) => { if (!isAdmin && AP.includes(p)) return; setPage(p); setMobileOpen(false) }
+  const go = (p) => {
+    const item = [...NAV, ...MOB].find(n => n.id === p)
+    if (item?.perm && !can(item.perm)) return
+    if (item && item.admin && !item.perm && !isAdmin) return
+    setPage(p); setMobileOpen(false)
+  }
 
-  const items = NAV.filter(n => n.sep || !n.admin || isAdmin)
+  const items = NAV.filter(n => n.sep || ((!n.admin || isAdmin) && (!n.perm || can(n.perm))))
 
   return (<>
     {/* Desktop Sidebar */}
@@ -160,7 +165,7 @@ export default function Navigation({ onOpenCart }) {
 
     {/* Mobile Bottom Nav */}
     <nav className="flex md:hidden fixed bottom-0 left-0 right-0 glass safe-bottom px-3 pt-2 z-[100] border-t border-stone-200/30">
-      {MOB.filter(n => !n.admin || isAdmin).map(n => (
+      {MOB.filter(n => (!n.admin || isAdmin) && (!n.perm || can(n.perm))).map(n => (
         <button key={n.id} onClick={() => go(n.id)} className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-xl text-[10px] font-semibold relative transition ${page === n.id ? 'text-gray-800' : 'text-stone-300'}`}>
           <span className="w-5 h-5 flex items-center justify-center">{icons[n.id] || <I d="M12 12h.01" />}</span>
           {n.label}
@@ -187,7 +192,7 @@ export default function Navigation({ onOpenCart }) {
           </div>
         </div>
         <div className="space-y-0.5">
-          {NAV.filter(n => !n.sep && (!n.admin || isAdmin)).map(n => (
+          {NAV.filter(n => !n.sep && (!n.admin || isAdmin) && (!n.perm || can(n.perm))).map(n => (
             <button key={n.id} onClick={() => go(n.id)} className={`flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm font-medium text-left transition ${page === n.id ? 'bg-gray-900 text-white' : 'text-stone-500 hover:bg-stone-50'}`}>
               <span className="w-5 flex justify-center">{icons[n.id] || <I d="M12 12h.01" />}</span>{n.label}
             </button>

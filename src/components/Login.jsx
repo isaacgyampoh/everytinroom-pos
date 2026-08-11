@@ -34,7 +34,7 @@ export default function Login() {
         // gesture browsers require. Removes the title bar / close button so the
         // POS runs like a kiosk until the machine is powered off. No keyboard needed.
         try { if (!document.fullscreenElement && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen() } catch {}
-        login({ id: data.id, name: data.name, role: data.role }, isAdmin)
+        login({ id: data.id, name: data.name, role: data.role, permissions: data.permissions || [] }, isAdmin)
         setPage(isAdmin ? 'dash' : 'pos')
         return
       }

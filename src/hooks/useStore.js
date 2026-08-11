@@ -87,6 +87,13 @@ export const useStore = create((set, get) => ({
   customers: [], waOrders: [], refunds: [], promos: [], invoices: [], stockTakes: [], stockAdjustments: [],
   loading: true, loadingText: 'Connecting...',
   user: null, isAdmin: false,
+  // Permission check: admins can do everything; others need the specific permission.
+  can: (perm) => {
+    const { user, isAdmin } = get()
+    if (isAdmin) return true
+    const perms = (user && Array.isArray(user.permissions)) ? user.permissions : []
+    return perms.includes('admin') || perms.includes(perm)
+  },
   page: 'pos', cart: [], mode: 'retail', selectedCat: 'all', waFilter: 'Pending', perfPeriod: 'today',
   _secondaryLoaded: false,
   darkMode: localStorage.getItem('pos-dark') === 'true',

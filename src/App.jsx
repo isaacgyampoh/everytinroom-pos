@@ -37,9 +37,17 @@ const CustomerDisplay = lazy(() => import('./pages/CustomerDisplay'))
 
 const INACTIVITY_TIMEOUT = 60 * 1000 // 1 minute
 const ADMIN_PAGES = ['products', 'staff', 'promos', 'invoices', 'stocktakes', 'stockadjustments', 'restock']
+// Pages a non-admin may access IF they hold the matching permission.
+const PAGE_PERMISSIONS = {
+  products: 'product_management',
+  restock: 'product_receiving',
+  stocktakes: 'stock_taking',
+  stockadjustments: 'stock_taking',
+  reports: 'reports',
+}
 
 export default function App() {
-  const { user, page, setPage, loading, loadAll, logout, isAdmin, darkMode } = useStore()
+  const { user, page, setPage, loading, loadAll, logout, isAdmin, can, darkMode } = useStore()
   const [cartOpen, setCartOpen] = useState(false)
   const [receipt, setReceipt] = useState(null)
   const [lastActivity, setLastActivity] = useState(Date.now())
@@ -130,13 +138,16 @@ export default function App() {
     }
   }, [user, lastActivity, logout, resetActivity])
 
-  // Guard admin pages — redirect non-admin users
+  // Guard admin pages — allow if admin, or if the user holds the page's permission
   useEffect(() => {
-    if (user && !isAdmin && ADMIN_PAGES.includes(page)) {
+    if (!user || isAdmin) return
+    const neededPerm = PAGE_PERMISSIONS[page]
+    if (neededPerm && can(neededPerm)) return  // permitted staff may enter
+    if (ADMIN_PAGES.includes(page)) {
       setPage('pos')
-      toast.error('Admin access required')
+      toast.error('You do not have access to this page')
     }
-  }, [page, user, isAdmin, setPage])
+  }, [page, user, isAdmin, can, setPage])
 
   const playSaleSound = () => {
     try {
