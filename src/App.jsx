@@ -16,6 +16,7 @@ const POS = lazy(() => import('./pages/POS'))
 const WhatsAppOrders = lazy(() => import('./pages/WhatsAppOrders'))
 const WhatsAppChats = lazy(() => import('./pages/WhatsAppChats'))
 const ReceivingPage = lazy(() => import('./pages/ReceivingPage'))
+const WhatsAppSettings = lazy(() => import('./pages/WhatsAppSettings'))
 const Receipts = lazy(() => import('./pages/Receipts'))
 const Products = lazy(() => import('./pages/Products'))
 const StaffPage = lazy(() => import('./pages/StaffPage'))
@@ -37,7 +38,7 @@ const DeliveryDetails = lazy(() => import('./pages/DeliveryDetails'))
 const CustomerDisplay = lazy(() => import('./pages/CustomerDisplay'))
 
 const INACTIVITY_TIMEOUT = 60 * 1000 // 1 minute
-const ADMIN_PAGES = ['products', 'staff', 'promos', 'invoices', 'stocktakes', 'stockadjustments', 'restock']
+const ADMIN_PAGES = ['products', 'staff', 'promos', 'invoices', 'stocktakes', 'stockadjustments', 'restock', 'wasettings']
 // Pages a non-admin may access IF they hold the matching permission.
 const PAGE_PERMISSIONS = {
   products: 'product_management',
@@ -230,6 +231,7 @@ export default function App() {
     whatsapp: <WhatsAppOrders />,
     wachats: <WhatsAppChats />,
     receiving: <ReceivingPage />,
+    wasettings: <WhatsAppSettings />,
     receipts: <Receipts onPrintReceipt={(s) => setReceipt({ receiptNo: s.receiptNo, date: s.date, customer: s.customer, cashier: s.cashier, payment: s.payment, type: s.type, items: s.items, total: s.total, discount: s.discount })} />,
     products: <Products />,
     staff: <StaffPage />,

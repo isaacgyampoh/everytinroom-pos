@@ -6,7 +6,7 @@ import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
 
 export default function StockTakesPage() {
-  const { stockTakes, stockAdjustments, products, user, refreshStockTakes, refreshStockAdjustments, refreshProducts, setLoading } = useStore()
+  const { stockTakes, stockAdjustments, products, user, isAdmin, refreshStockTakes, refreshStockAdjustments, refreshProducts, setLoading } = useStore()
   const [tab, setTab] = useState('takes')
   const [modal, setModal] = useState(false)
   const [adjModal, setAdjModal] = useState(false)
@@ -99,19 +99,49 @@ export default function StockTakesPage() {
   const saveTake = async () => {
     const filled = counts.filter(c => c.countedQty !== '')
     if (!filled.length) { toast.error('Count at least one product'); return }
+    const items = filled.map(c => ({ productId: c.productId, name: c.name, systemQty: c.systemQty, countedQty: parseInt(c.countedQty) || 0, variance: c.variance }))
+    const sb = getSupabase()
+
+    // Non-admins: submit for approval. Stock does NOT change until an admin approves.
+    if (!isAdmin) {
+      if (!confirm(`Submit stock take (${filled.length} products) for admin approval?`)) return
+      setLoading(true, 'Submitting...')
+      await sb.from('stock_takes').insert({ date: new Date().toISOString(), items, notes: notes.trim(), conducted_by: user?.name || '', status: 'pending' })
+      await refreshStockTakes(); setLoading(false); setModal(false)
+      toast.success('Submitted for approval')
+      return
+    }
+
+    // Admins: apply immediately (with audit logging).
     if (!confirm('Save stock take with ' + filled.length + ' products counted?')) return
     setLoading(true, 'Saving...')
-    const sb = getSupabase()
-    const items = filled.map(c => ({ productId: c.productId, name: c.name, systemQty: c.systemQty, countedQty: parseInt(c.countedQty) || 0, variance: c.variance }))
-    await sb.from('stock_takes').insert({ date: new Date().toISOString(), items, notes: notes.trim(), conducted_by: user?.name || '' })
+    await sb.from('stock_takes').insert({ date: new Date().toISOString(), items, notes: notes.trim(), conducted_by: user?.name || '', status: 'approved', approved_by: user?.name || '', approved_at: new Date().toISOString() })
     for (const item of items) {
       if (item.variance !== 0) {
+        const prod = products.find(p => p.id === item.productId)
         await sb.from('products').update({ quantity: item.countedQty }).eq('id', item.productId)
         await sb.from('stock_adjustments').insert({ date: new Date().toISOString(), product_id: item.productId, product_name: item.name, qty: item.variance, reason: 'Stock Take', notes: notes.trim() || 'From stock take', adjusted_by: user?.name || '' })
+        try { await sb.from('stock_ledger').insert({ product_id: item.productId, product_name: item.name, previous_qty: prod?.quantity ?? item.systemQty, change_qty: item.variance, new_qty: item.countedQty, reason: 'Stock take', action_type: 'stock_take', staff: user?.name || '', reference: 'ST' }) } catch {}
       }
     }
     await refreshStockTakes(); await refreshStockAdjustments(); await refreshProducts(); setLoading(false); setModal(false)
     toast.success('Saved! ' + items.filter(i => i.variance !== 0).length + ' adjustments')
+  }
+
+  const approveTake = async (st) => {
+    if (!confirm('Approve this stock take? Counted quantities will become the official stock.')) return
+    setLoading(true, 'Approving...')
+    const sb = getSupabase()
+    const { data, error } = await sb.rpc('approve_stock_take', { p_id: st.id, p_approver: user?.name || 'Admin' })
+    if (error || !data?.success) { toast.error('Approve failed: ' + (error?.message || data?.error)); setLoading(false); return }
+    await refreshStockTakes(); await refreshStockAdjustments(); await refreshProducts(); setLoading(false)
+    toast.success(`Approved — ${data.applied} product(s) updated`)
+  }
+  const rejectTake = async (st) => {
+    const reason = prompt('Reason for rejecting?') || ''
+    const sb = getSupabase()
+    await sb.from('stock_takes').update({ status: 'rejected', reject_reason: reason, approved_by: user?.name || 'Admin', approved_at: new Date().toISOString() }).eq('id', st.id)
+    await refreshStockTakes(); toast.success('Rejected')
   }
 
   const saveAdj = async () => {
@@ -179,19 +209,29 @@ export default function StockTakesPage() {
             <div className="divide-y divide-gray-50">
               {stockTakes.map(st => {
                 const variances = st.items.filter(i => (i.variance || 0) !== 0).length
+                const status = st.status || 'approved'
                 return (
-                  <div key={st.id} className="p-4 hover:bg-gray-50/50 cursor-pointer transition" onClick={() => setViewModal(st)}>
-                    <div className="flex items-center justify-between">
+                  <div key={st.id} className="p-4 hover:bg-gray-50/50 transition">
+                    <div className="flex items-center justify-between cursor-pointer" onClick={() => setViewModal(st)}>
                       <div>
                         <div className="text-sm font-bold text-gray-800">{fmtDateTime(st.date)}</div>
                         <div className="text-xs text-gray-400 mt-0.5">By {st.conductedBy || 'Unknown'} • {st.items.length} counted</div>
                         {st.notes && <div className="text-xs text-gray-400 mt-1 italic">"{st.notes}"</div>}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 items-center">
+                        {status === 'pending' && <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-lg text-[10px] font-bold">PENDING</span>}
+                        {status === 'rejected' && <span className="px-2 py-1 bg-red-100 text-red-700 rounded-lg text-[10px] font-bold">REJECTED</span>}
                         {variances > 0 && <span className="px-2.5 py-1 bg-red-50 text-red-500 rounded-lg text-xs font-bold">{variances}</span>}
                         <span className="text-gray-300">→</span>
                       </div>
                     </div>
+                    {status === 'pending' && isAdmin && (
+                      <div className="flex gap-2 mt-3">
+                        <button onClick={(e) => { e.stopPropagation(); approveTake(st) }} className="flex-1 h-9 bg-green-600 text-white rounded-lg text-xs font-bold">Approve & Update Stock</button>
+                        <button onClick={(e) => { e.stopPropagation(); rejectTake(st) }} className="h-9 px-4 border border-red-300 text-red-500 rounded-lg text-xs font-bold">Reject</button>
+                      </div>
+                    )}
+                    {status === 'pending' && !isAdmin && <div className="mt-2 text-[11px] text-amber-600">Waiting for admin approval</div>}
                   </div>
                 )
               })}

@@ -30,6 +30,7 @@ const NAV = [
   { id: 'pos', label: 'POS' },
   { id: 'whatsapp', label: 'WhatsApp', wa: true },
   { id: 'wachats', label: 'WhatsApp AI', admin: true },
+  { id: 'wasettings', label: 'WhatsApp Setup', admin: true },
   { id: 'receipts', label: 'Receipts' },
   { id: 'refunds', label: 'Refunds' },
   { id: 'sep1', sep: true },
