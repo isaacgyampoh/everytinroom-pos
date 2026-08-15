@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../hooks/useStore'
 import { LogoMark } from './Logo'
 import { getRegisterId, openCustomerScreenManual } from '../hooks/useCustomerDisplay'
@@ -23,29 +23,40 @@ const icons = {
   expenses: <I d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />,
   reports: <I d="M18 20V10M12 20V4M6 20v-6" />,
   staff: <I d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
+  receiving: <I d="M16 16h6M19 13v6M21 10V6a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 6v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0" />,
+  wachats: <I d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
+  wasettings: <I d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.17V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15H4a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 6 9.4a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 11 4.6V4a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 2.82 1.17l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 11H21a2 2 0 0 1 0 4z" />,
 }
 
-const NAV = [
-  { id: 'dash', label: 'Dashboard', admin: true },
-  { id: 'pos', label: 'POS' },
-  { id: 'whatsapp', label: 'WhatsApp', wa: true },
-  { id: 'wachats', label: 'WhatsApp AI', admin: true },
-  { id: 'wasettings', label: 'WhatsApp Setup', admin: true },
-  { id: 'receipts', label: 'Receipts' },
-  { id: 'refunds', label: 'Refunds' },
-  { id: 'sep1', sep: true },
-  { id: 'performance', label: 'Staff Sales', admin: true },
-  { id: 'products', label: 'Products', perm: 'product_management' },
-  { id: 'promos', label: 'Promos & Bundles', admin: true },
-  { id: 'restock', label: 'Restock', perm: 'product_receiving' },
-  { id: 'receiving', label: 'Receiving', perm: 'product_receiving' },
-  { id: 'stocktakes', label: 'Stock & Adjust', perm: 'stock_taking' },
-  { id: 'sep2', sep: true },
-  { id: 'invoices', label: 'Invoices', admin: true },
-  { id: 'customers', label: 'Customers', admin: true },
-  { id: 'expenses', label: 'Expenses', admin: true },
-  { id: 'reports', label: 'Reports', perm: 'reports' },
-  { id: 'staff', label: 'Staff', admin: true },
+const NAV_GROUPS = [
+  { section: 'Workspace', items: [
+    { id: 'dash', label: 'Dashboard', admin: true },
+    { id: 'pos', label: 'Point of Sale' },
+    { id: 'customers', label: 'Customers', admin: true },
+    { id: 'receipts', label: 'Receipts' },
+    { id: 'refunds', label: 'Refunds' },
+  ]},
+  { section: 'Inventory', items: [
+    { id: 'products', label: 'Products', perm: 'product_management' },
+    { id: 'stocktakes', label: 'Stock & Adjust', perm: 'stock_taking' },
+    { id: 'restock', label: 'Restock', perm: 'product_receiving' },
+    { id: 'receiving', label: 'Goods Received', perm: 'product_receiving' },
+    { id: 'promos', label: 'Promos & Bundles', admin: true },
+  ]},
+  { section: 'Finance', items: [
+    { id: 'invoices', label: 'Invoices', admin: true },
+    { id: 'expenses', label: 'Expenses', admin: true },
+    { id: 'performance', label: 'Staff Sales', admin: true },
+    { id: 'reports', label: 'Reports', perm: 'reports' },
+  ]},
+  { section: 'Channels', items: [
+    { id: 'whatsapp', label: 'WhatsApp Orders', wa: true },
+    { id: 'wachats', label: 'WhatsApp AI', admin: true },
+    { id: 'wasettings', label: 'WhatsApp Setup', admin: true },
+  ]},
+  { section: 'System', items: [
+    { id: 'staff', label: 'Staff & Roles', admin: true },
+  ]},
 ]
 
 const MOB = [
@@ -59,10 +70,17 @@ const MOB = [
 const AP = ['dash','products','bundles','staff','expenses','reports','customers','performance','promos','invoices','stocktakes','restock','stockadjustments']
 
 export default function Navigation({ onOpenCart }) {
-  const [expanded, setExpanded] = useState(false)
+  const [pinned, setPinned] = useState(() => { try { return localStorage.getItem('sidebar-pinned') === '1' } catch { return false } })
+  const [hovering, setHovering] = useState(false)
+  const hoverTimer = useRef(null)
+  const expanded = pinned || hovering
+  const onEnter = () => { if (pinned) return; clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(() => setHovering(true), 90) }
+  const onLeave = () => { if (pinned) return; clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(() => setHovering(false), 180) }
+  const togglePin = () => { const nx = !pinned; setPinned(nx); setHovering(false); try { localStorage.setItem('sidebar-pinned', nx ? '1' : '0') } catch {} }
   const [mobileOpen, setMobileOpen] = useState(false)
   const { page, setPage, user, isAdmin, can, logout, waOrders, cart, darkMode, toggleDark, shopOpen, shopSettingLoaded, fetchShopOpen, setShopOpen } = useStore()
   useEffect(() => { if (isAdmin) fetchShopOpen() }, [isAdmin])
+  useEffect(() => { document.documentElement.style.setProperty('--sidebar-w', (pinned ? 236 : 68) + 'px') }, [pinned])
   const toggleShop = async () => {
     const next = !shopOpen
     const res = await setShopOpen(next)
@@ -80,75 +98,78 @@ export default function Navigation({ onOpenCart }) {
   const wa = waOrders.filter(o => o.status === 'Pending' || o.status === 'Paid').length
   const cc = cart.reduce((a, c) => a + c.qty, 0)
   const go = (p) => {
-    const item = [...NAV, ...MOB].find(n => n.id === p)
+    const allItems = [...NAV_GROUPS.flatMap(g => g.items), ...MOB]
+    const item = allItems.find(n => n.id === p)
     if (item?.perm && !can(item.perm)) return
     if (item && item.admin && !item.perm && !isAdmin) return
     setPage(p); setMobileOpen(false)
   }
 
-  const items = NAV.filter(n => n.sep || ((!n.admin || isAdmin) && (!n.perm || can(n.perm))))
+  // Filter each group's items by permission; drop empty groups.
+  const groups = NAV_GROUPS.map(g => ({
+    ...g,
+    items: g.items.filter(n => (!n.admin || isAdmin) && (!n.perm || can(n.perm)))
+  })).filter(g => g.items.length > 0)
 
   return (<>
-    {/* Desktop Sidebar */}
-    <aside className="hidden md:flex fixed top-0 left-0 bottom-0 z-[100] flex-col transition-all duration-300 ease-out"
-      style={{ width: expanded ? 220 : 64 }}
-      onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => setExpanded(false)}>
-      <div className="absolute inset-0 bg-white border-r border-stone-200/60 dark-sidebar" />
+    {/* Desktop Sidebar — solid, structured, enterprise */}
+    <aside className={`hidden md:flex fixed top-0 left-0 bottom-0 z-[100] flex-col bg-[#0f1115] border-r border-black/20 transition-[width] duration-200 ease-out ${expanded && !pinned ? 'shadow-2xl shadow-black/40' : ''}`}
+      onMouseEnter={onEnter} onMouseLeave={onLeave}
+      style={{ width: expanded ? 236 : 68 }}>
 
-      {/* Logo */}
-      <div className="relative z-10 flex items-center gap-3 px-4 h-16 flex-shrink-0">
-        <LogoMark size={32} rounded={9} />
-        <div className={`overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'}`}>
-          <div className="font-heading text-[13px] font-bold tracking-tight whitespace-nowrap">EVERYTINROOM</div>
-        </div>
+      {/* Brand + collapse toggle */}
+      <div className="flex items-center gap-3 px-4 h-16 flex-shrink-0 border-b border-white/5">
+        <LogoMark size={30} rounded={8} />
+        {expanded && <div className="font-heading text-[14px] font-bold tracking-tight text-white whitespace-nowrap flex-1">EVERYTINROOM</div>}
+        {expanded && <button onClick={togglePin} title={pinned ? 'Unpin sidebar' : 'Pin sidebar open'} className={`transition flex-shrink-0 ${pinned ? 'text-white' : 'text-white/40 hover:text-white/80'}`}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill={pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>
+        </button>}
       </div>
 
-      {/* Nav */}
-      <nav className="relative z-10 flex-1 overflow-y-auto overflow-x-hidden px-2 py-2 scrollbar-hide">
-        {items.map(n => {
-          if (n.sep) return <div key={n.id} className="my-2 mx-2 h-px bg-stone-200/60" />
-          const active = page === n.id
-          return (
-            <button key={n.id} onClick={() => go(n.id)}
-              className={`w-full flex items-center gap-3 h-10 px-3 rounded-xl mb-0.5 transition-all duration-150 relative group ${active ? 'bg-gray-900 text-white' : 'text-stone-400 hover:bg-stone-100 hover:text-stone-700'}`}>
-              <span className="flex-shrink-0 w-5 flex justify-center">{icons[n.id] || <I d="M12 12h.01" />}</span>
-              <span className={`text-[13px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'}`}>{n.label}</span>
-              {n.wa && wa > 0 && <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-[8px] font-bold text-white flex items-center justify-center">{wa}</span>}
-              {!expanded && <div className="absolute left-full ml-2 px-2.5 py-1 bg-gray-900 text-white text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">{n.label}</div>}
-            </button>
-          )
-        })}
+      {/* Nav groups */}
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 scrollbar-hide">
+        {groups.map(g => (
+          <div key={g.section} className="mb-4">
+            {expanded && <div className="px-5 mb-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-white/30">{g.section}</div>}
+            <div className="px-2 space-y-0.5">
+              {g.items.map(n => {
+                const active = page === n.id
+                return (
+                  <button key={n.id} onClick={() => go(n.id)}
+                    className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg transition-colors relative group ${active ? 'bg-white text-[#0f1115] font-semibold' : 'text-white/55 hover:bg-white/8 hover:text-white'}`}>
+                    <span className="flex-shrink-0 w-5 flex justify-center">{icons[n.id] || <I d="M12 12h.01" />}</span>
+                    {expanded && <span className="text-[13px] whitespace-nowrap overflow-hidden flex-1 text-left">{n.label}</span>}
+                    {n.wa && wa > 0 && <span className={`${expanded ? 'ml-auto' : 'absolute top-1 right-1'} min-w-[18px] h-[18px] px-1 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center`}>{wa}</span>}
+                    {!expanded && <div className="absolute left-full ml-2 px-2.5 py-1 bg-[#0f1115] border border-white/10 text-white text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">{n.label}</div>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
-      {/* Bottom */}
-      <div className="relative z-10 px-2 pb-3 flex-shrink-0 space-y-0.5">
-        <div className="my-2 mx-2 h-px bg-stone-200/60" />
-        <button onClick={openCustomerScreen} className="w-full flex items-center gap-3 h-10 px-3 rounded-xl text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition">
+      {/* Bottom — tools + user */}
+      <div className="flex-shrink-0 border-t border-white/5 px-2 py-2 space-y-0.5">
+        <button onClick={openCustomerScreen} className="w-full flex items-center gap-3 h-9 px-3 rounded-lg text-white/45 hover:bg-white/8 hover:text-white transition group relative">
           <span className="flex-shrink-0 w-5 flex justify-center"><I d="M2 3h20v14H2zM8 21h8M12 17v4" /></span>
-          <span className={`text-[13px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'}`}>Customer Screen</span>
+          {expanded && <span className="text-[13px]">Customer Screen</span>}
+          {!expanded && <div className="absolute left-full ml-2 px-2.5 py-1 bg-[#0f1115] border border-white/10 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">Customer Screen</div>}
         </button>
-        {isAdmin && <button onClick={toggleShop} disabled={!shopSettingLoaded} className="w-full flex items-center gap-3 h-10 px-3 rounded-xl text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition disabled:opacity-50">
+        {isAdmin && <button onClick={toggleShop} disabled={!shopSettingLoaded} className="w-full flex items-center gap-3 h-9 px-3 rounded-lg text-white/45 hover:bg-white/8 hover:text-white transition disabled:opacity-40">
           <span className="flex-shrink-0 w-5 flex justify-center"><I d="M3 9l1-5h16l1 5M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9M3 9h18" /></span>
-          <span className={`flex-1 flex items-center justify-between text-[13px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'}`}>
-            <span>Online Shop</span>
-            <span className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${shopOpen ? 'bg-[#16181d]' : 'bg-stone-300'}`}>
-              <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${shopOpen ? 'left-[18px]' : 'left-0.5'}`} />
-            </span>
-          </span>
+          {expanded && <span className="flex-1 flex items-center justify-between text-[13px]"><span>Online Shop</span><span className={`relative w-9 h-5 rounded-full transition-colors ${shopOpen ? 'bg-green-500' : 'bg-white/20'}`}><span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${shopOpen ? 'left-[18px]' : 'left-0.5'}`} /></span></span>}
         </button>}
-        {isAdmin && <button onClick={toggleDark} className="w-full flex items-center gap-3 h-10 px-3 rounded-xl text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition">
+        {isAdmin && <button onClick={toggleDark} className="w-full flex items-center gap-3 h-9 px-3 rounded-lg text-white/45 hover:bg-white/8 hover:text-white transition">
           <span className="flex-shrink-0 w-5 flex justify-center">{darkMode ? <I d="M12 3v1m0 16v1m9-9h-1M4 12H3m3.34-5.66l-.7-.7m12.73 0l-.71.7M6.34 17.66l-.7.7m12.73 0l-.71-.7M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" /> : <I d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />}</span>
-          <span className={`text-[13px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'}`}>{darkMode ? 'Light mode' : 'Dark mode'}</span>
+          {expanded && <span className="text-[13px]">{darkMode ? 'Light mode' : 'Dark mode'}</span>}
         </button>}
-        <div className="flex items-center gap-3 h-10 px-3 rounded-xl">
-          <div className="w-6 h-6 bg-gray-800 rounded-lg flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0">{user?.name?.charAt(0)}</div>
-          <span className={`text-[13px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'}`}>{user?.name}</span>
+        <div className="flex items-center gap-3 h-11 px-3 mt-1 border-t border-white/5 pt-2">
+          <div className="w-7 h-7 bg-white/10 rounded-lg flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0">{user?.name?.charAt(0)}</div>
+          {expanded && <div className="flex-1 overflow-hidden"><div className="text-[13px] font-medium text-white truncate">{user?.name}</div><div className="text-[10px] text-white/40">{isAdmin ? 'Administrator' : 'Staff'}</div></div>}
+          {expanded && <button onClick={logout} className="text-white/40 hover:text-red-400 transition flex-shrink-0"><I d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" width="16" height="16" /></button>}
         </div>
-        <button onClick={logout} className="w-full flex items-center gap-3 h-10 px-3 rounded-xl text-stone-400 hover:bg-red-50 hover:text-red-500 transition">
-          <span className="flex-shrink-0 w-5 flex justify-center"><I d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></span>
-          <span className={`text-[13px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'}`}>Sign out</span>
-        </button>
+        {!expanded && <button onClick={logout} className="w-full flex items-center justify-center h-9 rounded-lg text-white/45 hover:bg-red-500/10 hover:text-red-400 transition"><I d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" width="16" height="16" /></button>}
       </div>
     </aside>
 
@@ -193,11 +214,19 @@ export default function Navigation({ onOpenCart }) {
             <div className="text-[10px] text-white/50 mt-1">{user?.role?.toUpperCase()}</div>
           </div>
         </div>
-        <div className="space-y-0.5">
-          {NAV.filter(n => !n.sep && (!n.admin || isAdmin) && (!n.perm || can(n.perm))).map(n => (
-            <button key={n.id} onClick={() => go(n.id)} className={`flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm font-medium text-left transition ${page === n.id ? 'bg-gray-900 text-white' : 'text-stone-500 hover:bg-stone-50'}`}>
-              <span className="w-5 flex justify-center">{icons[n.id] || <I d="M12 12h.01" />}</span>{n.label}
-            </button>
+        <div className="space-y-4">
+          {groups.map(g => (
+            <div key={g.section}>
+              <div className="px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.1em] text-stone-400">{g.section}</div>
+              <div className="space-y-0.5">
+                {g.items.map(n => (
+                  <button key={n.id} onClick={() => go(n.id)} className={`flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm font-medium text-left transition ${page === n.id ? 'bg-gray-900 text-white' : 'text-stone-500 hover:bg-stone-50'}`}>
+                    <span className="w-5 flex justify-center">{icons[n.id] || <I d="M12 12h.01" />}</span>{n.label}
+                    {n.wa && wa > 0 && <span className="ml-auto min-w-[18px] h-[18px] px-1 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center">{wa}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </div>

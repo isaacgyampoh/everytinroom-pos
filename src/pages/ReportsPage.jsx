@@ -2,18 +2,29 @@ import { useState } from 'react'
 import { useStore } from '../hooks/useStore'
 import { money, num, today, weekStartDate, monthStart, isoDate, fmtDate } from '../lib/utils'
 
-const Section = ({ title, children, icon }) => (
-  <div className="bg-white rounded-2xl p-5 md:p-6 border border-gray-100 shadow-sm">
-    <h3 className="text-base md:text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">{icon && <span>{icon}</span>}{title}</h3>
-    {children}
+const Section = ({ title, children, action }) => (
+  <div className="bg-white rounded-xl border border-gray-200/80">
+    <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+      <h3 className="text-[13px] font-bold text-gray-700 uppercase tracking-wide">{title}</h3>
+      {action}
+    </div>
+    <div className="p-5">{children}</div>
+  </div>
+)
+
+const Kpi = ({ label, value, sub, accent }) => (
+  <div className="px-5 py-4 border-r border-gray-100 last:border-r-0">
+    <div className="text-[11px] text-gray-400 font-medium uppercase tracking-wide">{label}</div>
+    <div className={`text-xl md:text-2xl font-bold mt-1 tabular-nums ${accent || 'text-gray-900'}`}>{value}</div>
+    {sub && <div className="text-[11px] text-gray-400 mt-0.5">{sub}</div>}
   </div>
 )
 
 const Stat = ({ label, value, sub, color = 'text-gray-900' }) => (
-  <div className="text-center p-3 md:p-4 bg-gray-50 rounded-xl">
-    <div className="text-xs md:text-sm text-gray-400 font-medium">{label}</div>
-    <div className={`text-lg md:text-2xl font-bold mt-1 ${color}`}>{value}</div>
-    {sub && <div className="text-[11px] md:text-xs text-gray-400 mt-0.5">{sub}</div>}
+  <div className="py-2">
+    <div className="text-xs text-gray-400 font-medium">{label}</div>
+    <div className={`text-lg font-bold mt-0.5 tabular-nums ${color}`}>{value}</div>
+    {sub && <div className="text-[11px] text-gray-400 mt-0.5">{sub}</div>}
   </div>
 )
 
@@ -129,29 +140,32 @@ export default function ReportsPage() {
         </button>
       </div>
 
-      {/* Period Tabs */}
-      <div className="flex gap-2 overflow-x-auto mb-6 pb-1 scrollbar-hide">
+      {/* Period control — segmented */}
+      <div className="inline-flex bg-gray-100 rounded-lg p-1 mb-6">
         {tabs.map(tb => (
           <button key={tb.id} onClick={() => setTab(tb.id)}
-            className={`h-10 md:h-11 px-4 md:px-5 rounded-xl text-[13px] md:text-sm font-semibold whitespace-nowrap transition-all ${tab === tb.id ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+            className={`h-9 px-4 rounded-md text-[13px] font-semibold whitespace-nowrap transition-all ${tab === tb.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
             {tb.label}
           </button>
         ))}
       </div>
 
-      {/* Revenue Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-5">
-        <Stat label="Total Revenue" value={money(totalRev)} sub={fSales.length + ' sales'} color="text-gray-800" />
-        <Stat label="Gross Profit" value={money(totalProfit)} color="text-green-600" />
-        <Stat label="Expenses" value={money(totalExp)} sub={fExpenses.length + ' entries'} color="text-red-500" />
-        <Stat label="Net Cash Flow" value={money(netCashFlow)} color={netCashFlow >= 0 ? 'text-green-600' : 'text-red-500'} />
+      {/* Summary strip — unified, not scattered cards */}
+      <div className="bg-white rounded-xl border border-gray-200/80 mb-5 overflow-hidden">
+        <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-gray-100">
+          <Kpi label="Total Revenue" value={money(totalRev)} sub={fSales.length + ' sales'} />
+          <Kpi label="Gross Profit" value={money(totalProfit)} accent="text-green-600" />
+          <Kpi label="Expenses" value={money(totalExp)} sub={fExpenses.length + ' entries'} accent="text-red-500" />
+          <Kpi label="Net Cash Flow" value={money(netCashFlow)} accent={netCashFlow >= 0 ? 'text-green-600' : 'text-red-500'} />
+        </div>
       </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
-        <Stat label="Cash Collected" value={money(cashTotal)} sub={cashSales.length + ' cash sales'} color="text-green-600" />
-        <Stat label="Momo Collected" value={money(momoTotal)} sub={momoSales.length + ' momo sales'} color="text-amber-600" />
-        <Stat label="Refunds" value={money(totalRefAmt)} sub={fRefunds.length + ' refunds'} color="text-violet-500" />
-        <Stat label="Discounts Given" value={money(totalDiscount)} color="text-gray-500" />
+      <div className="bg-white rounded-xl border border-gray-200/80 mb-6 overflow-hidden">
+        <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-gray-100">
+          <Kpi label="Cash Collected" value={money(cashTotal)} sub={cashSales.length + ' sales'} accent="text-green-600" />
+          <Kpi label="Momo Collected" value={money(momoTotal)} sub={momoSales.length + ' sales'} accent="text-amber-600" />
+          <Kpi label="Refunds" value={money(totalRefAmt)} sub={fRefunds.length + ' refunds'} accent="text-violet-500" />
+          <Kpi label="Discounts Given" value={money(totalDiscount)} accent="text-gray-500" />
+        </div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-5 mb-5">
