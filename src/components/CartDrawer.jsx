@@ -219,6 +219,32 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
     } catch (e) { setMomoStep('failed'); setMomoMessage('Error: ' + (e?.message || '')); setProcessing(false) }
   }
 
+  // MANUAL COMPLETE — the safety net. If the MoMo automation fails or is slow
+  // but the cashier has confirmed the money (customer approved on their phone,
+  // paid by other means, or is paying the MoMo part in cash instead), record
+  // the sale NOW so the cash portion of a split is never lost. Records the exact
+  // split amounts (cash + momo) and closes the pending order.
+  const completeManually = async (fromStep) => {
+    if (processing) return
+    setProcessing(true)
+    try {
+      if (pollRef.current) clearInterval(pollRef.current)
+      // Close the durable pending order so the reconcile job won't double-handle it.
+      if (promptOrderId) { try { await getSupabase().from('whatsapp_orders').update({ status: 'Completed', notes: 'Manually completed by cashier at POS' }).eq('id', promptOrderId) } catch {} }
+      const extra = splitMode ? { splitCash: num(splitCash), splitMomo: splitRemainder } : {}
+      const saleData = await recordSale(splitMode ? 'Split' : 'Momo', extra)
+      if (saleData) {
+        try { fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=thankyou-sms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: phone.trim() }) }) } catch {}
+        toast.success('Sale recorded! ' + saleData.receiptNo)
+        setPromptOrderId(null)
+        finishSale(saleData)
+      } else {
+        toast.error('Could not record sale — try again')
+        setProcessing(false)
+      }
+    } catch (e) { toast.error('Error: ' + (e?.message || '')); setProcessing(false) }
+  }
+
   // Create a WhatsApp order with USSD code for payment
   const createUssdInvoice = async (amount, isSplit) => {
     setProcessing(true)
@@ -545,6 +571,13 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
             )}
 
             {momoStep === 'failed' && <div className="bg-red-50 rounded-xl p-3.5 text-red-600 text-sm font-medium border border-red-100"> {momoMessage}</div>}
+            {momoStep === 'failed' && splitMode && num(splitCash) > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <p className="text-[13px] text-amber-800 font-semibold mb-1">Cash {money(num(splitCash))} was collected.</p>
+                <p className="text-[12px] text-amber-700 mb-3">MoMo prompt failed. If the customer has paid the {money(splitRemainder)} MoMo portion another way (or is paying it in cash), save the sale now so nothing is lost.</p>
+                <button onClick={() => completeManually('failed')} disabled={processing} className="w-full px-5 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold disabled:opacity-50">Save sale — Cash {money(num(splitCash))} + MoMo {money(splitRemainder)}</button>
+              </div>
+            )}
 
             <button onClick={handleCompleteSale} disabled={processing || (!isWhatsApp && !splitMode && !payMethod)}
               className="w-full h-12 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all shadow-sm">
@@ -585,8 +618,14 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
               <h3 className="text-lg font-bold text-gray-900 mb-1">Waiting for payment</h3>
               <p className="text-3xl font-bold text-[#16181d] mb-2">{money(splitMode ? splitRemainder : total)}</p>
               <p className="text-sm text-gray-500 mb-1">Prompt sent to {phone.trim()} · {waitSecs}s</p>
-              <p className="text-xs text-gray-400 mb-6">The receipt prints automatically once the customer approves on their phone.</p>
-              <button onClick={async () => { if (pollRef.current) clearInterval(pollRef.current); if (promptOrderId) { try { await getSupabase().from('whatsapp_orders').update({ status: 'Cancelled', notes: 'Cancelled by cashier' }).eq('id', promptOrderId).eq('status', 'Pending') } catch {} } setPromptOrderId(null); setMomoStep('idle'); setMomoMessage('') }} className="px-6 py-3 border border-gray-300 rounded-xl text-sm font-semibold text-gray-600">Cancel order</button>
+              <p className="text-xs text-gray-400 mb-5">The receipt prints automatically once the customer approves on their phone.</p>
+              {splitMode && <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-left"><p className="text-[13px] text-amber-800 font-semibold">Cash {money(num(splitCash))} already collected.</p><p className="text-[12px] text-amber-700 mt-0.5">If MoMo won't go through, tap below to save the sale so the cash is never lost.</p></div>}
+              <div className="flex flex-col gap-2.5">
+                <button onClick={() => completeManually('waiting')} disabled={processing} className="w-full px-6 py-3.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold disabled:opacity-50">
+                  {splitMode ? `MoMo received — complete sale (${money(splitRemainder)})` : 'MoMo received — complete sale'}
+                </button>
+                <button onClick={async () => { if (pollRef.current) clearInterval(pollRef.current); if (promptOrderId) { try { await getSupabase().from('whatsapp_orders').update({ status: 'Cancelled', notes: 'Cancelled by cashier' }).eq('id', promptOrderId).eq('status', 'Pending') } catch {} } setPromptOrderId(null); setMomoStep('idle'); setMomoMessage('') }} className="px-6 py-2.5 border border-gray-300 rounded-xl text-sm font-semibold text-gray-500">Cancel order</button>
+              </div>
             </div>
           )}
 
