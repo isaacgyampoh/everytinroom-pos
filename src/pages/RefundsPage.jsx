@@ -52,11 +52,11 @@ export default function RefundsPage() {
         <button onClick={() => { setReceiptNo(''); setSale(null); setSaleItems([]); setReason(''); setModal(true) }} className="h-12 px-5 bg-gray-800 text-white rounded-xl text-sm font-semibold">New Refund</button>
       </div>
       <div className="bg-gray-800 rounded-2xl p-5 text-white mb-6"><small className="text-sm opacity-80">Total Refunds Today</small><strong className="block text-[22px] md:text-[26px] font-bold mt-2">{money(todayTotal)}</strong></div>
-      <div className="bg-white rounded-2xl p-6 shadow-md overflow-x-auto">
-        <table className="w-full min-w-[500px]">
+      <div className="bg-white rounded-2xl p-4 md:p-6 shadow-md overflow-x-auto rtable-wrap">
+        <table className="rtable w-full min-w-[500px]">
           <thead><tr><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Refund #</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Date</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Receipt</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Customer</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Amount</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Reason</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">By</th></tr></thead>
           <tbody>{refunds.length === 0 ? <tr><td colSpan={7} className="text-center py-12 text-gray-400">No refunds</td></tr> : refunds.map(r => (
-            <tr key={r.id} className="border-b border-gray-50"><td className="p-3 text-sm font-bold text-violet-500">{r.refundNo}</td><td className="p-3 text-sm">{fmtDate(r.date)}</td><td className="p-3 text-sm">{r.originalReceiptNo}</td><td className="p-3 text-sm">{r.customer || '-'}</td><td className="p-3 text-sm font-bold text-red-500">{money(r.refundAmount)}</td><td className="p-3 text-sm">{r.reason || '-'}</td><td className="p-3 text-sm">{r.processedBy || '-'}</td></tr>
+            <tr key={r.id} className="border-b border-gray-50"><td data-label="Refund #" className="p-3 text-sm font-bold text-violet-500">{r.refundNo}</td><td data-label="Date" className="p-3 text-sm">{fmtDate(r.date)}</td><td data-label="Receipt" className="p-3 text-sm">{r.originalReceiptNo}</td><td data-label="Customer" className="p-3 text-sm">{r.customer || '-'}</td><td data-label="Amount" className="p-3 text-sm font-bold text-red-500">{money(r.refundAmount)}</td><td data-label="Reason" className="p-3 text-sm">{r.reason || '-'}</td><td data-label="By" className="p-3 text-sm">{r.processedBy || '-'}</td></tr>
           ))}</tbody>
         </table>
       </div>

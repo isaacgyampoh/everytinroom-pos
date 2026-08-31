@@ -94,8 +94,10 @@ export default function TerminalPage() {
     setCounted(''); loadDrawer()
   }
 
+  // Stacks on a phone: a long explanatory hint next to a three-button control
+  // squeezes both into unreadable columns at 375px.
   const Row = ({ label, hint, children }) => (
-    <div className="flex items-center justify-between gap-4 py-3.5 border-b border-gray-100 last:border-0">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 py-3.5 border-b border-gray-100 last:border-0">
       <div className="min-w-0">
         <div className="text-sm font-semibold text-gray-800">{label}</div>
         {hint && <div className="text-[11px] text-gray-400 mt-0.5 leading-snug">{hint}</div>}
@@ -204,7 +206,7 @@ export default function TerminalPage() {
               <div className="text-xs text-gray-500 mb-2">
                 Open since {new Date(drawer.opened_at).toLocaleString('en-GB')} · float {money(drawer.opening_float)} · by {drawer.opened_by || '—'}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input type="number" inputMode="decimal" placeholder="Cash counted in drawer"
                   className="flex-1 h-12 px-4 bg-white border-2 border-gray-200 rounded-xl text-base"
                   value={counted} onChange={e => setCounted(e.target.value)} />

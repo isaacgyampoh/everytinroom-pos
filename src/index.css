@@ -26,6 +26,64 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Inter', -apple-system, system-ui, sans-se
 /* Headline figures: tight, dark, unmistakably the thing you came to read. */
 .figure { font-variant-numeric: tabular-nums; letter-spacing: -0.03em; font-weight: 700; line-height: 1; }
 
+/* ── Data tables on small screens ──────────────────────────────────────────
+   Every list in the app was a table with a min-width, so on a phone you either
+   scrolled sideways through it or (in one case) it was clipped outright. Below
+   640px each row becomes a card and each cell is labelled from its `data-label`,
+   which is how a table is meant to degrade. Above 640px it is an ordinary table.
+
+   Cells with data-label="" are omitted on mobile — for columns like a thumbnail
+   that carry no meaning once stacked. */
+@media (max-width: 639px) {
+  .rtable, .rtable tbody, .rtable tr, .rtable td { display: block; width: 100%; }
+  .rtable thead { display: none; }
+  .rtable { min-width: 0 !important; }
+  .rtable tr {
+    border: 1px solid rgba(16,24,29,.09);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    background: #fff;
+  }
+  body.dark .rtable tr { background: #191b1f; border-color: rgba(255,255,255,.08); }
+  .rtable td {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 5px 0 !important;
+    border: 0 !important;
+    text-align: right;
+  }
+  .rtable td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #9aa0a6;
+    text-align: left;
+  }
+  /* First cell is the row's identity — full width, no label, reads as a title. */
+  .rtable td:first-child {
+    display: block !important;
+    text-align: left;
+    padding: 0 0 8px !important;
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(16,24,29,.07) !important;
+  }
+  .rtable td:first-child::before { display: none; }
+  .rtable td[data-label=""] { display: none !important; }
+  /* Action buttons get the full width so they stay tappable. */
+  .rtable td:last-child { padding-top: 10px !important; }
+  .rtable td:last-child::before { display: none; }
+  .rtable td:last-child > div { width: 100%; justify-content: stretch; }
+  .rtable td:last-child button { flex: 1; }
+  /* The wrapper's horizontal scroll is meaningless once rows are cards. */
+  .rtable-wrap { overflow-x: visible !important; }
+}
+
 /* ── Product imagery ───────────────────────────────────────────────────────
    The photos are ecommerce shots: median aspect ratio 1.00, a third of them
    portrait (down to 0.67). They were being forced into a 4:3 landscape box
