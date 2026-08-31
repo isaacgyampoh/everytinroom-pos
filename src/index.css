@@ -15,6 +15,57 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Inter', -apple-system, system-ui, sans-se
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-thumb { background: #d1d1d1; border-radius: 10px; }
 
+/* ── Numerals ──────────────────────────────────────────────────────────────
+   Money and counts sit in columns and get compared against each other, so
+   digits must be the same width. Without this the totals visibly jitter as
+   they update, which on a till reads as the number being unstable. */
+.tnum, table td, table th, input[inputmode="decimal"], input[type="number"] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'cv01' 1;
+}
+/* Headline figures: tight, dark, unmistakably the thing you came to read. */
+.figure { font-variant-numeric: tabular-nums; letter-spacing: -0.03em; font-weight: 700; line-height: 1; }
+
+/* ── Product imagery ───────────────────────────────────────────────────────
+   The photos are ecommerce shots: median aspect ratio 1.00, a third of them
+   portrait (down to 0.67). They were being forced into a 4:3 landscape box
+   with object-cover, which cropped up to HALF the height off — bedsheets and
+   baskets were showing as a band from the middle of the product.
+
+   Square box + contain shows the whole product whatever shape it is, which is
+   what a catalogue does. The tile background is the same near-white as the
+   typical product-shot backdrop, so the letterboxing is invisible. */
+.product-shot {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: #f4f4f2;
+  overflow: hidden;
+}
+.product-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 6%;
+}
+body.dark .product-shot { background: #202329; }
+
+/* Small square thumbnails in tables and lists — same rule, less padding. */
+.thumb-shot { background: #f4f4f2; overflow: hidden; }
+.thumb-shot img { width: 100%; height: 100%; object-fit: contain; padding: 8%; }
+body.dark .thumb-shot { background: #202329; }
+
+/* ── Panels ────────────────────────────────────────────────────────────────
+   One surface treatment instead of five hand-rolled ones. */
+.panel { background: #fff; border: 1px solid rgba(16,24,29,.07); border-radius: 14px; }
+body.dark .panel { background: #191b1f; border-color: rgba(255,255,255,.07); }
+.panel-pad { padding: 18px 20px; }
+.panel-head { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: #9aa0a6; }
+body.dark .panel-head { color: #7d838d; }
+
+/* Hairline dividers that don't shout */
+.rule { border-top: 1px solid rgba(16,24,29,.07); }
+body.dark .rule { border-color: rgba(255,255,255,.07); }
+
 @layer utilities {
   .safe-top { padding-top: env(safe-area-inset-top); }
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }

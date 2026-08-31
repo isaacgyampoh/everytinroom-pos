@@ -4,6 +4,7 @@ import { getSupabase } from '../lib/supabase'
 import { fmtDateTime, money } from '../lib/utils'
 import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
+import { IconClipboard, EmptyState } from '../components/Icons'
 
 const REASONS = ['Damaged', 'Broken', 'Missing', 'Expired', 'Theft', 'Returned to Supplier', 'Other']
 
@@ -116,7 +117,7 @@ export default function StockAdjustmentsPage() {
       {/* Adjustments List */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {filteredAdj.length === 0 ? (
-          <div className="text-center py-16 text-gray-300"><span className="text-xl opacity-15">—</span>No adjustments recorded</div>
+          <EmptyState icon={IconClipboard} title="No adjustments recorded" hint="Damages, losses and corrections show up here" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">

@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useStore } from '../hooks/useStore'
 import { getSupabase } from '../lib/supabase'
-import { money, num, fmtDate, today } from '../lib/utils'
+import { money, num, fmtDate, today, thumb } from '../lib/utils'
 import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
+import { IconFile, EmptyState } from '../components/Icons'
 
 export default function InvoicesPage() {
   const { invoices, refreshInvoices, setLoading } = useStore()
@@ -41,12 +42,14 @@ export default function InvoicesPage() {
       <div className="bg-gray-800 rounded-2xl p-5 text-white mb-6"><small className="text-sm opacity-80">Total Invoices Value</small><strong className="block text-[22px] md:text-[26px] font-bold mt-2">{money(totalAmount)}</strong></div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {invoices.length === 0 && <div className="col-span-full text-center py-12 text-gray-400"><span className="text-xl opacity-15">—</span>No invoices</div>}
+        {invoices.length === 0 && <div className="col-span-full"><EmptyState icon={IconFile} title="No invoices" hint="Supplier invoices you record will appear here" /></div>}
         {invoices.map(inv => (
           <div key={inv.id} className="bg-white rounded-2xl p-5 shadow-md">
+            {/* An invoice is a document — cropping it hides the total, which is
+                the one line anyone opens this page to read. */}
             {inv.image && (
-              <div className="w-full h-40 bg-gray-100 rounded-xl mb-4 overflow-hidden cursor-pointer" onClick={() => setViewImg(inv.image)}>
-                <img src={inv.image} alt="" className="w-full h-full object-cover" />
+              <div className="w-full h-40 bg-[#f4f4f2] rounded-xl mb-4 overflow-hidden cursor-pointer" onClick={() => setViewImg(inv.image)}>
+                <img src={thumb(inv.image, 480)} alt="" className="w-full h-full object-contain p-2" loading="lazy" />
               </div>
             )}
             <div className="flex justify-between items-start mb-3">

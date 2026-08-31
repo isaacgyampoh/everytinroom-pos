@@ -34,7 +34,7 @@ const NAV_GROUPS = [
     { id: 'pos', label: 'Point of Sale' },
     { id: 'customers', label: 'Customers', admin: true },
     { id: 'receipts', label: 'Receipts' },
-    { id: 'refunds', label: 'Refunds' },
+    { id: 'refunds', label: 'Refunds', perm: 'refunds' },
   ]},
   { section: 'Inventory', items: [
     { id: 'products', label: 'Products', perm: 'product_management' },
@@ -56,6 +56,7 @@ const NAV_GROUPS = [
   ]},
   { section: 'System', items: [
     { id: 'staff', label: 'Staff & Roles', admin: true },
+    { id: 'terminal', label: 'Terminal & Printer' },
   ]},
 ]
 
@@ -63,7 +64,7 @@ const MOB = [
   { id: 'pos', label: 'Sale' },
   { id: 'whatsapp', label: 'WA', wa: true },
   { id: 'receipts', label: 'Receipts' },
-  { id: 'refunds', label: 'Refund' },
+  { id: 'refunds', label: 'Refund', perm: 'refunds' },
   { id: 'dash', label: 'More', admin: true },
 ]
 

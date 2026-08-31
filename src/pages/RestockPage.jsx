@@ -133,7 +133,7 @@ export default function RestockPage() {
                 className="flex items-center gap-3 w-full p-3.5 hover:bg-gray-50 transition text-left border-b border-gray-50 last:border-0"
               >
                 {p.image ? (
-                  <img src={p.image} alt="" className="w-11 h-11 rounded-xl object-cover bg-gray-100" />
+                  <img src={p.image} alt="" className="w-11 h-11 rounded-xl object-contain p-[8%] bg-[#f4f4f2]" />
                 ) : (
                   <div className="w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center text-gray-300"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>
                 )}
@@ -165,7 +165,7 @@ export default function RestockPage() {
             {cart.map((item, i) => (
               <div key={item.productId} className="flex items-center gap-3 p-4">
                 {item.image ? (
-                  <img src={item.image} alt="" className="w-12 h-12 rounded-xl object-cover bg-gray-100" />
+                  <img src={item.image} alt="" className="w-12 h-12 rounded-xl object-contain p-[8%] bg-[#f4f4f2]" />
                 ) : (
                   <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center text-gray-300"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>
                 )}

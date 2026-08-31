@@ -4,6 +4,7 @@ import { getSupabase } from '../lib/supabase'
 import { money, num, fmtDate, today } from '../lib/utils'
 import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
+import { IconTag, EmptyState } from '../components/Icons'
 
 export default function PromosPage() {
   const { promos, bundles, products, refreshPromos, refreshBundles, setLoading } = useStore()
@@ -54,7 +55,7 @@ export default function PromosPage() {
     <div >
       <div className="flex justify-between items-start flex-wrap gap-4 mb-5">
         <div>
-          <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight">Promos Promos & Bundles Bundles</h1>
+          <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight">Promos &amp; Bundles</h1>
           <p className="text-gray-400 text-sm mt-0.5">Manage promotions and product bundles</p>
         </div>
         <div className="flex gap-2">
@@ -82,7 +83,7 @@ export default function PromosPage() {
       {/* Promos Tab */}
       {tab === 'promos' && (
         <div className="space-y-3">
-          {promos.length === 0 && <div className="text-center py-16 text-gray-300"><span className="text-xl opacity-15">—</span>No promotions</div>}
+          {promos.length === 0 && <EmptyState icon={IconTag} title="No promotions" hint="Create one to discount selected products for a date range" />}
           {promos.map(p => {
             const active = isActive(p)
             return (

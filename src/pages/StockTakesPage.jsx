@@ -4,9 +4,11 @@ import { getSupabase } from '../lib/supabase'
 import { fmtDate, fmtDateTime, money, num } from '../lib/utils'
 import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
+import { IconClipboard, EmptyState } from '../components/Icons'
+import { rpcMessage } from '../lib/rpcError'
 
 export default function StockTakesPage() {
-  const { stockTakes, stockAdjustments, products, user, isAdmin, refreshStockTakes, refreshStockAdjustments, refreshProducts, setLoading } = useStore()
+  const { stockTakes, stockAdjustments, products, user, token, isAdmin, refreshStockTakes, refreshStockAdjustments, refreshProducts, setLoading } = useStore()
   const [tab, setTab] = useState('takes')
   const [modal, setModal] = useState(false)
   const [adjModal, setAdjModal] = useState(false)
@@ -112,35 +114,42 @@ export default function StockTakesPage() {
       return
     }
 
-    // Admins: apply immediately (with audit logging).
+    // Admins: submit, then approve in one go. This used to walk the products
+    // table row by row from the browser — one UPDATE, one adjustment and one
+    // ledger row per item, none of them in a transaction. A dropped connection
+    // halfway through left stock partly rewritten with an audit trail that
+    // disagreed with it. approve_stock_take does the whole thing atomically.
     if (!confirm('Save stock take with ' + filled.length + ' products counted?')) return
     setLoading(true, 'Saving...')
-    await sb.from('stock_takes').insert({ date: new Date().toISOString(), items, notes: notes.trim(), conducted_by: user?.name || '', status: 'approved', approved_by: user?.name || '', approved_at: new Date().toISOString() })
-    for (const item of items) {
-      if (item.variance !== 0) {
-        const prod = products.find(p => p.id === item.productId)
-        await sb.from('products').update({ quantity: item.countedQty }).eq('id', item.productId)
-        await sb.from('stock_adjustments').insert({ date: new Date().toISOString(), product_id: item.productId, product_name: item.name, qty: item.variance, reason: 'Stock Take', notes: notes.trim() || 'From stock take', adjusted_by: user?.name || '' })
-        try { await sb.from('stock_ledger').insert({ product_id: item.productId, product_name: item.name, previous_qty: prod?.quantity ?? item.systemQty, change_qty: item.variance, new_qty: item.countedQty, reason: 'Stock take', action_type: 'stock_take', staff: user?.name || '', reference: 'ST' }) } catch {}
-      }
-    }
+    const { data: row, error: insErr } = await sb.from('stock_takes')
+      .insert({ date: new Date().toISOString(), items, notes: notes.trim(), conducted_by: user?.name || '', status: 'pending' })
+      .select('id').single()
+    if (insErr || !row?.id) { toast.error('Could not save: ' + (insErr?.message || '')); setLoading(false); return }
+
+    const { data, error } = await sb.rpc('approve_stock_take', { p_token: token, p_id: row.id })
+    if (error || !data?.success) { toast.error(rpcMessage(error, data, 'Saved, but could not apply to stock')); setLoading(false); await refreshStockTakes(); return }
+
     await refreshStockTakes(); await refreshStockAdjustments(); await refreshProducts(); setLoading(false); setModal(false)
-    toast.success('Saved! ' + items.filter(i => i.variance !== 0).length + ' adjustments')
+    toast.success(`Saved — ${data.applied} product(s) updated`)
   }
 
   const approveTake = async (st) => {
     if (!confirm('Approve this stock take? Counted quantities will become the official stock.')) return
     setLoading(true, 'Approving...')
     const sb = getSupabase()
-    const { data, error } = await sb.rpc('approve_stock_take', { p_id: st.id, p_approver: user?.name || 'Admin' })
-    if (error || !data?.success) { toast.error('Approve failed: ' + (error?.message || data?.error)); setLoading(false); return }
+    const { data, error } = await sb.rpc('approve_stock_take', { p_token: token, p_id: st.id })
+    if (error || !data?.success) { toast.error(rpcMessage(error, data, 'Approve failed')); setLoading(false); return }
     await refreshStockTakes(); await refreshStockAdjustments(); await refreshProducts(); setLoading(false)
     toast.success(`Approved — ${data.applied} product(s) updated`)
   }
   const rejectTake = async (st) => {
-    const reason = prompt('Reason for rejecting?') || ''
+    const reason = prompt('Reason for rejecting?')
+    if (reason === null) return
     const sb = getSupabase()
-    await sb.from('stock_takes').update({ status: 'rejected', reject_reason: reason, approved_by: user?.name || 'Admin', approved_at: new Date().toISOString() }).eq('id', st.id)
+    // Goes through the gated function: the table itself is no longer writable
+    // from the browser, so a cashier cannot mark their own count approved.
+    const { data, error } = await sb.rpc('reject_stock_take', { p_token: token, p_id: st.id, p_reason: reason })
+    if (error || !data?.success) { toast.error(rpcMessage(error, data, 'Reject failed')); return }
     await refreshStockTakes(); toast.success('Rejected')
   }
 
@@ -163,7 +172,7 @@ export default function StockTakesPage() {
     <div >
       <div className="flex justify-between items-start flex-wrap gap-4 mb-5">
         <div>
-          <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight">Stock Stock & Adjustments Adjustments</h1>
+          <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight">Stock &amp; Adjustments</h1>
           <p className="text-gray-400 text-sm mt-0.5">Count inventory, track variances & adjustments</p>
         </div>
         <div className="flex gap-2">
@@ -205,7 +214,7 @@ export default function StockTakesPage() {
       {tab === 'takes' && (
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <div className="p-4 border-b border-gray-100"><h3 className="font-bold text-gray-800">Stock Take History ({stockTakes.length})</h3></div>
-          {stockTakes.length === 0 ? <div className="text-center py-16 text-gray-300"><span className="text-xl opacity-15">—</span>No stock takes yet</div> : (
+          {stockTakes.length === 0 ? <EmptyState icon={IconClipboard} title="No stock takes yet" hint="Print a count sheet to start one" /> : (
             <div className="divide-y divide-gray-50">
               {stockTakes.map(st => {
                 const variances = st.items.filter(i => (i.variance || 0) !== 0).length
@@ -247,7 +256,7 @@ export default function StockTakesPage() {
             <h3 className="font-bold text-gray-800">Adjustments ({stockAdjustments.length})</h3>
             <button onClick={() => setAdjModal(true)} className="h-8 px-3 bg-gray-50 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-100 transition">+ New</button>
           </div>
-          {stockAdjustments.length === 0 ? <div className="text-center py-16 text-gray-300"><span className="text-xl opacity-15">—</span>No adjustments yet</div> : (
+          {stockAdjustments.length === 0 ? <EmptyState icon={IconClipboard} title="No adjustments yet" /> : (
             <div className="divide-y divide-gray-50">
               {stockAdjustments.slice(0, 50).map(a => (
                 <div key={a.id} className="p-4 flex items-center gap-3">

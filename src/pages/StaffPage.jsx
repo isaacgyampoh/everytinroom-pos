@@ -3,9 +3,11 @@ import { useStore } from '../hooks/useStore'
 import { getSupabase } from '../lib/supabase'
 import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
+import { rpcMessage } from '../lib/rpcError'
 
 const PERMISSIONS = [
   { key: 'sales', label: 'Sales', desc: 'Create & process sales' },
+  { key: 'refunds', label: 'Refunds & Voids', desc: 'Pay money back and cancel sales' },
   { key: 'stock_taking', label: 'Stock Taking', desc: 'Print sheets, count, submit adjustments' },
   { key: 'product_receiving', label: 'Product Receiving', desc: 'Receive supplier deliveries' },
   { key: 'product_management', label: 'Product Management', desc: 'Add & edit products' },
@@ -16,7 +18,7 @@ const PERMISSIONS = [
 const emptyForm = { id: '', name: '', role: 'Cashier', pin: '', permissions: ['sales'] }
 
 export default function StaffPage() {
-  const { staff, refreshStaff, setLoading } = useStore()
+  const { staff, refreshStaff, setLoading, token } = useStore()
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState(emptyForm)
 
@@ -38,31 +40,33 @@ export default function StaffPage() {
 
   const isAdminRole = form.role === 'Admin'
 
+  // Staff writes go through save_staff/delete_staff, which check the caller's
+  // session server-side. The browser can no longer read or write the staff
+  // table directly, so a PIN clash is detected where the PINs actually live —
+  // the old client-side check compared against a field that was always
+  // undefined and therefore never once fired.
   const save = async () => {
     if (!form.name.trim()) { toast.error('Name is required'); return }
     if (!form.id && form.pin.length !== 4) { toast.error('4-digit PIN required'); return }
     if (form.pin && form.pin.length !== 4) { toast.error('PIN must be 4 digits'); return }
-    if (form.pin) {
-      const clash = staff.find(s => s.id !== form.id && s.pin === form.pin)
-      if (clash) { toast.error(`PIN already used by ${clash.name}`); return }
-    }
     setLoading(true, 'Saving...'); const sb = getSupabase()
-    const perms = isAdminRole
-      ? ['sales', 'stock_taking', 'product_receiving', 'product_management', 'inventory_view', 'reports', 'admin']
-      : form.permissions
-    const data = { name: form.name.trim(), role: form.role, active: true, permissions: perms }
-    if (form.pin) data.pin = form.pin
-    let err
-    if (form.id) ({ error: err } = await sb.from('staff').update(data).eq('id', form.id))
-    else ({ error: err } = await sb.from('staff').insert(data))
-    if (err) { toast.error('Save failed: ' + err.message); setLoading(false); return }
-    await refreshStaff(); setLoading(false); setModal(false); toast.success('Saved!')
+    const { data, error } = await sb.rpc('save_staff', {
+      p_token: token, p_id: form.id || null, p_name: form.name.trim(),
+      p_role: form.role, p_pin: form.pin || null, p_active: true,
+      p_permissions: isAdminRole ? [] : form.permissions,
+    })
+    setLoading(false)
+    if (error || !data?.success) { toast.error(rpcMessage(error, data, 'Save failed')); return }
+    await refreshStaff(); setModal(false); toast.success('Saved!')
   }
 
   const del = async (id) => {
-    if (!confirm('Delete this staff member?')) return; setLoading(true); const sb = getSupabase()
-    await sb.from('staff').delete().eq('id', id)
-    await refreshStaff(); setLoading(false); toast.success('Deleted!')
+    if (!confirm('Delete this staff member?')) return
+    setLoading(true); const sb = getSupabase()
+    const { data, error } = await sb.rpc('delete_staff', { p_token: token, p_id: id })
+    setLoading(false)
+    if (error || !data?.success) { toast.error(rpcMessage(error, data, 'Delete failed')); return }
+    await refreshStaff(); toast.success('Deleted!')
   }
 
   const permSummary = (s) => {

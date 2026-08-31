@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../hooks/useStore'
 import { money, num, today, weekStartDate, monthStart, isoDate } from '../lib/utils'
+import { IconChart, EmptyState } from '../components/Icons'
 
 export default function PerformancePage() {
   const { sales, staff, perfPeriod, setPerfPeriod } = useStore()
@@ -67,7 +68,7 @@ export default function PerformancePage() {
       </div>
 
       {/* Staff Cards */}
-      {staffData.length === 0 && <div className="text-center py-16 text-gray-300"><span className="text-xl opacity-15">—</span>No sales data for this period</div>}
+      {staffData.length === 0 && <EmptyState icon={IconChart} title="No sales in this period" hint="Pick a different date range above" />}
 
       <div className="space-y-4">
         {staffData.map((s, idx) => {
