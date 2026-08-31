@@ -6,13 +6,24 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://noiiuwkovoojkcwzup
 const SUPABASE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 const SHOP = 'EVERYTINROOM'
 
-// NaloPay credentials — read from Supabase secrets (fallbacks are EVERYTINROOM's
-// own live keys, so nothing can route through another account).
-const NALOPAY_MERCHANT_ID = Deno.env.get('NALOPAY_MERCHANT_ID') || 'TimA4kiLJWoQ5cTXLf8EKh'
-const NALOPAY_API_KEY = Deno.env.get('NALOPAY_API_KEY') || '3b3c6f0e30ae457904167129b84d4595268e684921a930caa38695c2a3e28304'
-const NALOPAY_AUTH = Deno.env.get('NALOPAY_AUTH_HEADER') || 'Basic 2503ad8373e7fd5faea6fd18c9deb3d282e20c6b822d690465be37a23cf3396286092e17bdd86c0a7a0a8c1117542e5a2d751c4dc0f739597d59f8272871b171'
+// Shared secret for the endpoints that spend money or send SMS on their own
+// (report, remind). Cron sends it as `x-task-secret`. While it is unset those
+// endpoints stay open to the whole internet — set it in Supabase secrets.
+const TASK_SECRET = Deno.env.get('TASK_SECRET') || ''
+
+// NaloPay + SMS credentials come from Supabase secrets ONLY.
+// They used to be hardcoded here as fallbacks, in a public GitHub repo, which
+// meant anyone could collect through this merchant account and send SMS billed
+// to the shop. Never put a live key back in this file.
+const NALOPAY_MERCHANT_ID = Deno.env.get('NALOPAY_MERCHANT_ID') || ''
+const NALOPAY_API_KEY = Deno.env.get('NALOPAY_API_KEY') || ''
+const NALOPAY_AUTH = Deno.env.get('NALOPAY_AUTH_HEADER') || ''
 const NALOPAY_TOKEN_URL = 'https://api.nalopay.com/clientapi/generate-payment-token/'
 const NALOPAY_COLLECTION_URL = 'https://api.nalopay.com/clientapi/collection/'
+
+for (const [name, value] of Object.entries({ PAYSTACK_SECRET, SUPABASE_KEY, NALOPAY_API_KEY, NALOPAY_AUTH })) {
+  if (!value) console.error(`MISSING SECRET: ${name} is not set — the paths that use it will fail.`)
+}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -21,12 +32,48 @@ const CORS = {
   'Content-Type': 'application/json',
 }
 
-// Nalo SMS credentials
-const NALO_SMS_USERNAME = 'ISAAC'
-const NALO_SMS_PASSWORD = 'Isaac@1024'
-const NALO_SMS_SENDER = 'EverytinRm'
+// Nalo SMS credentials — from Supabase secrets. The previous hardcoded
+// username/password pair is public and must be treated as compromised.
+const NALO_SMS_USERNAME = Deno.env.get('NALO_SMS_USERNAME') || ''
+const NALO_SMS_PASSWORD = Deno.env.get('NALO_SMS_PASSWORD') || ''
+const NALO_SMS_SENDER = Deno.env.get('NALO_SMS_SENDER') || 'EverytinRm'
+
+// Constant-time compare so a caller can't discover the secret byte by byte.
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
+// Paystack signs every webhook with HMAC-SHA512 of the RAW body, keyed on the
+// secret key. Without this check anyone could POST `charge.success` and flip an
+// order to Paid — the till polls that status and hands over the goods.
+async function paystackSignatureValid(rawBody: string, signature: string): Promise<boolean> {
+  if (!PAYSTACK_SECRET || !signature) return false
+  const key = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(PAYSTACK_SECRET),
+    { name: 'HMAC', hash: 'SHA-512' }, false, ['sign'],
+  )
+  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawBody))
+  const hex = Array.from(new Uint8Array(mac)).map(b => b.toString(16).padStart(2, '0')).join('')
+  return safeEqual(hex, signature.toLowerCase())
+}
+
+// Guards the endpoints that send SMS or run reports on their own.
+function taskAuthorised(req: Request): boolean {
+  if (!TASK_SECRET) {
+    console.warn('TASK_SECRET is not set — this endpoint is open to the internet.')
+    return true
+  }
+  return safeEqual(req.headers.get('x-task-secret') || '', TASK_SECRET)
+}
 
 async function sendSMS(to: string, message: string) {
+  if (!NALO_SMS_USERNAME || !NALO_SMS_PASSWORD) {
+    console.error('SMS not sent: NALO_SMS_USERNAME / NALO_SMS_PASSWORD are not set.')
+    return
+  }
   const recipients = to.split(',').map(r => r.trim())
   for (const recipient of recipients) {
     const phone = recipient.replace(/\s+/g, '').replace(/^0/, '233')
@@ -50,7 +97,18 @@ serve(async (req) => {
 
     // ==================== PAYSTACK WEBHOOK ====================
     if (action === 'webhook') {
-      const body = await req.json()
+      // Read the body as TEXT: the signature covers the exact bytes Paystack
+      // sent, so re-serialising the parsed JSON would not match.
+      const rawBody = await req.text()
+      const signature = req.headers.get('x-paystack-signature') || ''
+      if (!(await paystackSignatureValid(rawBody, signature))) {
+        console.warn('Rejected webhook with bad/missing signature from', req.headers.get('x-forwarded-for') || 'unknown')
+        return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 401, headers: { 'Content-Type': 'application/json' } })
+      }
+      let body: any
+      try { body = JSON.parse(rawBody) } catch {
+        return new Response(JSON.stringify({ error: 'Bad JSON' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
+      }
       console.log('WEBHOOK:', body.event, JSON.stringify(body.data || {}).slice(0, 500))
 
       if (body.event !== 'charge.success') {
@@ -481,6 +539,7 @@ serve(async (req) => {
 
     // ==================== SMS REPORTS ====================
     if (action === 'report') {
+      if (!taskAuthorised(req)) return new Response(JSON.stringify({ error: 'Unauthorised' }), { status: 401, headers: CORS })
       const reportUrl = new URL(req.url)
       const type = reportUrl.searchParams.get('type') || ''
       const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
@@ -650,6 +709,7 @@ serve(async (req) => {
 
     // ==================== PAYMENT REMINDERS ====================
     if (action === 'remind') {
+      if (!taskAuthorised(req)) return new Response(JSON.stringify({ error: 'Unauthorised' }), { status: 401, headers: CORS })
       const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
       const now = Date.now()
       

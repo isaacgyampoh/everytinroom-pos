@@ -4,6 +4,27 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const PAYSTACK_SECRET = Deno.env.get('PAYSTACK_SECRET_KEY') || ''
+
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
+// Paystack signs the RAW body with HMAC-SHA512 keyed on the secret key.
+// Unverified, this endpoint let anyone mark any order Paid.
+async function signatureValid(rawBody: string, signature: string): Promise<boolean> {
+  if (!PAYSTACK_SECRET || !signature) return false
+  const key = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(PAYSTACK_SECRET),
+    { name: 'HMAC', hash: 'SHA-512' }, false, ['sign'],
+  )
+  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawBody))
+  const hex = Array.from(new Uint8Array(mac)).map(b => b.toString(16).padStart(2, '0')).join('')
+  return safeEqual(hex, signature.toLowerCase())
+}
 
 serve(async (req) => {
   if (req.method !== 'POST') {
@@ -11,7 +32,19 @@ serve(async (req) => {
   }
 
   try {
-    const body = await req.json()
+    const rawBody = await req.text()
+    if (!(await signatureValid(rawBody, req.headers.get('x-paystack-signature') || ''))) {
+      console.warn('Rejected webhook with bad/missing signature')
+      return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+        status: 401, headers: { 'Content-Type': 'application/json' }
+      })
+    }
+    let body: any
+    try { body = JSON.parse(rawBody) } catch {
+      return new Response(JSON.stringify({ error: 'Bad JSON' }), {
+        status: 400, headers: { 'Content-Type': 'application/json' }
+      })
+    }
 
     console.log('WEBHOOK EVENT:', body.event)
     console.log('WEBHOOK DATA:', JSON.stringify(body.data || {}).slice(0, 500))
