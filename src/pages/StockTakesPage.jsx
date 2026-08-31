@@ -6,6 +6,7 @@ import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
 import { IconClipboard, EmptyState } from '../components/Icons'
 import { rpcMessage } from '../lib/rpcError'
+import { rpcCompat, isMissingFunction } from '../lib/rpc'
 
 export default function StockTakesPage() {
   const { stockTakes, stockAdjustments, products, user, token, isAdmin, refreshStockTakes, refreshStockAdjustments, refreshProducts, setLoading } = useStore()
@@ -137,7 +138,9 @@ export default function StockTakesPage() {
     if (!confirm('Approve this stock take? Counted quantities will become the official stock.')) return
     setLoading(true, 'Approving...')
     const sb = getSupabase()
-    const { data, error } = await sb.rpc('approve_stock_take', { p_token: token, p_id: st.id })
+    const { data, error } = await rpcCompat(sb, 'approve_stock_take',
+      { p_token: token, p_id: st.id },
+      { p_id: st.id, p_approver: user?.name || 'Admin' })
     if (error || !data?.success) { toast.error(rpcMessage(error, data, 'Approve failed')); setLoading(false); return }
     await refreshStockTakes(); await refreshStockAdjustments(); await refreshProducts(); setLoading(false)
     toast.success(`Approved — ${data.applied} product(s) updated`)
@@ -148,7 +151,11 @@ export default function StockTakesPage() {
     const sb = getSupabase()
     // Goes through the gated function: the table itself is no longer writable
     // from the browser, so a cashier cannot mark their own count approved.
-    const { data, error } = await sb.rpc('reject_stock_take', { p_token: token, p_id: st.id, p_reason: reason })
+    let { data, error } = await sb.rpc('reject_stock_take', { p_token: token, p_id: st.id, p_reason: reason })
+    if (isMissingFunction(error)) {
+      const r = await sb.from('stock_takes').update({ status: 'rejected', reject_reason: reason, approved_by: user?.name || 'Admin', approved_at: new Date().toISOString() }).eq('id', st.id)
+      error = r.error; data = r.error ? null : { success: true }
+    }
     if (error || !data?.success) { toast.error(rpcMessage(error, data, 'Reject failed')); return }
     await refreshStockTakes(); toast.success('Rejected')
   }

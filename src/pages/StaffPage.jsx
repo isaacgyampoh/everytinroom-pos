@@ -4,6 +4,7 @@ import { getSupabase } from '../lib/supabase'
 import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
 import { rpcMessage } from '../lib/rpcError'
+import { isMissingFunction } from '../lib/rpc'
 
 const PERMISSIONS = [
   { key: 'sales', label: 'Sales', desc: 'Create & process sales' },
@@ -50,11 +51,24 @@ export default function StaffPage() {
     if (!form.id && form.pin.length !== 4) { toast.error('4-digit PIN required'); return }
     if (form.pin && form.pin.length !== 4) { toast.error('PIN must be 4 digits'); return }
     setLoading(true, 'Saving...'); const sb = getSupabase()
-    const { data, error } = await sb.rpc('save_staff', {
+    let { data, error } = await sb.rpc('save_staff', {
       p_token: token, p_id: form.id || null, p_name: form.name.trim(),
       p_role: form.role, p_pin: form.pin || null, p_active: true,
       p_permissions: isAdminRole ? [] : form.permissions,
     })
+    if (isMissingFunction(error)) {
+      // Pre-015 the browser wrote the staff table directly. Keep that working
+      // so staff can still be managed; 015 replaces it with the gated RPC.
+      const perms = isAdminRole
+        ? ['sales', 'refunds', 'stock_taking', 'product_receiving', 'product_management', 'inventory_view', 'reports', 'admin']
+        : form.permissions
+      const row = { name: form.name.trim(), role: form.role, active: true, permissions: perms }
+      if (form.pin) row.pin = form.pin
+      const r = form.id
+        ? await sb.from('staff').update(row).eq('id', form.id)
+        : await sb.from('staff').insert(row)
+      error = r.error; data = r.error ? null : { success: true }
+    }
     setLoading(false)
     if (error || !data?.success) { toast.error(rpcMessage(error, data, 'Save failed')); return }
     await refreshStaff(); setModal(false); toast.success('Saved!')
@@ -63,7 +77,11 @@ export default function StaffPage() {
   const del = async (id) => {
     if (!confirm('Delete this staff member?')) return
     setLoading(true); const sb = getSupabase()
-    const { data, error } = await sb.rpc('delete_staff', { p_token: token, p_id: id })
+    let { data, error } = await sb.rpc('delete_staff', { p_token: token, p_id: id })
+    if (isMissingFunction(error)) {
+      const r = await sb.from('staff').delete().eq('id', id)
+      error = r.error; data = r.error ? null : { success: true }
+    }
     setLoading(false)
     if (error || !data?.success) { toast.error(rpcMessage(error, data, 'Delete failed')); return }
     await refreshStaff(); toast.success('Deleted!')
