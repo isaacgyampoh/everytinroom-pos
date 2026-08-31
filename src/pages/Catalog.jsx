@@ -144,7 +144,7 @@ export default function Catalog() {
             const promo = promoMap[p.id], dp = promo ? promo.price : p.price, hw = Number(p.wholesale_price||0) > 0 && Number(p.wholesale_min_qty||0) > 0
             return <div key={p.id} className="group cursor-pointer" onClick={() => open(p)}>
               <div className="product-shot w-full rounded-2xl relative mb-2.5">
-                {p.image ? <img src={thumb(p.image)} alt={p.name} className="group-hover:scale-[1.03] transition-transform duration-500" loading="lazy" /> : <div className="w-full h-full bg-stone-50" />}
+                {p.image ? <img src={thumb(p.image, 400)} alt={p.name} className="group-hover:scale-[1.03] transition-transform duration-500" loading="lazy" /> : <div className="w-full h-full bg-stone-50" />}
                 {promo && <div className="absolute top-2 left-2 bg-[#16181d] text-white text-[9px] font-bold px-2 py-1 rounded-lg">PROMO</div>}
               </div>
               <p className="text-xs text-stone-400 mb-0.5">{p.category}</p>

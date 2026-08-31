@@ -27,7 +27,7 @@ export const IMAGEKIT_ENDPOINT = 'https://ik.imagekit.io/bqikvsp59'
 // transform the CDN has to generate and store, so a handful of shared sizes
 // caches far better than eight arbitrary ones.
 const WIDTHS = [96, 200, 320, 480, 800]
-const snap = (w) => WIDTHS.find(x => x >= w) || WIDTHS[WIDTHS.length - 1]
+const snap = (w) => WIDTHS.find(x => x >= (Number(w) || 320)) || WIDTHS[WIDTHS.length - 1]
 
 export const thumb = (url, w) => {
   if (!url) return ''
@@ -39,8 +39,14 @@ export const thumb = (url, w) => {
   // never finished, and a failed <img> gets swapped for a grey placeholder —
   // which is why "images aren't showing". Resized, the same screen is ~2.5MB.
   if (url.includes('/storage/v1/object/public/')) {
+    const s = snap(w)
+    // `resize=contain` is NOT optional. Given width alone the transform returns
+    // a broken image for anything with EXIF orientation — a 4032x3024 photo
+    // came back 320x4032 (ratio 0.079), which rendered as a 9px sliver. That
+    // hit 242 of 534 photos. With width+height+contain the same photo returns
+    // 240x320, correctly proportioned, and a tenth of the bytes.
     return url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/')
-      + `?width=${snap(w)}&quality=70`
+      + `?width=${s}&height=${s}&resize=contain&quality=72`
   }
   // Already a render URL (defensive — don't double-transform).
   if (url.includes('/storage/v1/render/image/public/')) return url
