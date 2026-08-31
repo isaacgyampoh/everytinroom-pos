@@ -5,6 +5,7 @@ import { money, num } from '../lib/utils'
 import { broadcastDisplay } from '../hooks/useCustomerDisplay'
 import { terminalLabel } from '../lib/hardware'
 import { newClientRef, enqueue, isNetworkish } from '../lib/offlineQueue'
+import { callRecordSale } from '../lib/rpc'
 import Modal from './Modal'
 import Numpad from './Numpad'
 import toast from 'react-hot-toast'
@@ -121,7 +122,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
         return queueOffline(args, paymentMethod, extraData, clientRef)
       }
 
-      const { data, error } = await sb.rpc('record_sale', args)
+      const { data, error } = await callRecordSale(sb, args)
 
       // Network died mid-sale on a cash payment — take the money, park the
       // record, and let the customer go. The queue replays it on reconnect.

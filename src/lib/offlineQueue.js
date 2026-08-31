@@ -19,6 +19,7 @@
 // ============================================================================
 
 import { getSupabase } from './supabase'
+import { callRecordSale } from './rpc'
 
 const KEY = 'pos-offline-sales'
 const listeners = new Set()
@@ -84,7 +85,9 @@ export async function flush() {
     while (list.length) {
       const job = list[0]
       try {
-        const { data, error } = await sb.rpc('record_sale', job.args)
+        // Same signature fallback as the live path — a queued sale must not
+        // be dropped just because migration 020 has not run yet.
+        const { data, error } = await callRecordSale(sb, job.args)
         if (error) throw error
         if (data?.success) {
           sent++

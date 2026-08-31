@@ -4,6 +4,7 @@ import { getSupabase } from '../lib/supabase'
 import { money, num } from '../lib/utils'
 import toast from 'react-hot-toast'
 import { rpcMessage } from '../lib/rpcError'
+import { rpcCompat, isMissingFunction } from '../lib/rpc'
 
 // Supplier receiving. Warehouse staff create a delivery record (expected vs
 // actually received -> variance). Stock does NOT change until an admin approves.
@@ -67,7 +68,9 @@ export default function ReceivingPage() {
 
   const approve = async (rec) => {
     if (!confirm(`Approve ${rec.ref_no}? This will add the received quantities to stock.`)) return
-    const { data, error } = await sb.rpc('approve_receiving', { p_token: token, p_id: rec.id })
+    const { data, error } = await rpcCompat(sb, 'approve_receiving',
+      { p_token: token, p_id: rec.id },
+      { p_id: rec.id, p_approver: user?.name || 'Admin' })
     if (error || !data?.success) { toast.error(rpcMessage(error, data, 'Approve failed')); return }
     toast.success(`Approved — ${data.applied} product(s) stocked`)
     await refreshProducts(); load()
@@ -78,7 +81,13 @@ export default function ReceivingPage() {
     // The receivings table is no longer writable from the browser — otherwise
     // the person raising a delivery could approve it themselves and the
     // approval step would be theatre.
-    const { data, error } = await sb.rpc('reject_receiving', { p_token: token, p_id: rec.id, p_reason: reason })
+    let { data, error } = await sb.rpc('reject_receiving', { p_token: token, p_id: rec.id, p_reason: reason })
+    if (isMissingFunction(error)) {
+      // Pre-021: the table is still directly writable, which is how this
+      // worked before. Once 021 lands the RPC takes over and the write is gated.
+      const r = await sb.from('receivings').update({ status: 'rejected', reject_reason: reason, approved_by: user?.name || 'Admin', approved_at: new Date().toISOString() }).eq('id', rec.id)
+      error = r.error; data = r.error ? null : { success: true }
+    }
     if (error || !data?.success) { toast.error(rpcMessage(error, data, 'Reject failed')); return }
     toast.success('Rejected'); load()
   }

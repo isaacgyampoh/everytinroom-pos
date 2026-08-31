@@ -5,6 +5,7 @@ import { money, fmtDateTime } from '../lib/utils'
 import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
 import { rpcMessage } from '../lib/rpcError'
+import { rpcCompat } from '../lib/rpc'
 
 export default function WhatsAppOrders() {
   const { waOrders, waFilter, setWAFilter, refreshWAOrders, user, token, setLoading, loadAll } = useStore()
@@ -52,7 +53,9 @@ export default function WhatsAppOrders() {
     setLoading(true, 'Completing...')
     try {
       const sb = getSupabase()
-      const { data, error } = await sb.rpc('complete_wa_order', { p_token: token, p_order_id: id })
+      const { data, error } = await rpcCompat(sb, 'complete_wa_order',
+        { p_token: token, p_order_id: id },
+        { p_order_id: id, p_processed_by: user?.name || '' })
       setLoading(false)
       if (data?.success) { toast.success('Completed! ' + data.receiptNo); setSelected(null); loadAll() }
       else toast.error(rpcMessage(error, data, 'Could not complete the order'))

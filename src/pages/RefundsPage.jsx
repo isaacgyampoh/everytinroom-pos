@@ -5,6 +5,7 @@ import { money, num, fmtDate, today, isoDate } from '../lib/utils'
 import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
 import { rpcMessage } from '../lib/rpcError'
+import { rpcCompat } from '../lib/rpc'
 
 export default function RefundsPage() {
   const { refunds, user, token, setLoading, loadAll } = useStore()
@@ -38,7 +39,9 @@ export default function RefundsPage() {
     setLoading(true, 'Processing...')
     try {
       const sb = getSupabase()
-      const { data, error } = await sb.rpc('process_refund', { p_token: token, p_receipt_no: receiptNo.trim(), p_items: items, p_reason: reason.trim(), p_customer: sale.customer || 'Walk-in' })
+      const { data, error } = await rpcCompat(sb, 'process_refund',
+        { p_token: token, p_receipt_no: receiptNo.trim(), p_items: items, p_reason: reason.trim(), p_customer: sale.customer || 'Walk-in' },
+        { p_receipt_no: receiptNo.trim(), p_items: items, p_reason: reason.trim(), p_processed_by: user?.name || '', p_customer: sale.customer || 'Walk-in' })
       setLoading(false)
       if (data?.success) { toast.success('Refund ' + data.refundNo + ' done! ' + money(data.refundAmount)); setModal(false); loadAll() }
       else toast.error(rpcMessage(error, data, 'Refund failed'))
