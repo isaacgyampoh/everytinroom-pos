@@ -30,10 +30,10 @@ const ProductCard = memo(({ item, price, hasPromo, onAdd }) => {
           <span className="absolute top-1.5 left-1.5 bg-[#16181d] text-white text-[9px] font-bold tracking-[.09em] uppercase px-1.5 py-[3px] rounded">Promo</span>
         )}
         {out && (
-          <span className="absolute inset-x-0 bottom-0 bg-[#16181d]/85 text-white text-[10px] font-bold tracking-wide text-center py-1">OUT OF STOCK</span>
+          <span className="absolute inset-x-0 bottom-0 bg-[#16181d]/85 text-white text-[11px] font-bold tracking-wide text-center py-1">OUT OF STOCK</span>
         )}
         {low && (
-          <span className="absolute top-1.5 right-1.5 bg-white/95 text-[#b3402b] text-[10px] font-bold px-1.5 py-[3px] rounded tnum">{qty} left</span>
+          <span className="absolute top-1.5 right-1.5 bg-white/95 text-[#b3402b] text-[11px] font-bold px-2 py-[3px] rounded tnum shadow-sm">{qty} left</span>
         )}
       </div>
 
@@ -123,11 +123,11 @@ export default function POS() {
           rows stacked on top of each other. On a 1024x768 till those ate a
           third of the screen before a single product appeared — and the page
           title told the cashier something they already knew. */}
-      <div className="flex flex-col lg:flex-row lg:items-center gap-2.5 mb-3">
+      <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-2.5 mb-2.5">
         <div className="relative flex-1 min-w-0">
           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-300 pointer-events-none"><IconSearch size={18} /></span>
           <input
-            className="w-full h-12 pl-11 pr-4 panel text-[15px] font-medium placeholder:text-stone-300 focus:outline-none focus:border-gray-900 transition"
+            className="w-full h-12 md:h-12 pl-11 pr-4 panel text-[15px] font-medium placeholder:text-stone-300 focus:outline-none focus:border-gray-900 transition"
             placeholder="Search or scan a barcode" value={query}
             onChange={e => { setQuery(e.target.value); const v = e.target.value.trim(); if (v.length > 3) { const ex = products.find(p => p.name.toLowerCase() === v.toLowerCase()); if (ex && searchAdd(ex)) setQuery('') } }}
             onKeyDown={e => { if (e.key === 'Enter' && query.trim() && filtered[0] && mode !== 'bundle') { if (searchAdd(filtered[0])) setQuery('') } }}
@@ -152,7 +152,7 @@ export default function POS() {
       </div>
 
       {mode !== 'bundle' && (
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide mb-3.5 -mx-1 px-1">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide mb-2.5 md:mb-3.5 -mx-1 px-1">
           {categories.map(c => (
             <button key={c} onClick={() => setCat(c)}
               className={`h-8 px-3.5 rounded-full text-[12px] font-semibold whitespace-nowrap border transition ${selectedCat === c ? 'bg-[#16181d] text-white border-[#16181d]' : 'bg-transparent text-stone-500 border-stone-300 hover:border-stone-400 hover:text-stone-700'}`}>

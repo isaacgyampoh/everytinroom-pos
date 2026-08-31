@@ -321,3 +321,8 @@ export const useStore = create((set, get) => ({
     set({ products })
   },
 }))
+
+// Dev-only handle so the running app can be driven from the console or a
+// headless browser (responsive checks, reproducing a state without a PIN).
+// Stripped from production builds by the import.meta.env.DEV guard.
+if (import.meta.env.DEV && typeof window !== 'undefined') window.__store = useStore

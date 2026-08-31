@@ -190,7 +190,7 @@ export default function Navigation({ onOpenCart }) {
     {/* Mobile Bottom Nav */}
     <nav className="flex md:hidden fixed bottom-0 left-0 right-0 glass safe-bottom px-3 pt-2 z-[100] border-t border-stone-200/30">
       {MOB.filter(n => (!n.admin || isAdmin) && (!n.perm || can(n.perm))).map(n => (
-        <button key={n.id} onClick={() => go(n.id)} className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-xl text-[10px] font-semibold relative transition ${page === n.id ? 'text-gray-800' : 'text-stone-300'}`}>
+        <button key={n.id} onClick={() => go(n.id)} className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-xl text-[11px] font-semibold relative transition ${page === n.id ? 'text-gray-800' : 'text-stone-300'}`}>
           <span className="w-5 h-5 flex items-center justify-center">{icons[n.id] || <I d="M12 12h.01" />}</span>
           {n.label}
           {n.wa && wa > 0 && <span className="absolute top-0 right-1/4 w-3.5 h-3.5 bg-red-500 rounded-full text-[8px] font-bold text-white flex items-center justify-center">{wa}</span>}
