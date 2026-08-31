@@ -4,6 +4,12 @@
 
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 html, body, #root { min-height: 100vh; min-height: 100dvh; }
+/* The mobile menu is an off-canvas panel parked at translate-x-full. A fixed
+   element sitting past the right edge still extends the document, so every
+   phone page could be dragged ~50px sideways into empty space. Clipping the
+   root is the standard fix; nothing in this app uses position:sticky, so
+   there is no side effect. */
+html, body { overflow-x: hidden; max-width: 100%; }
 body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 15px; background: #f6f6f5; color: #16181d; letter-spacing: -0.011em; transition: background .2s ease, color .2s ease; }
 /* Fill correctly in fullscreen/kiosk and on mobile browsers (handles the address bar). */
 .fill-screen { height: 100vh; height: 100dvh; }
@@ -25,6 +31,18 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Inter', -apple-system, system-ui, sans-se
 }
 /* Headline figures: tight, dark, unmistakably the thing you came to read. */
 .figure { font-variant-numeric: tabular-nums; letter-spacing: -0.03em; font-weight: 700; line-height: 1; }
+
+/* ── Touch targets ─────────────────────────────────────────────────────────
+   On a finger-driven device the chips, filter pills and icon buttons measured
+   28-36px. Apple's guidance is 44px and Material's is 48; below ~40 a POS gets
+   mis-taps at the counter. `pointer: coarse` scopes this to touch input, so
+   mouse-driven desktop layouts keep their tighter proportions. */
+@media (pointer: coarse) {
+  button, [role="button"], select,
+  input:not([type="checkbox"]):not([type="radio"]) { min-height: 40px; }
+  /* Chips and segmented tabs sit in rows — give them width to match. */
+  button.rounded-full, [role="tab"] { padding-left: 14px; padding-right: 14px; }
+}
 
 /* ── Data tables on small screens ──────────────────────────────────────────
    Every list in the app was a table with a min-width, so on a phone you either

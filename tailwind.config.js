@@ -12,6 +12,11 @@ export default {
         wa: '#25d366',
       },
       borderRadius: { '2xl': '14px', '3xl': '18px', '4xl': '24px' },
+      // `h-13` is used on 33 inputs and buttons across the app but is not in
+      // Tailwind's default scale, so it generated no CSS at all and every one
+      // of them collapsed to content height — about 28px, half the intended
+      // size and well under a usable tap target. Defining it fixes all 33.
+      spacing: { 13: '3.25rem' },
     },
   },
   plugins: [],
