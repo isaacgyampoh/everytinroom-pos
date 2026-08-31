@@ -3,11 +3,12 @@ import { useStore } from '../hooks/useStore'
 import { getSupabase } from '../lib/supabase'
 import { money, num } from '../lib/utils'
 import toast from 'react-hot-toast'
+import { rpcMessage } from '../lib/rpcError'
 
 // Supplier receiving. Warehouse staff create a delivery record (expected vs
 // actually received -> variance). Stock does NOT change until an admin approves.
 export default function ReceivingPage() {
-  const { products, refreshProducts, user, isAdmin, can } = useStore()
+  const { products, refreshProducts, user, token, isAdmin, can } = useStore()
   const sb = getSupabase()
 
   const [tab, setTab] = useState('new')        // new | pending | history
@@ -66,14 +67,19 @@ export default function ReceivingPage() {
 
   const approve = async (rec) => {
     if (!confirm(`Approve ${rec.ref_no}? This will add the received quantities to stock.`)) return
-    const { data, error } = await sb.rpc('approve_receiving', { p_id: rec.id, p_approver: user?.name || 'Admin' })
-    if (error || !data?.success) { toast.error('Approve failed: ' + (error?.message || data?.error)); return }
+    const { data, error } = await sb.rpc('approve_receiving', { p_token: token, p_id: rec.id })
+    if (error || !data?.success) { toast.error(rpcMessage(error, data, 'Approve failed')); return }
     toast.success(`Approved — ${data.applied} product(s) stocked`)
     await refreshProducts(); load()
   }
   const reject = async (rec) => {
-    const reason = prompt('Reason for rejecting?') || ''
-    await sb.from('receivings').update({ status: 'rejected', reject_reason: reason, approved_by: user?.name || 'Admin', approved_at: new Date().toISOString() }).eq('id', rec.id)
+    const reason = prompt('Reason for rejecting?')
+    if (reason === null) return
+    // The receivings table is no longer writable from the browser — otherwise
+    // the person raising a delivery could approve it themselves and the
+    // approval step would be theatre.
+    const { data, error } = await sb.rpc('reject_receiving', { p_token: token, p_id: rec.id, p_reason: reason })
+    if (error || !data?.success) { toast.error(rpcMessage(error, data, 'Reject failed')); return }
     toast.success('Rejected'); load()
   }
 

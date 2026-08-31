@@ -1,120 +1,35 @@
 import { useEffect, useRef } from 'react'
 import { money, fmtDateTime, SHOP } from '../lib/utils'
+import { printReceipt, kickDrawer, getSettings } from '../lib/hardware'
+import toast from 'react-hot-toast'
 
 export default function ReceiptPreview({ sale, onClose }) {
   const printedRef = useRef(false)
 
   const items = Array.isArray(sale?.items) ? sale.items : []
 
-  const doPrint = () => {
-    const w = window.open('', '_blank', 'width=400,height=700')
-    if (!w) return
-    w.document.write(`<!DOCTYPE html><html><head><style>
-      * { margin: 0; padding: 0; color: #000 !important; box-sizing: border-box; }
-      body { width: 72mm; font-family: 'Arial', sans-serif; font-size: 12px; line-height: 1.4; padding: 3mm 2mm; margin: 0 auto; }
-
-      .hdr { text-align: center; padding-bottom: 4mm; border-bottom: 1px dashed #000; }
-      .shop-name { font-size: 21px; font-weight: 900; letter-spacing: 1px; white-space: nowrap; overflow: hidden; -webkit-text-stroke: 0.4px #000; }
-      .shop-info { font-size: 10px; margin-top: 1px; }
-
-      .title { text-align: center; font-size: 13px; font-weight: 900; margin: 3mm 0; letter-spacing: 2px; }
-
-      .meta { border-bottom: 1px dashed #000; padding-bottom: 3mm; margin-bottom: 3mm; }
-      .meta-row { display: flex; justify-content: space-between; padding: 1px 0; font-size: 11px; }
-      .meta-label { color: #555; }
-      .meta-val { font-weight: 700; text-align: right; max-width: 55%; word-break: break-all; }
-
-      .items-hdr { display: flex; justify-content: space-between; font-size: 10px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 1px; padding-bottom: 2mm; border-bottom: 1px solid #ccc; margin-bottom: 2mm; }
-
-      .item { margin-bottom: 3mm; }
-      .item-name { font-weight: 900; font-size: 12px; }
-      .item-line { display: flex; justify-content: space-between; font-size: 11px; padding-left: 2mm; margin-top: 1px; }
-      .item-qty { color: #555; }
-      .item-amt { font-weight: 700; }
-
-      .sep { border-top: 1px dashed #000; margin: 3mm 0; }
-
-      .total-row { display: flex; justify-content: space-between; font-size: 12px; padding: 1px 0; }
-      .total-label { color: #555; }
-      .total-val { font-weight: 700; }
-
-      .grand { display: flex; justify-content: space-between; font-size: 16px; font-weight: 900; border-top: 2px solid #000; padding-top: 3mm; margin-top: 3mm; }
-      .grand-label { }
-      .grand-val { }
-
-      .footer { text-align: center; border-top: 1px dashed #000; padding-top: 3mm; margin-top: 4mm; font-size: 10px; line-height: 1.6; }
-
-      body { position: relative; }
-      .wm { position: absolute; inset: 0; z-index: 0; overflow: hidden; opacity: 0.16; font-weight: 700; font-size: 9px; letter-spacing: 1px; line-height: 20px; word-spacing: 8px; word-break: break-all; pointer-events: none; }
-      .rc { position: relative; z-index: 1; }
-
-      @media print { @page { size: 80mm auto; margin: 0; } body { width: 72mm; } }
-    </style></head><body>
-
-      <div class="wm">${'everytinroom '.repeat(700)}</div>
-      <div class="rc">
-
-      <div class="hdr">
-        <div class="shop-name">EVERYTINROOM</div>
-        <div class="shop-info">${SHOP.address}</div>
-        <div class="shop-info">Tel: ${SHOP.phone}</div>
-        <div class="shop-info">${SHOP.website}</div>
-      </div>
-
-      <div class="title">SALES RECEIPT</div>
-
-      <div class="meta">
-        <div class="meta-row"><span class="meta-label">Receipt:</span><span class="meta-val">${sale.receiptNo}</span></div>
-        <div class="meta-row"><span class="meta-label">Date:</span><span class="meta-val">${fmtDateTime(sale.date)}</span></div>
-        <div class="meta-row"><span class="meta-label">Customer:</span><span class="meta-val">${sale.customer || 'Walk-in'}</span></div>
-        <div class="meta-row"><span class="meta-label">Cashier:</span><span class="meta-val">${sale.cashier}</span></div>
-        <div class="meta-row"><span class="meta-label">Payment:</span><span class="meta-val">${sale.payment === 'Paystack' ? 'Momo' : sale.payment}</span></div>
-        <div class="meta-row"><span class="meta-label">Type:</span><span class="meta-val">${sale.type || 'Retail'}</span></div>
-      </div>
-
-      <div class="items-hdr"><span>Item</span><span>Amount</span></div>
-
-      ${items.map(it => `
-        <div class="item">
-          <div class="item-name">${it.name}</div>
-          <div class="item-line">
-            <span class="item-qty">${it.qty} x GHS ${Number(it.price).toFixed(2)}</span>
-            <span class="item-amt">GHS ${Number(it.lineTotal).toFixed(2)}</span>
-          </div>
-        </div>
-      `).join('')}
-
-      <div class="sep"></div>
-
-      <div class="total-row"><span class="total-label">Subtotal</span><span class="total-val">GHS ${Number((sale.total || 0) + (sale.discount || 0)).toFixed(2)}</span></div>
-      ${(sale.discount || 0) > 0 ? `<div class="total-row"><span class="total-label">Discount</span><span class="total-val">-GHS ${Number(sale.discount).toFixed(2)}</span></div>` : ''}
-      ${sale.payment === 'Split' && sale.splitCash > 0 ? `<div class="total-row"><span class="total-label">Cash</span><span class="total-val">GHS ${Number(sale.splitCash).toFixed(2)}</span></div>` : ''}
-      ${sale.payment === 'Split' && sale.splitMomo > 0 ? `<div class="total-row"><span class="total-label">Momo</span><span class="total-val">GHS ${Number(sale.splitMomo).toFixed(2)}</span></div>` : ''}
-
-      <div class="grand">
-        <span class="grand-label">TOTAL</span>
-        <span class="grand-val">GHS ${Number(sale.total).toFixed(2)}</span>
-      </div>
-
-      <div class="footer">
-        <p>Thank you for shopping with us!</p>
-        <p>${SHOP.website}</p>
-        <p style="color:#999!important;margin-top:2mm;">Goods sold are not returnable</p>
-      </div>
-
-      </div>
-
-    </body></html>`)
-    w.document.close()
-    setTimeout(() => { w.focus(); w.print(); setTimeout(() => w.close(), 1000) }, 300)
+  // Printing, paper width, drawer kick and the choice between the browser
+  // dialog and raw ESC/POS all live in the hardware layer, configured per
+  // terminal. This component just says "print this sale".
+  const doPrint = async () => {
+    const r = await printReceipt(sale, { force: true })
+    if (!r.ok) toast.error(r.error || 'Could not print')
+    else if (r.warning) toast('Printed via the browser — ' + r.warning, { icon: '!' })
   }
 
-  // Auto-print receipt for completed Cash sales (once)
+  const openDrawer = async () => {
+    const r = await kickDrawer()
+    if (!r.ok) toast.error(r.error)
+  }
+
+  // Auto-print once, for any completed sale — not just cash. A customer paying
+  // by MoMo still expects a receipt, and the old rule quietly denied them one.
   useEffect(() => {
-    if (sale && !printedRef.current && sale.payment === 'Cash') {
-      printedRef.current = true
-      setTimeout(() => doPrint(), 250)
-    }
+    if (!sale || printedRef.current) return
+    if (!getSettings().autoPrint) return
+    printedRef.current = true
+    const t = setTimeout(() => { printReceipt(sale) }, 250)
+    return () => clearTimeout(t)
   }, [sale]) // eslint-disable-line
 
   if (!sale) return null
@@ -184,6 +99,7 @@ export default function ReceiptPreview({ sale, onClose }) {
         {/* Actions */}
         <div className="flex gap-2 px-5 pb-5">
           <button onClick={doPrint} className="flex-1 h-12 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-sm font-bold active:scale-95 transition">Print Receipt</button>
+          <button onClick={openDrawer} title="Open cash drawer" className="h-12 px-4 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-semibold text-gray-600 transition">Drawer</button>
           <button onClick={onClose} className="h-12 px-5 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-semibold text-gray-600 transition">Close</button>
         </div>
       </div>

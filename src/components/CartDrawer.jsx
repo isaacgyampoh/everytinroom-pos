@@ -3,8 +3,12 @@ import { useStore } from '../hooks/useStore'
 import { getSupabase } from '../lib/supabase'
 import { money, num } from '../lib/utils'
 import { broadcastDisplay } from '../hooks/useCustomerDisplay'
+import { terminalLabel } from '../lib/hardware'
+import { newClientRef, enqueue, isNetworkish } from '../lib/offlineQueue'
 import Modal from './Modal'
+import Numpad from './Numpad'
 import toast from 'react-hot-toast'
+import { IconCart, EmptyState } from './Icons'
 
 const CHARGE_URL = 'https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo'
 
@@ -33,8 +37,27 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
   const pollRef = useRef(null)
   const autoCloseRef = useRef(null)
 
+  // Which money field the on-screen keypad is typing into.
+  const [padTarget, setPadTarget] = useState(null) // 'cash' | 'split' | 'discount'
+  const padValue = padTarget === 'cash' ? cashReceived : padTarget === 'split' ? splitCash : String(discount ?? '')
+  const setPadValue = (v) => {
+    if (padTarget === 'cash') setCashReceived(v)
+    else if (padTarget === 'split') setSplitCash(v)
+    else if (padTarget === 'discount') setDiscount(v)
+  }
+  const padKey = (d) => {
+    const cur = String(padValue || '')
+    if (d === '.' && cur.includes('.')) return
+    setPadValue(cur === '0' && d !== '.' ? d : cur + d)
+  }
+  const padBack = () => setPadValue(String(padValue || '').slice(0, -1))
+
   const sub = cart.reduce((a, c) => a + c.lineTotal, 0)
-  const total = Math.max(0, sub - num(discount))
+  // Clamped once, here, and used for BOTH the on-screen total and what is sent
+  // to the server — the two used to disagree whenever the discount exceeded the
+  // basket, and the books took the negative figure.
+  const safeDiscount = Math.min(Math.max(num(discount), 0), sub)
+  const total = sub - safeDiscount
   const cnt = cart.reduce((a, c) => a + c.qty, 0)
   const splitRemainder = total - num(splitCash)
   const phoneValid = phone.trim().length >= 9
@@ -54,26 +77,76 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
   }, [momoStep, waitMode])
   useEffect(() => { localStorage.setItem('heldCarts', JSON.stringify(heldCarts)) }, [heldCarts])
 
+  // Park a sale that could not reach the server and hand back a provisional
+  // receipt so the counter keeps moving. The receipt number is marked so nobody
+  // mistakes it for a filed one — the real number is issued on replay.
+  const queueOffline = (args, paymentMethod, extraData, clientRef) => {
+    const left = enqueue(args, { cashier: user?.name || '' })
+    deductStock(cart)
+    toast(`Saved offline (${left} waiting) — will file itself when the internet returns`, { icon: '!', duration: 5000 })
+    return {
+      receiptNo: 'OFFLINE-' + clientRef.slice(3, 11), offline: true,
+      date: new Date().toISOString(), customer: phone.trim(), cashier: user?.name || '',
+      payment: paymentMethod, type: mode === 'wholesale' ? 'Wholesale' : 'Retail',
+      items: cart, total, discount: safeDiscount,
+      splitCash: extraData.splitCash, splitMomo: extraData.splitMomo,
+    }
+  }
+
   const recordSale = async (paymentMethod, extraData = {}) => {
     const sb = getSupabase(); if (!sb) return null
     try {
-      const { data, error } = await sb.rpc('record_sale', {
-        p_items: cart, p_customer: phone.trim(), p_payment: paymentMethod,
-        p_discount: num(discount), p_type: mode === 'wholesale' ? 'Wholesale' : 'Retail', p_cashier: user?.name || '',
-      })
+      // Strip costPrice before sending. The server reads cost from the products
+      // table now, and `sales.items` is world-readable — leaving cost in the
+      // line items would put the shop's margins back into a table every till
+      // can select from.
+      const items = cart.map(({ costPrice, ...rest }) => rest)
+      // Generated once per attempt. If the sale is queued offline and replayed,
+      // the server matches on this and refuses to ring the basket up twice.
+      const clientRef = newClientRef()
+      const args = {
+        p_items: items, p_customer: phone.trim(), p_payment: paymentMethod,
+        p_discount: safeDiscount, p_type: mode === 'wholesale' ? 'Wholesale' : 'Retail', p_cashier: user?.name || '',
+        // Written in the same transaction as the sale. This used to be a second
+        // UPDATE fired after record_sale returned; when that call failed the
+        // cash half of a split simply disappeared from the books.
+        p_split_cash: num(extraData.splitCash) || 0,
+        p_split_momo: num(extraData.splitMomo) || 0,
+        p_terminal: terminalLabel(),
+        p_client_ref: clientRef,
+      }
+
+      const offlineable = paymentMethod === 'Cash' || paymentMethod === 'Split'
+      if (offlineable && typeof navigator !== 'undefined' && navigator.onLine === false) {
+        return queueOffline(args, paymentMethod, extraData, clientRef)
+      }
+
+      const { data, error } = await sb.rpc('record_sale', args)
+
+      // Network died mid-sale on a cash payment — take the money, park the
+      // record, and let the customer go. The queue replays it on reconnect.
+      // Only for connection failures: a sale the SERVER rejected would be
+      // dropped on replay, so queuing it would hand the cashier a receipt for
+      // a sale that quietly never gets filed.
+      if (!data && error && offlineable && isNetworkish(error)) {
+        return queueOffline(args, paymentMethod, extraData, clientRef)
+      }
       if (data?.success) {
-        if (extraData.splitCash !== undefined) {
-          await sb.from('sales').update({ split_cash: num(extraData.splitCash), split_momo: num(extraData.splitMomo) }).eq('receipt_no', data.receiptNo)
+        // The server reports any line where book stock was below what we sold,
+        // instead of silently flooring the count at zero.
+        const short = Array.isArray(data.oversold) ? data.oversold : []
+        if (short.length) {
+          toast.error(`Stock count is off: ${short.map(x => `${x.name} (had ${x.had}, sold ${x.wanted})`).join(', ')}`, { duration: 6000 })
         }
         deductStock(cart)
-        return { receiptNo: data.receiptNo, date: new Date().toISOString(), customer: phone.trim(), cashier: user?.name || '', payment: paymentMethod, type: mode === 'wholesale' ? 'Wholesale' : 'Retail', items: cart, total: data.total, discount: data.discount, splitCash: extraData.splitCash, splitMomo: extraData.splitMomo }
+        return { receiptNo: data.receiptNo, date: new Date().toISOString(), customer: phone.trim(), cashier: user?.name || '', payment: paymentMethod, type: mode === 'wholesale' ? 'Wholesale' : 'Retail', items: cart, total: data.total, discount: data.discount, splitCash: extraData.splitCash, splitMomo: extraData.splitMomo, cashReceived: num(cashReceived) }
       } else { toast.error(data?.error || error?.message || 'Error'); return null }
     } catch (e) { toast.error('Error: ' + e.message); return null }
   }
 
   const finishSale = (saleData) => {
     clearCart(); setDiscount(0); setPhone(''); setPayOpen(false); setSplitMode(false); setSplitCash(''); setMomoStep('idle'); setMomoMessage('')
-    setIsWhatsApp(false); setWaCtx(null); setWaitMode('ussd'); setPromptOrderId(null); setPayMethod(''); setCashReceived('')
+    setIsWhatsApp(false); setWaCtx(null); setWaitMode('ussd'); setPromptOrderId(null); setPayMethod(''); setCashReceived(''); setPadTarget(null)
     if (pollRef.current) clearInterval(pollRef.current)
     onClose()
     if (onReceipt) onReceipt(saleData)
@@ -254,9 +327,21 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
       const orderNo = (isWhatsApp ? 'WA-' : 'POS-') + Date.now().toString(36).toUpperCase()
       const items = cart.map(c => ({ name: c.name, qty: c.qty, price: c.price, lineTotal: c.lineTotal }))
       
-      // Get next USSD code
-      const { data: mc } = await sb.from('whatsapp_orders').select('ussd_code').order('ussd_code', { ascending: false }).limit(1)
-      const uc = (mc?.[0]?.ussd_code || 0) + 1
+      // Next USSD pay code, allocated atomically by the database. Reading
+      // `max + 1` from the browser handed the same code to two customers when
+      // two tills generated one within moments of each other — and the poll
+      // below watches by code, so a payment could land on the wrong order.
+      let uc = null
+      const { data: allocated, error: ucErr } = await sb.rpc('next_ussd_code')
+      if (!ucErr && allocated) uc = allocated
+      else {
+        // Migration 016 not run yet — fall back to the old max+1 read so the
+        // counter keeps working. It carries the original race; the RPC is the fix.
+        console.warn('next_ussd_code unavailable, using legacy max+1:', ucErr?.message)
+        const { data: mc } = await sb.from('whatsapp_orders').select('ussd_code').order('ussd_code', { ascending: false }).limit(1)
+        uc = (mc?.[0]?.ussd_code || 0) + 1
+      }
+      if (!uc) { setMomoStep('failed'); setMomoMessage('Could not allocate a pay code. Try again.'); setProcessing(false); return }
 
       // Create order
       await sb.from('whatsapp_orders').insert({
@@ -379,7 +464,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
   const handleOpenPayment = () => {
     if (cnt === 0) return
     // Reset selection each time the payment sheet opens.
-    setSplitMode(false); setSplitCash(''); setPhone(''); setCashReceived('')
+    setSplitMode(false); setSplitCash(''); setPhone(''); setCashReceived(''); setPadTarget(null)
     setPayMethod(isWhatsApp ? 'WhatsApp' : '') // no method pre-selected for walk-in
     setPayOpen(true)
   }
@@ -407,21 +492,16 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
         {/* Cart Items */}
         <div className="flex-1 overflow-y-auto px-5 py-3">
           {cnt === 0 ? (
-            <div className="text-center py-14">
-              <div className="text-xl opacity-15">Empty cart</div>
-              <p className="text-gray-400 text-sm font-medium">Your cart is empty</p>
-              <p className="text-gray-300 text-xs mt-1">Add products from the POS page</p>
-            </div>
+            <EmptyState icon={IconCart} title="Cart is empty" hint="Scan an item, or tap one on the Point of Sale screen" />
           ) : (
             <div className="space-y-2">
               {cart.map((c, i) => (
                 <div key={i} className="cart-item flex items-center gap-3 p-3 rounded-xl bg-gray-50/80 border border-gray-100 hover:bg-gray-50 transition">
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-gray-900 leading-tight">{c.name}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">
+                    <div className="text-[14px] font-semibold text-gray-900 leading-[1.3] line-clamp-2">{c.name}</div>
+                    <div className="text-[12px] text-gray-400 mt-0.5 tnum">
                       {money(c.price)} each
-                      {c.isPromo && <span className="ml-1 text-orange-500 font-bold">• Promo </span>}
-                      {!c.isPromo && c.originalPrice && c.price < c.originalPrice && <span className="ml-1 text-green-600 font-bold">• Wholesale ✓</span>}
+                      {c.isPromo && <span className="ml-1.5 text-[#b3402b] font-bold">Promo</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -439,15 +519,32 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
 
         {/* Footer */}
         <div className="px-5 py-4 border-t border-gray-100 bg-white safe-bottom">
-          <div className="space-y-2 mb-3">
-            <div className="flex justify-between text-sm"><span className="text-gray-400">Subtotal</span><span className="font-semibold text-gray-900">{money(sub)}</span></div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-400">Discount</span>
-              <input type="number" className="w-20 h-8 px-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-right focus:outline-none focus:border-gray-400" value={discount} min={0} onChange={e => setDiscount(e.target.value)} />
+          {/* The total is the single most-read number in the whole app — it is
+              said out loud to the customer. It was 20px in mid-grey, the same
+              weight as the button under it. */}
+          <div className="mb-3.5">
+            <div className="flex justify-between text-[13px] mb-1.5">
+              <span className="text-gray-400">Subtotal</span>
+              <span className="tnum font-semibold text-gray-600">{money(sub)}</span>
             </div>
-            <div className="flex justify-between items-baseline pt-2 border-t border-dashed border-gray-200">
-              <span className="text-base font-bold text-gray-900">Total</span>
-              <span className="text-xl font-bold text-gray-700">{money(total)}</span>
+            <div className="flex justify-between items-center text-[13px]">
+              <span className="text-gray-400">Discount</span>
+              <div className="flex items-center gap-1.5">
+                {safeDiscount > 0 && <span className="text-[11px] text-[#b3402b] font-semibold tnum">−{money(safeDiscount)}</span>}
+                <input type="text" inputMode="decimal" placeholder="0"
+                  className="w-[68px] h-9 px-2 bg-gray-50 border border-gray-200 rounded-lg text-[13px] font-semibold text-right tnum focus:outline-none focus:border-gray-900 transition"
+                  value={discount} onChange={e => setDiscount(e.target.value.replace(/[^0-9.]/g, ''))} />
+              </div>
+            </div>
+            {num(discount) > sub && sub > 0 && (
+              <p className="text-[11px] text-[#b3402b] font-medium mt-1 text-right">Capped at the basket total</p>
+            )}
+            <div className="flex justify-between items-baseline pt-3 mt-3 border-t border-dashed border-gray-300">
+              <span className="text-[13px] font-bold uppercase tracking-[.06em] text-gray-500">Total</span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[12px] font-semibold text-gray-400">GHS</span>
+                <span className="figure text-[30px] text-gray-900">{Number(total).toFixed(2)}</span>
+              </div>
             </div>
           </div>
 
@@ -461,8 +558,8 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
           </button>
 
           <button onClick={handleOpenPayment} disabled={cnt === 0}
-            className="w-full h-12 bg-gray-900 hover:bg-gray-800 rounded-xl text-white text-base font-bold disabled:opacity-30 active:scale-[.98] transition-all ">
-            Complete Sale · {money(total)}
+            className="w-full h-14 bg-[#16181d] hover:bg-black rounded-[12px] text-white text-[16px] font-bold disabled:opacity-25 disabled:hover:bg-[#16181d] active:scale-[.98] transition-all">
+            {cnt === 0 ? 'Add items to sell' : `Take payment · ${money(total)}`}
           </button>
 
 
@@ -516,7 +613,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1.5">Amount received (optional)</label>
-                  <input type="number" inputMode="decimal" className="w-full h-11 px-4 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-gray-400" placeholder="0.00" value={cashReceived} onChange={e => setCashReceived(e.target.value)} />
+                  <input type="text" inputMode="decimal" readOnly onFocus={() => setPadTarget('cash')} onClick={() => setPadTarget('cash')} className={`w-full h-12 px-4 bg-white border rounded-xl text-base font-bold focus:outline-none ${padTarget === 'cash' ? 'border-gray-900 ring-2 ring-gray-900/10' : 'border-gray-200'}`} placeholder="Tap to enter cash received" value={cashReceived} />
                   {num(cashReceived) >= total && num(cashReceived) > 0 && (
                     <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-200">
                       <span className="text-sm font-semibold text-gray-500">Change</span>
@@ -545,7 +642,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                 <div className="text-sm font-bold text-[#16181d]">Split Payment · {money(total)}</div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1.5">Cash Amount received</label>
-                  <input type="number" inputMode="decimal" className="w-full h-11 px-4 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-gray-400" placeholder="0.00" value={splitCash} min={0} max={total} onChange={e => setSplitCash(e.target.value)} />
+                  <input type="text" inputMode="decimal" readOnly onFocus={() => setPadTarget('split')} onClick={() => setPadTarget('split')} className={`w-full h-12 px-4 bg-white border rounded-xl text-base font-bold focus:outline-none ${padTarget === 'split' ? 'border-gray-900 ring-2 ring-gray-900/10' : 'border-gray-200'}`} placeholder="Tap to enter cash part" value={splitCash} />
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-gray-200">
                   <span className="text-sm font-semibold text-gray-500">MoMo (prompt) portion</span>
@@ -558,6 +655,21 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
                     <p className="text-xs text-gray-400 mt-1">A prompt is sent to this number for the MoMo portion.</p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* On-screen keypad for whichever amount field is active. A till
+                with no keyboard has no other way to enter a figure. */}
+            {padTarget && (
+              <div className="bg-white rounded-xl p-3 border border-gray-200">
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-xs font-semibold text-gray-500">
+                    {padTarget === 'cash' ? 'Cash received' : padTarget === 'split' ? 'Cash part' : 'Discount'}
+                    <b className="ml-2 text-gray-900 text-sm">{padValue || '0'}</b>
+                  </span>
+                  <button onClick={() => setPadTarget(null)} className="h-8 px-3 rounded-lg bg-gray-100 text-gray-500 text-xs font-bold">Done</button>
+                </div>
+                <Numpad decimal onKey={padKey} onBackspace={padBack} onEnter={() => setPadTarget(null)} enterLabel="Done" />
               </div>
             )}
 

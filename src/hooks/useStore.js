@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { getSupabase } from '../lib/supabase'
 import { num } from '../lib/utils'
 
-const mapProduct = p => ({ id: p.id, name: p.name, category: p.category || '', costPrice: num(p.cost_price), price: num(p.price), wholesalePrice: num(p.wholesale_price), wholesaleMinQty: num(p.wholesale_min_qty) || 0, quantity: num(p.quantity), image: p.image || '', groupTag: (p.group_tag || '').trim().toLowerCase() })
+const mapProduct = p => ({ id: p.id, name: p.name, category: p.category || '', costPrice: num(p.cost_price), price: num(p.price), wholesalePrice: num(p.wholesale_price), wholesaleMinQty: num(p.wholesale_min_qty) || 0, quantity: num(p.quantity), image: p.image || '', groupTag: (p.group_tag || '').trim().toLowerCase(), barcode: String(p.barcode || '').trim() })
 
 // Derive a product's base name by stripping the variant suffix
 // e.g. "2 in 1 coloured curtains(type16)" -> "2 in 1 coloured curtains"
@@ -59,7 +59,7 @@ function applyWholesale_DISABLED(cart, products) {
 }
 const mapBundle = b => ({ id: b.id, name: b.name, products: typeof b.products === 'string' ? JSON.parse(b.products) : (b.products || []), bundlePrice: num(b.bundle_price), active: b.active })
 const mapSale = s => ({ id: s.id, receiptNo: s.receipt_no, date: s.date, items: typeof s.items === 'string' ? JSON.parse(s.items) : (s.items || []), subtotal: num(s.subtotal), discount: num(s.discount), total: num(s.total), profit: num(s.profit), payment: s.payment, splitCash: num(s.split_cash), splitMomo: num(s.split_momo), customer: s.customer || 'Walk-in', type: s.type || 'Retail', cashier: s.cashier || '', voided: s.voided })
-const mapStaff = s => ({ id: s.id, name: s.name, role: s.role, active: s.active })
+const mapStaff = s => ({ id: s.id, name: s.name, role: s.role, active: s.active, permissions: Array.isArray(s.permissions) ? s.permissions : [] })
 const mapExpense = e => ({ id: e.id, date: e.date, category: e.category, description: e.description, amount: num(e.amount) })
 const mapCustomer = c => ({ id: c.id, phone: c.phone, visitCount: num(c.visit_count), totalSpent: num(c.total_spent), lastVisit: c.last_visit })
 const mapWAOrder = o => ({ id: o.id, orderNo: o.order_no, date: o.date, customerName: o.customer_name, customerPhone: o.customer_phone, items: typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || []), subtotal: num(o.subtotal), deliveryFee: num(o.delivery_fee), total: num(o.total), address: o.address, notes: o.notes, status: o.status, paystackRef: o.paystack_ref, paidAt: o.paid_at, processedBy: o.processed_by, processedAt: o.processed_at, ussdCode: o.ussd_code, trackingNo: o.tracking_no || '', deliveryStatus: o.delivery_status || '', deliveryGuy: o.delivery_guy || '', deliveredAt: o.delivered_at, deliveryNotes: o.delivery_notes || '', source: o.source || (String(o.order_no||'').startsWith('WEB-') ? 'web' : String(o.order_no||'').startsWith('WA-') ? 'whatsapp' : 'walkin'), detailsFilled: !!o.details_filled })
@@ -70,23 +70,52 @@ const mapStockTake = s => ({ id: s.id, date: s.date, items: typeof s.items === '
 const mapStockAdj = a => ({ id: a.id, date: a.date, productId: a.product_id, productName: a.product_name, qty: num(a.qty), reason: a.reason, notes: a.notes, adjustedBy: a.adjusted_by })
 
 // Fast query with select only needed columns where possible
-const q = async (sb, table, opts = {}) => {
+// One place that actually reports whether a query failed, as opposed to
+// returning nothing. Everything below depends on telling those apart.
+const qTry = async (sb, table, opts = {}) => {
   try {
     let query = sb.from(table).select(opts.select || '*')
     if (opts.order) query = query.order(opts.order, { ascending: opts.asc ?? false })
     if (opts.limit) query = query.limit(opts.limit)
     if (opts.gt) query = query.gt(opts.gt[0], opts.gt[1])
     const { data, error } = await query
-    if (error) return []
-    return data || []
-  } catch { return [] }
+    if (error) return { rows: [], error }
+    return { rows: data || [], error: null }
+  } catch (e) { return { rows: [], error: e } }
+}
+
+const q = async (sb, table, opts = {}) => {
+  const { rows, error } = await qTry(sb, table, opts)
+  // An empty array used to be returned for BOTH "no rows" and "the request
+  // failed", so a permissions or network problem looked exactly like an empty
+  // shop. Log it so the cause is visible in the console.
+  if (error) console.error(`[load] ${table}: ${error.message || error}`)
+  return rows
+}
+
+// Views and columns added by migrations 015-021. If the frontend is live before
+// the SQL has been run, the preferred source fails and the till would show an
+// EMPTY product list — the worst possible failure. Fall back to a select that
+// exists on the old schema.
+//
+// The fallback triggers on the PRIMARY QUERY ERRORING, not on it coming back
+// empty. Probing the table separately is not good enough: `staff_safe` already
+// exists but without the `permissions` column, and `products` exists but
+// without `barcode`, so a `select=*` probe answers 200 while the real query
+// 400s on the missing column.
+const qFallback = async (sb, primary, fallback, opts = {}) => {
+  const { rows, error } = await qTry(sb, primary.table, { ...opts, select: primary.select })
+  if (!error) return rows
+  if (!fallback) { console.error(`[load] ${primary.table}: ${error.message || error}`); return [] }
+  console.warn(`[schema] ${primary.table} (${error.message || error}) — falling back to ${fallback.table}. Run migrations 015-021.`)
+  return q(sb, fallback.table, { ...opts, select: fallback.select })
 }
 
 export const useStore = create((set, get) => ({
   products: [], bundles: [], sales: [], staff: [], expenses: [],
   customers: [], waOrders: [], refunds: [], promos: [], invoices: [], stockTakes: [], stockAdjustments: [],
   loading: true, loadingText: 'Connecting...',
-  user: null, isAdmin: false,
+  user: null, isAdmin: false, token: null,
   // Permission check: admins can do everything; others need the specific permission.
   can: (perm) => {
     const { user, isAdmin } = get()
@@ -94,6 +123,21 @@ export const useStore = create((set, get) => ({
     const perms = (user && Array.isArray(user.permissions)) ? user.permissions : []
     return perms.includes('admin') || perms.includes(perm)
   },
+  // Cost prices and profit go to the browser ONLY for users who are allowed to
+  // see margins. Everyone else reads the `products_sale` view, which has no
+  // cost column at all. Profit is calculated server-side by record_sale, so a
+  // till that cannot see cost still records the right figure.
+  canSeeCost: () => { const { isAdmin, can } = get(); return isAdmin || can('reports') || can('inventory_view') },
+  _productSource: () => get().canSeeCost()
+    ? { table: 'products', select: 'id,name,category,cost_price,price,wholesale_price,wholesale_min_qty,quantity,image,group_tag,barcode' }
+    : { table: 'products_sale', select: 'id,name,category,price,wholesale_price,wholesale_min_qty,quantity,image,group_tag,barcode' },
+  // Pre-migration schema: no products_sale view, no barcode column. Used for
+  // BOTH roles — the admin select names `barcode` too.
+  _productFallback: () => ({ table: 'products', select: 'id,name,category,cost_price,price,wholesale_price,wholesale_min_qty,quantity,image,group_tag' }),
+  _saleSelect: () => get().canSeeCost()
+    ? 'id,receipt_no,date,items,subtotal,discount,total,profit,payment,split_cash,split_momo,customer,type,cashier,voided'
+    : 'id,receipt_no,date,items,subtotal,discount,total,payment,split_cash,split_momo,customer,type,cashier,voided',
+
   page: 'pos', cart: [], mode: 'retail', selectedCat: 'all', waFilter: 'Pending', perfPeriod: 'today',
   _secondaryLoaded: false,
   darkMode: localStorage.getItem('pos-dark') === 'true',
@@ -114,16 +158,20 @@ export const useStore = create((set, get) => ({
   // is stashed under their id. When they log back in, it's restored. A DIFFERENT
   // cashier logging in gets their own cart (fresh if none saved). Kept in memory
   // + localStorage so it survives the session.
-  login: (user, isAdmin) => {
+  login: (user, isAdmin, token) => {
     let restored = []
     try {
       const saved = JSON.parse(localStorage.getItem('carts-by-cashier') || '{}')
       restored = Array.isArray(saved[user.id]) ? saved[user.id] : []
     } catch {}
-    set({ user, isAdmin, cart: restored })
+    set({ user, isAdmin, token: token || null, cart: restored })
+    // The first load happens before anyone has signed in, so it deliberately
+    // asks for the no-cost column set. Now that we know who this is, refetch
+    // with margins if they are allowed to see them.
+    if (get().canSeeCost()) { get().refreshProducts(); get().refreshSales() }
   },
   logout: () => {
-    const { user, cart } = get()
+    const { user, cart, token } = get()
     if (user) {
       try {
         const saved = JSON.parse(localStorage.getItem('carts-by-cashier') || '{}')
@@ -131,7 +179,9 @@ export const useStore = create((set, get) => ({
         localStorage.setItem('carts-by-cashier', JSON.stringify(saved))
       } catch {}
     }
-    set({ user: null, isAdmin: false, cart: [] })
+    // Retire the session server-side so the token can't outlive the shift.
+    if (token) { try { getSupabase().rpc('end_session', { p_token: token }) } catch {} }
+    set({ user: null, isAdmin: false, token: null, cart: [] })
   },
 
   // Shop on/off switch (shared with the e-commerce site via store_settings)
@@ -198,8 +248,8 @@ export const useStore = create((set, get) => ({
     try {
       // PHASE 1: Only what POS needs immediately
       const [prodData, staffData, bunData, promoData] = await Promise.all([
-        q(sb, 'products', { select: 'id,name,category,cost_price,price,wholesale_price,wholesale_min_qty,quantity,image,group_tag', order: 'name', asc: true }),
-        q(sb, 'staff', { select: 'id,name,role,active' }),
+        qFallback(sb, get()._productSource(), get()._productFallback(), { order: 'name', asc: true }),
+        qFallback(sb, { table: 'staff_safe', select: 'id,name,role,active,permissions' }, { table: 'staff', select: 'id,name,role,active' }),
         q(sb, 'bundles', { select: 'id,name,products,bundle_price,active' }),
         q(sb, 'promos', { select: 'id,name,start_date,end_date,items,active', limit: 50 }),
       ])
@@ -226,7 +276,7 @@ export const useStore = create((set, get) => ({
     const sb = getSupabase(); if (!sb) return
     try {
       const [saleData, expData, custData, waData, refData, invData, stData, adjData] = await Promise.all([
-        q(sb, 'sales', { select: 'id,receipt_no,date,items,subtotal,discount,total,profit,payment,split_cash,split_momo,customer,type,cashier,voided', order: 'date', limit: 150 }),
+        q(sb, 'sales', { select: get()._saleSelect(), order: 'date', limit: 150 }),
         q(sb, 'expenses', { select: 'id,date,category,description,amount', order: 'date', limit: 100 }),
         q(sb, 'customers', { select: 'id,phone,visit_count,total_spent,last_visit', order: 'total_spent', limit: 300 }),
         q(sb, 'whatsapp_orders', { select: 'id,order_no,date,customer_name,customer_phone,items,subtotal,delivery_fee,total,status,ussd_code,paystack_ref,address,notes,paid_at,source,details_filled,tracking_no,delivery_status,delivery_guy', order: 'date', limit: 200 }),
@@ -249,10 +299,10 @@ export const useStore = create((set, get) => ({
     } catch (e) { console.warn('Secondary load:', e) }
   },
 
-  refreshProducts: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'products', { order: 'name', asc: true }); set({ products: d.map(mapProduct) }) },
-  refreshSales: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'sales', { order: 'date', limit: 300 }); set({ sales: d.map(mapSale) }) },
+  refreshProducts: async () => { const sb = getSupabase(); if (!sb) return; const d = await qFallback(sb, get()._productSource(), get()._productFallback(), { order: 'name', asc: true }); set({ products: d.map(mapProduct) }) },
+  refreshSales: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'sales', { select: get()._saleSelect(), order: 'date', limit: 300 }); set({ sales: d.map(mapSale) }) },
   refreshWAOrders: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'whatsapp_orders', { order: 'date', limit: 500 }); set({ waOrders: d.map(mapWAOrder) }) },
-  refreshStaff: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'staff', { select: 'id,name,role,active' }); set({ staff: d.map(mapStaff) }) },
+  refreshStaff: async () => { const sb = getSupabase(); if (!sb) return; const d = await qFallback(sb, { table: 'staff_safe', select: 'id,name,role,active,permissions' }, { table: 'staff', select: 'id,name,role,active' }); set({ staff: d.map(mapStaff) }) },
   refreshBundles: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'bundles'); set({ bundles: d.map(mapBundle) }) },
   refreshExpenses: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'expenses', { order: 'date', limit: 200 }); set({ expenses: d.map(mapExpense) }) },
   refreshCustomers: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'customers', { order: 'total_spent', limit: 500 }); set({ customers: d.map(mapCustomer) }) },

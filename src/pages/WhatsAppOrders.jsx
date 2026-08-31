@@ -4,9 +4,10 @@ import { getSupabase } from '../lib/supabase'
 import { money, fmtDateTime } from '../lib/utils'
 import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
+import { rpcMessage } from '../lib/rpcError'
 
 export default function WhatsAppOrders() {
-  const { waOrders, waFilter, setWAFilter, refreshWAOrders, user, setLoading, loadAll } = useStore()
+  const { waOrders, waFilter, setWAFilter, refreshWAOrders, user, token, setLoading, loadAll } = useStore()
   const [search, setSearch] = useState('')
   const reconcileRef = useRef(false)
 
@@ -51,10 +52,10 @@ export default function WhatsAppOrders() {
     setLoading(true, 'Completing...')
     try {
       const sb = getSupabase()
-      const { data, error } = await sb.rpc('complete_wa_order', { p_order_id: id, p_processed_by: user?.name || '' })
+      const { data, error } = await sb.rpc('complete_wa_order', { p_token: token, p_order_id: id })
       setLoading(false)
       if (data?.success) { toast.success('Completed! ' + data.receiptNo); setSelected(null); loadAll() }
-      else toast.error(data?.error || error?.message || 'Error')
+      else toast.error(rpcMessage(error, data, 'Could not complete the order'))
     } catch (e) { setLoading(false); toast.error('Error') }
   }
 

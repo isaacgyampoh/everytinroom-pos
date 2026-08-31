@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { getSupabase } from './lib/supabase'
 import { useStore } from './hooks/useStore'
@@ -8,6 +8,7 @@ import Login from './components/Login'
 import Navigation from './components/Navigation'
 import CartDrawer from './components/CartDrawer'
 import ReceiptPreview from './components/ReceiptPreview'
+import { startAutoFlush, pendingCount, onPendingChange, flush } from './lib/offlineQueue'
 import toast from 'react-hot-toast'
 
 // Lazy load all pages — only loads when needed
@@ -31,6 +32,7 @@ const InvoicesPage = lazy(() => import('./pages/InvoicesPage'))
 const StockTakesPage = lazy(() => import('./pages/StockTakesPage'))
 const StockAdjustmentsPage = lazy(() => import('./pages/StockAdjustmentsPage'))
 const RestockPage = lazy(() => import('./pages/RestockPage'))
+const TerminalPage = lazy(() => import('./pages/TerminalPage'))
 const InvoicePay = lazy(() => import('./pages/InvoicePay'))
 const Catalog = lazy(() => import('./pages/Catalog'))
 const DeliveryConfirm = lazy(() => import('./pages/DeliveryConfirm'))
@@ -38,23 +40,43 @@ const DeliveryDetails = lazy(() => import('./pages/DeliveryDetails'))
 const CustomerDisplay = lazy(() => import('./pages/CustomerDisplay'))
 
 const INACTIVITY_TIMEOUT = 60 * 1000 // 1 minute
-const ADMIN_PAGES = ['products', 'staff', 'promos', 'invoices', 'stocktakes', 'stockadjustments', 'restock', 'wasettings']
-// Pages a non-admin may access IF they hold the matching permission.
-const PAGE_PERMISSIONS = {
+
+// What each restricted page requires. 'admin' means admin only; anything else
+// is a permission key a cashier can be granted. Pages absent from this map are
+// open to any signed-in staff member (pos, receipts, refunds, whatsapp).
+//
+// This replaces a split ADMIN_PAGES / PAGE_PERMISSIONS pair where the guard only
+// ever consulted ADMIN_PAGES — so `reports`, `receiving`, `dash`, `customers`,
+// `expenses`, `performance` and `wachats` were merely HIDDEN in the nav and
+// stayed reachable, and the `reports` permission was never actually enforced.
+const PAGE_ACCESS = {
+  dash: 'admin',
+  customers: 'admin',
+  bundles: 'admin',
+  promos: 'admin',
+  invoices: 'admin',
+  expenses: 'admin',
+  performance: 'admin',
+  wachats: 'admin',
+  wasettings: 'admin',
+  staff: 'admin',
   products: 'product_management',
   restock: 'product_receiving',
   receiving: 'product_receiving',
   stocktakes: 'stock_taking',
   stockadjustments: 'stock_taking',
   reports: 'reports',
+  refunds: 'refunds',
 }
 
 export default function App() {
   const { user, page, setPage, loading, loadAll, logout, isAdmin, can, darkMode } = useStore()
   const [cartOpen, setCartOpen] = useState(false)
   const [receipt, setReceipt] = useState(null)
-  const [lastActivity, setLastActivity] = useState(Date.now())
+  const lastActivityRef = useRef(Date.now())
   const [salePopup, setSalePopup] = useState(null)
+  const [queued, setQueued] = useState(pendingCount())
+  const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine)
 
   // Broadcast live cart to the customer-facing display (#/customer-display)
   useCustomerDisplayBroadcast()
@@ -88,6 +110,18 @@ export default function App() {
     document.body.classList.toggle('dark', darkMode)
   }, [darkMode])
 
+  // Offline sale queue: drain it whenever the connection comes back, and keep
+  // the count on screen so nobody closes the till with sales still unfiled.
+  useEffect(() => {
+    startAutoFlush()
+    const off = onPendingChange(setQueued)
+    const up = () => { setOnline(true); flush().then(r => { if (r.sent) { toast.success(`${r.sent} offline sale${r.sent > 1 ? 's' : ''} filed`); loadAll() } }) }
+    const down = () => setOnline(false)
+    window.addEventListener('online', up)
+    window.addEventListener('offline', down)
+    return () => { off(); window.removeEventListener('online', up); window.removeEventListener('offline', down) }
+  }, []) // eslint-disable-line
+
   useEffect(() => { loadAll(); setupRealtime() }, [])
 
   // Global image fallback: any product image that fails to load (e.g. dead
@@ -97,9 +131,22 @@ export default function App() {
     const PLACEHOLDER = 'data:image/svg+xml;utf8,' + encodeURIComponent(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><rect width="96" height="96" fill="#f1f0ee"/><path d="M30 62l12-14 8 9 6-7 10 12H30z" fill="#d6d3ce"/><circle cx="38" cy="36" r="6" fill="#d6d3ce"/></svg>'
     )
+    // One failed load used to swap the image for a grey placeholder permanently,
+    // for the rest of the session. On a shop connection that drops constantly
+    // that turns a momentary blip into a POS full of grey boxes. Retry once
+    // before giving up, and only give up on the retry.
     const onErr = (e) => {
       const t = e.target
-      if (t && t.tagName === 'IMG' && t.src !== PLACEHOLDER) { t.src = PLACEHOLDER; t.style.objectFit = 'cover' }
+      if (!t || t.tagName !== 'IMG' || t.src === PLACEHOLDER) return
+      if (!t.dataset.retried) {
+        t.dataset.retried = '1'
+        const src = t.src
+        // Cache-bust the retry so a poisoned entry isn't served straight back.
+        setTimeout(() => { t.src = src + (src.includes('?') ? '&' : '?') + 'r=1' }, 800)
+        return
+      }
+      t.src = PLACEHOLDER
+      t.style.objectFit = 'cover'
     }
     window.addEventListener('error', onErr, true) // capture phase catches img errors
     return () => window.removeEventListener('error', onErr, true)
@@ -123,14 +170,15 @@ export default function App() {
   }, [user]) // eslint-disable-line
 
   // Auto-logout on inactivity
-  const resetActivity = useCallback(() => setLastActivity(Date.now()), [])
+  const resetActivity = useCallback(() => { lastActivityRef.current = Date.now() }, [])
 
   useEffect(() => {
     if (!user) return
+    lastActivityRef.current = Date.now()
     const events = ['mousedown', 'keydown', 'touchstart', 'scroll']
-    events.forEach(e => window.addEventListener(e, resetActivity))
+    events.forEach(e => window.addEventListener(e, resetActivity, { passive: true }))
     const timer = setInterval(() => {
-      if (Date.now() - lastActivity > INACTIVITY_TIMEOUT) {
+      if (Date.now() - lastActivityRef.current > INACTIVITY_TIMEOUT) {
         logout()
         toast('Logged out — enter your PIN to continue')
       }
@@ -139,17 +187,16 @@ export default function App() {
       events.forEach(e => window.removeEventListener(e, resetActivity))
       clearInterval(timer)
     }
-  }, [user, lastActivity, logout, resetActivity])
+  }, [user, logout, resetActivity])
 
-  // Guard admin pages — allow if admin, or if the user holds the page's permission
+  // Guard restricted pages — admins pass, everyone else needs the page's permission.
   useEffect(() => {
     if (!user || isAdmin) return
-    const neededPerm = PAGE_PERMISSIONS[page]
-    if (neededPerm && can(neededPerm)) return  // permitted staff may enter
-    if (ADMIN_PAGES.includes(page)) {
-      setPage('pos')
-      toast.error('You do not have access to this page')
-    }
+    const needed = PAGE_ACCESS[page]
+    if (!needed) return                 // open page
+    if (needed !== 'admin' && can(needed)) return
+    setPage('pos')
+    toast.error('You do not have access to this page')
   }, [page, user, isAdmin, can, setPage])
 
   const playSaleSound = () => {
@@ -244,7 +291,9 @@ export default function App() {
     promos: <PromosPage />,
     invoices: <InvoicesPage />,
     stocktakes: <StockTakesPage />,
+    stockadjustments: <StockAdjustmentsPage />,
     restock: <RestockPage />,
+    terminal: <TerminalPage />,
   }
 
   return (
@@ -265,6 +314,16 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Connection / unfiled-sales indicator. A till that has been offline for
+          an hour must not look identical to one that is fine. */}
+      {(!online || queued > 0) && (
+        <button onClick={() => setPage('terminal')}
+          className={`fixed bottom-[calc(150px+env(safe-area-inset-bottom))] md:bottom-24 right-4 md:right-6 z-[98] h-10 px-3.5 rounded-xl text-[11px] font-bold shadow-lg flex items-center gap-2 ${online ? 'bg-amber-500 text-white' : 'bg-red-600 text-white'}`}>
+          <span className="w-2 h-2 rounded-full bg-white/90 animate-pulse" />
+          {online ? `${queued} sale${queued > 1 ? 's' : ''} to file` : queued > 0 ? `Offline · ${queued} saved` : 'Offline'}
+        </button>
       )}
 
       <main className="pt-14 md:pt-0 pb-24 md:pb-10 min-h-screen transition-all duration-200 content-shell">

@@ -4,9 +4,10 @@ import { getSupabase } from '../lib/supabase'
 import { money, num, fmtDate, today, isoDate } from '../lib/utils'
 import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
+import { rpcMessage } from '../lib/rpcError'
 
 export default function RefundsPage() {
-  const { refunds, user, setLoading, loadAll } = useStore()
+  const { refunds, user, token, setLoading, loadAll } = useStore()
   const [modal, setModal] = useState(false)
   const [receiptNo, setReceiptNo] = useState('')
   const [sale, setSale] = useState(null)
@@ -37,10 +38,10 @@ export default function RefundsPage() {
     setLoading(true, 'Processing...')
     try {
       const sb = getSupabase()
-      const { data, error } = await sb.rpc('process_refund', { p_receipt_no: receiptNo.trim(), p_items: items, p_reason: reason.trim(), p_processed_by: user?.name || '', p_customer: sale.customer || 'Walk-in' })
+      const { data, error } = await sb.rpc('process_refund', { p_token: token, p_receipt_no: receiptNo.trim(), p_items: items, p_reason: reason.trim(), p_customer: sale.customer || 'Walk-in' })
       setLoading(false)
       if (data?.success) { toast.success('Refund ' + data.refundNo + ' done! ' + money(data.refundAmount)); setModal(false); loadAll() }
-      else toast.error(data?.error || 'Error')
+      else toast.error(rpcMessage(error, data, 'Refund failed'))
     } catch (e) { setLoading(false); toast.error('Error') }
   }
 
