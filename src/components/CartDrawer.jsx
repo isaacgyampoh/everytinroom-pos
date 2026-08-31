@@ -207,6 +207,15 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
   const deleteHeld = (id) => { setHeldCarts(prev => prev.filter(h => h.id !== id)) }
 
   const handleCompleteSale = () => {
+    // Nothing should leave the shop for nothing by accident. 445 products have
+    // no cost price and five have no selling price at all, so a zero line is
+    // far more likely to be missing data than a deliberate giveaway.
+    const freeLines = cart.filter(c => Number(c.price) <= 0)
+    if (freeLines.length && !confirm(
+      `${freeLines.map(c => '• ' + c.name).join('\n')}\n\n` +
+      `${freeLines.length === 1 ? 'This item has' : 'These items have'} no price and will be given away free.\n\nContinue?`
+    )) return
+
     // WhatsApp order: needs phone, then prepares USSD code + delivery link.
     if (isWhatsApp) {
       if (!phoneValid) { toast.error('Enter the customer phone number'); return }
