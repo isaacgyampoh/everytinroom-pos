@@ -15,6 +15,7 @@ const ProductCard = memo(({ item, price, hasPromo, onAdd }) => {
   const qty = item.quantity
   const out = qty === 0
   const low = qty > 0 && qty <= 5
+  const noPrice = Number(price) <= 0
   return (
     <button onClick={onAdd} disabled={out}
       className={`group relative text-left bg-white rounded-[14px] overflow-hidden border transition
@@ -32,15 +33,21 @@ const ProductCard = memo(({ item, price, hasPromo, onAdd }) => {
         {out && (
           <span className="absolute inset-x-0 bottom-0 bg-[#16181d]/85 text-white text-[11px] font-bold tracking-wide text-center py-1">OUT OF STOCK</span>
         )}
-        {low && (
+        {low && !noPrice && (
           <span className="absolute top-1.5 right-1.5 bg-white/95 text-[#b3402b] text-[11px] font-bold px-2 py-[3px] rounded tnum shadow-sm">{qty} left</span>
+        )}
+        {/* A product with no price rings up at GHS 0.00. Five in this
+            catalogue are in stock and sellable for free — say so on the tile
+            rather than letting it reach the till unnoticed. */}
+        {noPrice && !out && (
+          <span className="absolute top-1.5 right-1.5 bg-[#b3402b] text-white text-[10px] font-bold px-2 py-[3px] rounded shadow-sm">NO PRICE</span>
         )}
       </div>
 
       <div className="px-2.5 pt-2 pb-2.5">
         <div className="text-[13px] md:text-[13.5px] font-semibold text-gray-900 leading-[1.25] line-clamp-2 min-h-[33px]">{item.name}</div>
         <div className="flex items-baseline gap-1.5 mt-1.5">
-          <span className="figure text-[16px] text-gray-900">{money(price)}</span>
+          <span className={`figure text-[16px] ${noPrice ? 'text-[#b3402b]' : 'text-gray-900'}`}>{noPrice ? 'No price set' : money(price)}</span>
           {hasPromo && <span className="text-[11px] text-stone-300 line-through tnum">{money(item.price)}</span>}
         </div>
       </div>
