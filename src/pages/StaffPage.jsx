@@ -86,8 +86,8 @@ export default function StaffPage() {
         </div>
         <button onClick={openNew} className="h-12 px-5 bg-gray-700 text-white rounded-xl text-sm font-semibold">Add Staff</button>
       </div>
-      <div className="bg-white rounded-2xl p-6 shadow-md overflow-x-auto">
-        <table className="w-full min-w-[400px]">
+      <div className="bg-white rounded-2xl p-4 md:p-6 shadow-md overflow-x-auto rtable-wrap">
+        <table className="rtable w-full min-w-[400px]">
           <thead><tr>
             <th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Name</th>
             <th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Role</th>
@@ -96,10 +96,10 @@ export default function StaffPage() {
           </tr></thead>
           <tbody>{staff.map(s => (
             <tr key={s.id} className="border-b border-gray-50">
-              <td className="p-3 text-sm font-semibold">{s.name}</td>
-              <td className="p-3"><span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${s.role === 'Admin' ? 'bg-gray-100 text-gray-600' : 'bg-green-50 text-green-500'}`}>{s.role}</span></td>
-              <td className="p-3 text-[11px] text-gray-500 max-w-[240px]">{permSummary(s)}</td>
-              <td className="p-3"><div className="flex gap-2 justify-center"><button onClick={() => doEdit(s)} className="h-9 px-3 border border-stone-300 rounded-lg text-xs font-medium text-stone-600 hover:bg-stone-100 transition">Edit</button><button onClick={() => del(s.id)} className="h-9 px-3 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 transition">Delete</button></div></td>
+              <td data-label="Name" className="p-3 text-sm font-semibold">{s.name}</td>
+              <td data-label="Role" className="p-3"><span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${s.role === 'Admin' ? 'bg-gray-100 text-gray-600' : 'bg-green-50 text-green-500'}`}>{s.role}</span></td>
+              <td data-label="Can do" className="p-3 text-[11px] text-gray-500 max-w-[240px]">{permSummary(s)}</td>
+              <td data-label="" className="p-3"><div className="flex gap-2 justify-center"><button onClick={() => doEdit(s)} className="h-9 px-3 border border-stone-300 rounded-lg text-xs font-medium text-stone-600 hover:bg-stone-100 transition">Edit</button><button onClick={() => del(s.id)} className="h-9 px-3 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 transition">Delete</button></div></td>
             </tr>
           ))}</tbody>
         </table>

@@ -233,14 +233,14 @@ export default function Dashboard() {
       </div>
 
       {/* ── Period figures. A compact strip, not four more big cards. ───── */}
-      <div className="panel mb-4 grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-[rgba(16,24,29,.07)]">
+      <div className="panel mb-4 grid grid-cols-2 md:grid-cols-4">
         {[
           { label: 'This week', value: money(weekRev), sub: `${weekSales.length} sales` },
           { label: 'This month', value: money(monthRev), sub: `${monthSales.length} sales` },
           { label: 'Month margin', value: margin.toFixed(1) + '%', sub: money(monthProfit) + ' profit', tone: margin >= 30 ? 'text-emerald-600' : margin >= 15 ? 'text-amber-600' : 'text-[#b3402b]' },
           { label: 'Stock on hand', value: money(stockValue), sub: `${products.length} products` },
         ].map((c, i) => (
-          <div key={i} className="px-5 py-4">
+          <div key={i} className={`px-4 md:px-5 py-4 border-[rgba(16,24,29,.07)] ${i % 2 === 1 ? 'border-l' : ''} ${i >= 2 ? 'border-t' : ''} md:border-t-0 ${i > 0 ? "md:border-l" : "md:border-l-0"}`}>
             <div className="panel-head">{c.label}</div>
             <div className={`figure text-[19px] mt-2 ${c.tone || 'text-gray-900'}`}>{c.value}</div>
             <div className="text-[11px] text-gray-400 mt-1">{c.sub}</div>
@@ -347,16 +347,16 @@ export default function Dashboard() {
       {/* ── Latest sales. Was computed and discarded. ──────────────────── */}
       {recent.length > 0 && (
         <div className="panel mt-4">
-          <div className="flex items-center justify-between px-5 pt-4 pb-3">
+          <div className="flex items-center justify-between px-4 sm:px-5 pt-4 pb-3">
             <span className="panel-head">Latest sales</span>
             <button onClick={() => setPage('receipts')} className="text-[11px] font-semibold text-gray-400 hover:text-gray-700">All receipts →</button>
           </div>
           <div className="rule">
             {recent.map(s => (
-              <div key={s.id} className="flex items-center gap-4 px-5 py-2.5 border-b border-[rgba(16,24,29,.05)] last:border-0">
-                <span className="text-[12px] font-mono text-gray-400 w-[104px] shrink-0 truncate">{s.receiptNo}</span>
+              <div key={s.id} className="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-2.5 border-b border-[rgba(16,24,29,.05)] last:border-0">
+                <span className="text-[12px] font-mono text-gray-400 w-[92px] sm:w-[104px] shrink-0 truncate">{s.receiptNo}</span>
                 <span className="text-[12px] text-gray-500 flex-1 truncate">{s.cashier || '—'}</span>
-                <span className="text-[11px] text-gray-400 w-16 shrink-0">{s.payment}</span>
+                <span className="hidden sm:block text-[11px] text-gray-400 w-16 shrink-0">{s.payment}</span>
                 <span className="text-[13px] font-bold text-gray-900 tnum shrink-0">{money(s.total)}</span>
               </div>
             ))}

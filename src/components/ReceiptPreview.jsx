@@ -37,7 +37,7 @@ export default function ReceiptPreview({ sale, onClose }) {
   return (
     <>
       <div className="fixed inset-0 bg-black/70 z-[499]" onClick={onClose} />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-lg z-[500]">
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(340px,calc(100vw-2rem))] max-h-[88vh] overflow-y-auto bg-white rounded-2xl shadow-lg z-[500]">
         <button onClick={onClose} className="absolute top-3 right-3 w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm flex items-center justify-center transition z-10">✕</button>
 
         <div id="receipt-content" className="p-5 text-black">
@@ -97,8 +97,8 @@ export default function ReceiptPreview({ sale, onClose }) {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2 px-5 pb-5">
-          <button onClick={doPrint} className="flex-1 h-12 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-sm font-bold active:scale-95 transition">Print Receipt</button>
+        <div className="flex flex-wrap gap-2 px-5 pb-5 safe-bottom">
+          <button onClick={doPrint} className="flex-1 min-w-[130px] h-12 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-sm font-bold active:scale-95 transition">Print Receipt</button>
           <button onClick={openDrawer} title="Open cash drawer" className="h-12 px-4 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-semibold text-gray-600 transition">Drawer</button>
           <button onClick={onClose} className="h-12 px-5 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-semibold text-gray-600 transition">Close</button>
         </div>

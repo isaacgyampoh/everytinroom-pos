@@ -30,11 +30,11 @@ export default function ExpensesPage() {
         <button onClick={() => { setForm({ date: today(), category: 'Utilities', description: '', amount: '' }); setModal(true) }} className="h-12 px-5 bg-gray-800 text-white rounded-xl text-sm font-semibold">Add</button>
       </div>
       <div className="bg-gray-800 rounded-2xl p-5 text-white mb-6"><small className="text-sm opacity-80">This Month</small><strong className="block text-[22px] md:text-[26px] font-bold mt-2">{money(moTotal)}</strong></div>
-      <div className="bg-white rounded-2xl p-6 shadow-md overflow-x-auto">
-        <table className="w-full min-w-[400px]">
+      <div className="bg-white rounded-2xl p-4 md:p-6 shadow-md overflow-x-auto rtable-wrap">
+        <table className="rtable w-full min-w-[400px]">
           <thead><tr><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Date</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Category</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Description</th><th className="p-3 bg-gray-50 text-left text-[11px] font-bold text-gray-500 uppercase">Amount</th><th className="p-3 bg-gray-50"></th></tr></thead>
           <tbody>{expenses.length === 0 ? <tr><td colSpan={5} className="text-center py-12 text-gray-400">No expenses</td></tr> : expenses.map(e => (
-            <tr key={e.id} className="border-b border-gray-50"><td className="p-3 text-sm">{fmtDate(e.date)}</td><td className="p-3"><span className="px-2.5 py-1 bg-red-50 text-red-500 rounded-lg text-[11px] font-bold">{e.category}</span></td><td className="p-3 text-sm">{e.description}</td><td className="p-3 text-sm font-bold text-red-500">{money(e.amount)}</td><td className="p-3"><button onClick={() => del(e.id)} className="h-9 px-3 bg-gray-800 text-white rounded-lg text-xs font-medium hover:bg-red-600 transition">Delete</button></td></tr>
+            <tr key={e.id} className="border-b border-gray-50"><td data-label="Date" className="p-3 text-sm">{fmtDate(e.date)}</td><td data-label="Category" className="p-3"><span className="px-2.5 py-1 bg-red-50 text-red-500 rounded-lg text-[11px] font-bold">{e.category}</span></td><td data-label="Description" className="p-3 text-sm">{e.description}</td><td data-label="Amount" className="p-3 text-sm font-bold text-red-500">{money(e.amount)}</td><td data-label="" className="p-3"><button onClick={() => del(e.id)} className="h-9 px-3 bg-gray-800 text-white rounded-lg text-xs font-medium hover:bg-red-600 transition">Delete</button></td></tr>
           ))}</tbody>
         </table>
       </div>

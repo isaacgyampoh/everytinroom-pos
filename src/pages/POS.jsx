@@ -141,10 +141,10 @@ export default function POS() {
         {/* Segmented control. Modes change what you are selling, so they read
             as one switch — not as three loose pills identical to the category
             chips underneath, which is what they looked like before. */}
-        <div className="flex p-1 bg-stone-200/70 rounded-[12px] shrink-0">
+        <div className="flex p-1 bg-stone-200/70 rounded-[12px] shrink-0 w-full lg:w-auto">
           {[{ id: 'retail', l: 'Retail' }, { id: 'wholesale', l: 'Wholesale' }, { id: 'bundle', l: 'Bundles' }].map(m => (
             <button key={m.id} onClick={() => setMode(m.id)}
-              className={`h-9 px-4 rounded-[9px] text-[13px] font-semibold transition ${mode === m.id ? 'bg-white text-gray-900 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
+              className={`flex-1 lg:flex-none h-10 lg:h-9 px-4 rounded-[9px] text-[13px] font-semibold transition ${mode === m.id ? 'bg-white text-gray-900 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
               {m.l}
             </button>
           ))}
@@ -168,7 +168,7 @@ export default function POS() {
       )}
 
       {/* Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2.5">
+      <div className="grid grid-cols-2 min-[420px]:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2 sm:gap-2.5">
         {filtered.length === 0 && <div className="col-span-full"><EmptyState icon={IconSearch} title={query ? `Nothing matches "${query}"` : 'No products yet'} hint={query ? 'Check the spelling, or scan the barcode' : 'Add products from the Products page'} /></div>}
         {filtered.map((item, idx) => {
           if (mode === 'bundle') return (
