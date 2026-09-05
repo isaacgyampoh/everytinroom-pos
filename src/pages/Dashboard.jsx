@@ -1,7 +1,7 @@
 import { useStore } from '../hooks/useStore'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { money, moneyShort, today, weekStartDate, monthStart, isoDate } from '../lib/utils'
+import { money, moneyShort, num, today, weekStartDate, monthStart, isoDate } from '../lib/utils'
 
 // The previous version computed a 7-day trend, an hourly distribution, a
 // low-stock list and a recent-sales list — and rendered none of them. What it
@@ -88,6 +88,25 @@ export default function Dashboard() {
   const monthSplit = monthSales.filter(s => s.payment === 'Split').reduce((a, s) => a + s.total, 0)
   const margin = monthRev > 0 ? (monthProfit / monthRev) * 100 : 0
 
+  // A product with cost_price = 0 records the ENTIRE selling price as profit.
+  // 445 of 651 products are in that state, so the headline margin is not a
+  // margin — it is mostly revenue wearing a profit label. Measure the share of
+  // this month's takings that came from those products and say so, rather than
+  // letting the number be trusted.
+  const costById = {}
+  for (const p of products) costById[p.id] = p.costPrice
+  let revCosted = 0, revUncosted = 0
+  for (const s of monthSales) {
+    for (const it of (Array.isArray(s.items) ? s.items : [])) {
+      const line = num(it.lineTotal)
+      const c = it.productId ? costById[it.productId] : undefined
+      if (c === undefined || c <= 0) revUncosted += line; else revCosted += line
+    }
+  }
+  const uncostedPct = (revCosted + revUncosted) > 0
+    ? (revUncosted / (revCosted + revUncosted)) * 100 : 0
+  const profitUnreliable = uncostedPct >= 10
+
   const outOfStock = products.filter(p => p.quantity === 0)
   const lowStock = products.filter(p => p.quantity > 0 && p.quantity <= 5).sort((a, b) => a.quantity - b.quantity)
   const pendingOrders = waOrders.filter(o => o.status === 'Pending' || o.status === 'Paid')
@@ -128,6 +147,31 @@ export default function Dashboard() {
           </span>
         </button>
       </div>
+
+      {/* Profit here is only as good as the cost prices behind it. An honest
+          gap beats a confident wrong number — 445 of 651 products carry no
+          cost, so their whole selling price is being counted as profit. */}
+      {profitUnreliable && (
+        <div className="panel panel-pad mb-5 flex items-start gap-3.5" style={{ borderColor: 'rgba(179,64,43,.34)' }}>
+          <span className="mt-0.5 shrink-0 text-[#b3402b]">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <circle cx="12" cy="12" r="9" /><path d="M12 8v4.5M12 16h.01" />
+            </svg>
+          </span>
+          <div className="min-w-0">
+            <div className="text-[14px] font-semibold text-gray-900">Profit figures are not reliable yet</div>
+            <p className="text-[12.5px] text-gray-500 mt-1 leading-relaxed max-w-[62ch]">
+              <b className="text-[#b3402b]">{uncostedPct.toFixed(0)}%</b> of this month's takings came from
+              products with no cost price saved. For those the whole selling price is counted as
+              profit, so every profit and margin figure below reads higher than the truth.
+            </p>
+            <button onClick={() => setPage('products')}
+              className="mt-2.5 h-9 px-3.5 rounded-[10px] bg-[#16181d] text-white text-[12px] font-semibold">
+              Add cost prices
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-4 mb-4">
 
@@ -237,7 +281,9 @@ export default function Dashboard() {
         {[
           { label: 'This week', value: money(weekRev), sub: `${weekSales.length} sales` },
           { label: 'This month', value: money(monthRev), sub: `${monthSales.length} sales` },
-          { label: 'Month margin', value: margin.toFixed(1) + '%', sub: money(monthProfit) + ' profit', tone: margin >= 30 ? 'text-emerald-600' : margin >= 15 ? 'text-amber-600' : 'text-[#b3402b]' },
+          { label: 'Month margin', value: profitUnreliable ? '—' : margin.toFixed(1) + '%',
+            sub: profitUnreliable ? 'needs cost prices' : money(monthProfit) + ' profit',
+            tone: profitUnreliable ? 'text-[#b3402b]' : margin >= 30 ? 'text-emerald-600' : margin >= 15 ? 'text-amber-600' : 'text-[#b3402b]' },
           { label: 'Stock on hand', value: money(stockValue), sub: `${products.length} products` },
         ].map((c, i) => (
           <div key={i} className={`px-4 md:px-5 py-4 border-[rgba(16,24,29,.07)] ${i % 2 === 1 ? 'border-l' : ''} ${i >= 2 ? 'border-t' : ''} md:border-t-0 ${i > 0 ? "md:border-l" : "md:border-l-0"}`}>

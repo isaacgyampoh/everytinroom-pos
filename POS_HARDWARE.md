@@ -145,3 +145,61 @@ The till locks after 1 minute of inactivity, and the cashier's cart is kept and
 restored when they sign back in — a different cashier signing in gets their own
 cart. Change the timeout in `src/App.jsx` (`INACTIVITY_TIMEOUT`) if that is too
 aggressive for your counter.
+
+---
+
+## Installing it as a desktop app
+
+The app installs as a real desktop application on the till — its own window, its
+own icon in the Start menu or Dock, no address bar, and it keeps working when
+the internet drops. No separate download, no installer to maintain.
+
+### Windows / Linux (Chrome or Edge)
+
+1. Open **https://www.everytinroom.store**
+2. Click the **install icon** in the address bar (a screen with a down arrow),
+   or menu → *Cast, save and share* → **Install page as app**
+3. It appears in the Start menu as **EVERYTINROOM**
+
+### macOS
+
+Chrome or Edge → menu → *Cast, save and share* → **Install page as app**. Safari
+users: *File → Add to Dock*.
+
+### What installing gets you
+
+- **Its own window** with no browser chrome, so nothing to click away from
+- **Right-click the taskbar icon** for New sale, Orders, and Terminal & printer
+- **One window only.** Clicking the icon again focuses the till that is already
+  open rather than starting a second one — two windows would mean two carts.
+- **Opens offline.** The app shell is cached, so a till that reboots with no
+  internet still starts and can sell; the queue files those sales later.
+
+### Making the till start itself
+
+A shop till should come up ready without anyone opening anything.
+
+**Windows** — press `Win+R`, type `shell:startup`, and drop a shortcut in that
+folder pointing at:
+
+```
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --app=https://www.everytinroom.store --start-fullscreen
+```
+
+`--app` removes all browser furniture; `--start-fullscreen` fills the screen. Set
+the machine to log in automatically and the till is ready from a cold boot.
+
+**A note on the printer:** Direct (ESC/POS) mode asks permission for the
+serial/USB device once per machine. Pair it from Terminal & printer after
+installing, and the browser remembers it.
+
+### Do you need a packaged .exe instead?
+
+Probably not. A wrapped build (Tauri or Electron) would add automatic updates,
+printer access with no permission prompt, and independence from an installed
+browser. It also brings per-platform builds, code signing — without it Windows
+shows a scary publisher warning — and a release process to maintain.
+
+The installed web app already gives you the window, the icon, the offline start
+and the printer. Worth revisiting only if the permission prompt or the lack of
+auto-update becomes a daily annoyance.
