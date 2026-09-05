@@ -231,6 +231,21 @@ export default function TerminalPage() {
         <Row label="Beep on scan" hint="A short tone confirms the item landed in the cart, so the cashier need not look up at the screen.">
           <Toggle on={s.beepOnScan} onClick={() => set({ beepOnScan: !s.beepOnScan })} />
         </Row>
+      </div>
+
+      {/* ---- security ---- */}
+      <div className={card}>
+        <h2 className="text-sm font-bold text-gray-800 mb-3">Locking</h2>
+        <Row label="Lock after" hint="How long the till may sit untouched before it asks for a PIN again. The cashier's cart is kept and comes back when they sign in.">
+          <div className="flex gap-2 flex-wrap">
+            {[1, 15, 60, 240].map(m => (
+              <button key={m} onClick={() => set({ idleMinutes: m })}
+                className={`h-10 px-3.5 rounded-xl text-xs font-bold border-2 transition ${Number(s.idleMinutes) === m ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500'}`}>
+                {m < 60 ? m + ' min' : (m / 60) + (m === 60 ? ' hour' : ' hours')}
+              </button>
+            ))}
+          </div>
+        </Row>
         <p className="text-[11px] text-gray-400 mt-3 leading-relaxed">
           Any USB or Bluetooth scanner in keyboard mode works — no setup needed. Scan anywhere on the Point of Sale screen and the item is added.
           A product only scans once its barcode has been saved on the Products page.
