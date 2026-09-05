@@ -49,6 +49,14 @@ const INACTIVITY_TIMEOUT = 60 * 1000 // 1 minute
 // ever consulted ADMIN_PAGES — so `reports`, `receiving`, `dash`, `customers`,
 // `expenses`, `performance` and `wachats` were merely HIDDEN in the nav and
 // stayed reachable, and the `reports` permission was never actually enforced.
+// Every internal page id that a deep link may target. Kept next to PAGE_ACCESS
+// so the two cannot drift apart.
+const PAGES_BY_ID = new Set([
+  'dash','pos','whatsapp','wachats','receiving','wasettings','receipts','products',
+  'staff','expenses','customers','bundles','performance','refunds','reports',
+  'promos','invoices','stocktakes','stockadjustments','restock','terminal',
+])
+
 const PAGE_ACCESS = {
   dash: 'admin',
   customers: 'admin',
@@ -188,6 +196,24 @@ export default function App() {
       clearInterval(timer)
     }
   }, [user, logout, resetActivity])
+
+  // Deep links. The desktop app's jump-list shortcuts (right-click the taskbar
+  // icon) and any bookmarked link arrive as #/pos, #/whatsapp, #/terminal. The
+  // app otherwise navigates through store state, so without this a shortcut
+  // just opened the default page and looked broken.
+  useEffect(() => {
+    if (!user) return
+    const apply = () => {
+      const id = (window.location.hash || '').replace(/^#\/?/, '').split('?')[0]
+      if (!id || !PAGES_BY_ID.has(id)) return
+      const needed = PAGE_ACCESS[id]
+      if (needed && !isAdmin && (needed === 'admin' || !can(needed))) return
+      setPage(id)
+    }
+    apply()
+    window.addEventListener('hashchange', apply)
+    return () => window.removeEventListener('hashchange', apply)
+  }, [user, isAdmin, can, setPage])
 
   // Guard restricted pages — admins pass, everyone else needs the page's permission.
   useEffect(() => {

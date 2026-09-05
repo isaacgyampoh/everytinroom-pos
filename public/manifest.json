@@ -1,31 +1,46 @@
 {
+  "id": "/?source=pwa",
   "name": "EVERYTINROOM POS",
   "short_name": "EVERYTINROOM",
-  "description": "Point of Sale System",
-  "start_url": "/",
+  "description": "Till, stock and orders for EVERYTINROOM — works on the counter with or without internet.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "fullscreen",
-  "display_override": ["fullscreen", "standalone"],
-  "background_color": "#ffffff",
-  "theme_color": "#111111",
+  "display_override": ["window-controls-overlay", "fullscreen", "standalone"],
+  "background_color": "#f6f6f5",
+  "theme_color": "#16181d",
   "orientation": "any",
-  "icons": [
+  "categories": ["business", "productivity", "shopping"],
+  "prefer_related_applications": false,
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+  "shortcuts": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
+      "name": "New sale",
+      "short_name": "Sell",
+      "description": "Open the till and start ringing up",
+      "url": "/?source=pwa#/pos",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
+      "name": "Orders",
+      "short_name": "Orders",
+      "description": "WhatsApp and website orders waiting to be packed",
+      "url": "/?source=pwa#/whatsapp",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "name": "Terminal & printer",
+      "short_name": "Terminal",
+      "description": "Printer, cash drawer and till settings",
+      "url": "/?source=pwa#/terminal",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
+  ],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
