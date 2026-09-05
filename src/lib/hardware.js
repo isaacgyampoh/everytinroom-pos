@@ -33,6 +33,10 @@ const DEFAULTS = {
   openDrawerOnCash: true,  // kick the drawer for cash / split-cash sales
   copies: 1,
   beepOnScan: true,
+  // Minutes of no touching before the till locks. Was hardcoded at one minute,
+  // which meant a cashier serving a slow customer had to re-enter their PIN
+  // mid-sale. An hour suits a staffed counter; drop it for an unattended one.
+  idleMinutes: 60,
 }
 
 export function getSettings() {

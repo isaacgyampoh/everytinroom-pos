@@ -9,6 +9,7 @@ import Navigation from './components/Navigation'
 import CartDrawer from './components/CartDrawer'
 import ReceiptPreview from './components/ReceiptPreview'
 import { startAutoFlush, pendingCount, onPendingChange, flush } from './lib/offlineQueue'
+import { getSettings } from './lib/hardware'
 import toast from 'react-hot-toast'
 
 // Lazy load all pages — only loads when needed
@@ -40,7 +41,13 @@ const DeliveryConfirm = lazy(() => import('./pages/DeliveryConfirm'))
 const DeliveryDetails = lazy(() => import('./pages/DeliveryDetails'))
 const CustomerDisplay = lazy(() => import('./pages/CustomerDisplay'))
 
-const INACTIVITY_TIMEOUT = 60 * 1000 // 1 minute
+// How long the till may sit untouched before it locks. Read per terminal from
+// Terminal & printer, so a counter and a back-office machine can differ without
+// a deploy. Defaults to an hour.
+const idleMs = () => {
+  const m = Number(getSettings().idleMinutes)
+  return (Number.isFinite(m) && m > 0 ? m : 60) * 60 * 1000
+}
 
 // What each restricted page requires. 'admin' means admin only; anything else
 // is a permission key a cashier can be granted. Pages absent from this map are
@@ -188,7 +195,7 @@ export default function App() {
     const events = ['mousedown', 'keydown', 'touchstart', 'scroll']
     events.forEach(e => window.addEventListener(e, resetActivity, { passive: true }))
     const timer = setInterval(() => {
-      if (Date.now() - lastActivityRef.current > INACTIVITY_TIMEOUT) {
+      if (Date.now() - lastActivityRef.current > idleMs()) {
         logout()
         toast('Logged out — enter your PIN to continue')
       }
