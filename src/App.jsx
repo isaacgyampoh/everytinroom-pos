@@ -32,6 +32,7 @@ const InvoicesPage = lazy(() => import('./pages/InvoicesPage'))
 const StockTakesPage = lazy(() => import('./pages/StockTakesPage'))
 const StockAdjustmentsPage = lazy(() => import('./pages/StockAdjustmentsPage'))
 const RestockPage = lazy(() => import('./pages/RestockPage'))
+const StockInsights = lazy(() => import('./pages/StockInsights'))
 const TerminalPage = lazy(() => import('./pages/TerminalPage'))
 const InvoicePay = lazy(() => import('./pages/InvoicePay'))
 const Catalog = lazy(() => import('./pages/Catalog'))
@@ -54,7 +55,7 @@ const INACTIVITY_TIMEOUT = 60 * 1000 // 1 minute
 const PAGES_BY_ID = new Set([
   'dash','pos','whatsapp','wachats','receiving','wasettings','receipts','products',
   'staff','expenses','customers','bundles','performance','refunds','reports',
-  'promos','invoices','stocktakes','stockadjustments','restock','terminal',
+  'promos','invoices','stocktakes','stockadjustments','restock','terminal','stockinsights',
 ])
 
 const PAGE_ACCESS = {
@@ -72,6 +73,7 @@ const PAGE_ACCESS = {
   restock: 'product_receiving',
   receiving: 'product_receiving',
   stocktakes: 'stock_taking',
+  stockinsights: 'inventory_view',
   stockadjustments: 'stock_taking',
   reports: 'reports',
   refunds: 'refunds',
@@ -319,6 +321,7 @@ export default function App() {
     stocktakes: <StockTakesPage />,
     stockadjustments: <StockAdjustmentsPage />,
     restock: <RestockPage />,
+    stockinsights: <StockInsights />,
     terminal: <TerminalPage />,
   }
 
