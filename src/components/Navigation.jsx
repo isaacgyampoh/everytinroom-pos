@@ -17,6 +17,7 @@ const icons = {
   products: <I d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />,
   promos: <I d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82zM7 7h.01" />,
   restock: <I d="M1 3h15v13H1zM16 8h4l3 3v5h-7V8zM5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z" />,
+  stockinsights: <I d="M3 3v18h18M7 14l4-4 3 3 5-6" />,
   stocktakes: <I d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />,
   invoices: <I d="M4 4h16v16H4zM4 9h16M9 4v16" />,
   customers: <I d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />,
@@ -38,6 +39,7 @@ const NAV_GROUPS = [
   ]},
   { section: 'Inventory', items: [
     { id: 'products', label: 'Products', perm: 'product_management' },
+    { id: 'stockinsights', label: 'Stock Insights', perm: 'inventory_view' },
     { id: 'stocktakes', label: 'Stock & Adjust', perm: 'stock_taking' },
     { id: 'restock', label: 'Restock', perm: 'product_receiving' },
     { id: 'receiving', label: 'Goods Received', perm: 'product_receiving' },
