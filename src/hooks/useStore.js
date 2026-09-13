@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { getSupabase } from '../lib/supabase'
 import { num } from '../lib/utils'
+import { saveCatalogue, loadCatalogue } from '../lib/offlineStore'
 
 const mapProduct = p => ({ id: p.id, name: p.name, category: p.category || '', costPrice: num(p.cost_price), price: num(p.price), wholesalePrice: num(p.wholesale_price), wholesaleMinQty: num(p.wholesale_min_qty) || 0, quantity: num(p.quantity), image: p.image || '', groupTag: (p.group_tag || '').trim().toLowerCase(), barcode: String(p.barcode || '').trim() })
 
@@ -116,6 +117,9 @@ export const useStore = create((set, get) => ({
   customers: [], waOrders: [], refunds: [], promos: [], invoices: [], stockTakes: [], stockAdjustments: [],
   loading: true, loadingText: 'Connecting...',
   user: null, isAdmin: false, token: null,
+  // When set, the catalogue on screen came from disk, not the server; the
+  // number is when it was captured so the till can say how old it is.
+  offlineCatalogue: null,
   // Permission check: admins can do everything; others need the specific permission.
   can: (perm) => {
     const { user, isAdmin } = get()
@@ -254,13 +258,35 @@ export const useStore = create((set, get) => ({
         q(sb, 'promos', { select: 'id,name,start_date,end_date,items,active', limit: 50 }),
       ])
 
+      // A load that comes back with nothing is not a load. Offline, every query
+      // resolves to [] rather than throwing, so an empty product list is the
+      // shape a dead connection takes — fall back to the snapshot instead of
+      // showing a cashier an empty shop.
+      if (!prodData.length) {
+        const snap = loadCatalogue()
+        if (snap) {
+          console.warn('No products from the server — trading from the offline catalogue')
+          set({
+            products: snap.products.map(p => ({ ...p, costPrice: 0 })),
+            bundles: snap.bundles, promos: snap.promos,
+            staff: staffData.map(mapStaff),
+            offlineCatalogue: snap.at, loading: false,
+          })
+          return
+        }
+      }
+
+      const products = prodData.map(mapProduct)
       set({
-        products: prodData.map(mapProduct),
+        products,
         staff: staffData.map(mapStaff),
         bundles: bunData.map(mapBundle),
         promos: promoData.map(mapPromo),
+        offlineCatalogue: null,
         loading: false,
       })
+      // Keep a copy for the next cold start with no internet.
+      saveCatalogue({ products, bundles: bunData.map(mapBundle), promos: promoData.map(mapPromo) })
 
       // PHASE 2: Load everything else in background (non-blocking)
       get()._loadSecondary()

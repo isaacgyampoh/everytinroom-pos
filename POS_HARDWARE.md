@@ -87,6 +87,32 @@ difference as over or short.
 
 ## Working offline
 
+The till sells with no internet at all — including from a cold boot with the
+line already down.
+
+Three things make that work, and all three had to be added:
+
+**The catalogue is kept on the machine.** Every successful load writes a
+snapshot of products, bundles and promos (about 116 KB) to that till. If the
+next start cannot reach the server, the till trades from the snapshot and shows
+a red bar saying how old it is. Cost prices are deliberately left out of the
+snapshot, so a machine that may not see margins still does not store them. A
+snapshot older than a fortnight is discarded rather than trusted — prices move.
+
+**Staff can still sign in.** Checking a PIN normally needs the server, so an
+outage used to leave a login screen nobody could pass. Anyone who has signed in
+on that till before can now sign in without the line. The PIN itself is never
+stored; what is kept is a hash over a random per-machine salt, which is enough
+to check a PIN typed at that till and useless anywhere else.
+
+**Sales queue and file themselves.** As below.
+
+What is deliberately NOT available offline: reports, order history, customers
+and refunds. None are needed to serve someone at the counter, and all of them
+mislead when stale.
+
+### Sales made while the line is down
+
 Cash sales don't need the internet at the moment of the sale, only the record
 does. When the connection drops:
 
@@ -141,10 +167,10 @@ are sized for a fingertip on a resistive screen, not a mouse.
 
 ### Auto-logout
 
-The till locks after 1 minute of inactivity, and the cashier's cart is kept and
-restored when they sign back in — a different cashier signing in gets their own
-cart. Change the timeout in `src/App.jsx` (`INACTIVITY_TIMEOUT`) if that is too
-aggressive for your counter.
+The till locks after **1 hour** of inactivity, and the cashier's cart is kept
+and restored when they sign back in — a different cashier signing in gets their
+own cart. Change it in **Terminal & Printer → Locking** (1 min / 15 min / 1 hour
+/ 4 hours); it is per machine, so a counter and a back-office PC can differ.
 
 ---
 
@@ -203,3 +229,51 @@ shows a scary publisher warning — and a release process to maintain.
 The installed web app already gives you the window, the icon, the offline start
 and the printer. Worth revisiting only if the permission prompt or the lack of
 auto-update becomes a daily annoyance.
+
+---
+
+## The Windows installer
+
+The installed web app puts the till in its own window but the application still
+lives in a browser profile — clear the browser's data and the till has nothing
+to open until it can reach the internet again. The Windows build puts the
+application on the machine.
+
+### Getting it
+
+Every tagged release builds an installer on a Windows machine and attaches it
+to the GitHub release. Download the `.exe`, run it, and the till appears in the
+Start menu and on the desktop.
+
+To produce one without tagging: Actions → **Windows desktop build** → *Run
+workflow*. The installer is attached to the run as an artifact.
+
+Windows will warn that the publisher is unknown, because the installer is not
+code-signed. *More info → Run anyway*. Signing needs a certificate (roughly
+$200–400 a year) and is worth it only if staff are installing it themselves.
+
+### What it adds over the browser install
+
+- **The application is on the machine.** It opens and sells with no internet,
+  from a cold boot, even on a PC that has never been online.
+- **No permission prompt for the printer.** Serial and USB are granted to the
+  shop's own till, so Direct (ESC/POS) mode and the cash drawer work without a
+  click each session.
+- **No browser needed**, and nothing for staff to close by accident — there is
+  no address bar and no tabs.
+- **One window, enforced.** A second launch focuses the running till.
+
+### Building it yourself
+
+```
+npm ci && npm run build          # the web app
+cd desktop && npm install
+npm run build:win                # installer lands in desktop/release
+```
+
+The desktop shell serves the same `dist/` the browser gets, over a local
+address, so there is one build and one code path — the till runs exactly what
+the website runs.
+
+If it exits immediately complaining about `ELECTRON_RUN_AS_NODE`, that variable
+is set in your shell and makes Electron behave as plain Node. Unset it.

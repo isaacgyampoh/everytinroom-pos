@@ -1,0 +1,84 @@
+# ============================================================================
+# Build the Windows till installer.
+#
+# This runs on a real Windows runner rather than cross-compiling. A POS
+# installer produced on a Mac is not something to hand a shop: the NSIS
+# packaging, the icon embedding and any native module all behave differently,
+# and the failure shows up on the counter rather than in CI.
+#
+# Push a tag (v2.1.0) to get a published release; run it by hand from the
+# Actions tab to get an installer to test without publishing anything.
+# ============================================================================
+name: Windows desktop build
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Attach the installer to a GitHub release'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # The desktop shell serves the ordinary web build, so that has to exist
+      # first. One source of truth: the till runs exactly what the browser runs.
+      - name: Build the web app
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build the installer
+        working-directory: desktop
+        run: |
+          npm install
+          npm run build:win
+
+      - name: Check the installer actually came out
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem release -Filter *.exe -Recurse | Select-Object -First 1
+          if (-not $exe) { Write-Error 'No installer produced'; exit 1 }
+          $mb = [math]::Round($exe.Length / 1MB, 1)
+          Write-Host "built: $($exe.Name)  ${mb} MB"
+          if ($exe.Length -lt 40MB) { Write-Error 'Installer is suspiciously small'; exit 1 }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: everytinroom-pos-windows
+          path: desktop/release/*.exe
+          retention-days: 30
+
+      - name: Publish to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: desktop/release/*.exe
+          body: |
+            **EVERYTINROOM POS — Windows till**
+
+            Download the `.exe`, run it, and the till installs to the Start menu
+            and the desktop.
+
+            The application lives on the machine, so it opens and sells whether
+            or not there is internet. Sales made offline queue on that till and
+            file themselves when the line comes back.
+
+            Windows will warn that the publisher is unknown — the installer is
+            not code-signed. Choose *More info → Run anyway*.

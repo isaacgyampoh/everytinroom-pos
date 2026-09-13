@@ -8,3 +8,8 @@ dist/
 # Supabase CLI local state
 supabase/.temp/
 supabase/.branches/
+
+# Electron desktop build
+desktop/node_modules/
+desktop/app/
+desktop/release/
