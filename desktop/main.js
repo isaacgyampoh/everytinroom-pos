@@ -7,14 +7,22 @@
 // own software without internet. This ships the built app inside the installer,
 // so the till opens and trades whether or not there is a line.
 //
-// WHY A LOCAL SERVER AND NOT loadFile()
-//     file:// has no stable origin, so localStorage is unreliable and service
-//     workers do not run at all. Everything the offline design depends on —
-//     the catalogue snapshot, the queued sales, the terminal settings, the
-//     remembered sign-ins — lives in localStorage. Serving the same bundle over
-//     127.0.0.1 gives a real, stable http origin, so the desktop build behaves
-//     exactly like the browser one and there is no second code path to keep
-//     honest.
+// WHY A CUSTOM SCHEME AND NOT file:// OR A LOCAL PORT
+//     Everything the offline design depends on — the catalogue snapshot, the
+//     queued sales, the terminal settings, the remembered sign-ins — lives in
+//     localStorage, which is keyed by ORIGIN.
+//
+//     file:// has no stable origin and no service worker. A local HTTP server
+//     looked right and was worse in a way that would only have shown up in the
+//     shop: listen(0) takes a free port, so the origin was
+//     http://127.0.0.1:53744 one launch and :53745 the next. Every restart
+//     would have started with empty storage and silently abandoned any sale
+//     queued while the line was down.
+//
+//     A registered privileged scheme has one origin, everytinroom://pos, for
+//     the life of the installation. No port, nothing to collide with, no
+//     firewall prompt, and localStorage and service workers behave exactly as
+//     they do in the browser build.
 // ============================================================================
 
 // If ELECTRON_RUN_AS_NODE is set, the Electron binary behaves as plain Node and
@@ -30,73 +38,42 @@ if (process.env.ELECTRON_RUN_AS_NODE) {
   process.exit(1)
 }
 
-const { app, BrowserWindow, shell, Menu, dialog } = require('electron')
+const { app, BrowserWindow, shell, Menu, dialog, protocol, net } = require('electron')
 const path = require('path')
-const http = require('http')
 const fs = require('fs')
 const { pathToFileURL } = require('url')
 
 const DIST = path.join(__dirname, 'app')
-const HOST = '127.0.0.1'
+const SCHEME = 'everytinroom'
+const ORIGIN = `${SCHEME}://pos`
 
-const MIME = {
-  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',  '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon',
-  '.woff': 'font/woff', '.woff2': 'font/woff2',
-}
+// Declared before app-ready, as Electron requires. `standard` gives it a real
+// origin, `secure` is what unlocks localStorage and service workers.
+protocol.registerSchemesAsPrivileged([{
+  scheme: SCHEME,
+  privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true },
+}])
 
-// Serve the bundle. Any path that is not a real file falls through to
+// Serve the bundle. Anything that is not a real file falls through to
 // index.html so the app's own routing keeps working.
-function startServer() {
-  return new Promise((resolve, reject) => {
-    const server = http.createServer((req, res) => {
-      try {
-        const url = new URL(req.url, `http://${HOST}`)
-        let rel = decodeURIComponent(url.pathname)
-        if (rel === '/') rel = '/index.html'
+function serveBundle() {
+  protocol.handle(SCHEME, (request) => {
+    let rel
+    try { rel = decodeURIComponent(new URL(request.url).pathname) } catch { rel = '/' }
+    if (!rel || rel === '/') rel = '/index.html'
 
-        // Never serve outside the bundle, whatever the request says.
-        const full = path.normalize(path.join(DIST, rel))
-        if (!full.startsWith(DIST)) { res.writeHead(403).end('Forbidden'); return }
+    // Never serve outside the bundle, whatever the request says.
+    const full = path.normalize(path.join(DIST, rel))
+    if (!full.startsWith(DIST)) return new Response('Forbidden', { status: 403 })
 
-        const file = fs.existsSync(full) && fs.statSync(full).isFile()
-          ? full
-          : path.join(DIST, 'index.html')
-
-        const ext = path.extname(file).toLowerCase()
-        res.writeHead(200, {
-          'Content-Type': MIME[ext] || 'application/octet-stream',
-          // Hashed assets never change meaning; index.html must not be pinned
-          // or an update would never be seen.
-          'Cache-Control': file.includes(`${path.sep}assets${path.sep}`)
-            ? 'public, max-age=31536000, immutable'
-            : 'no-cache',
-        })
-        fs.createReadStream(file).pipe(res)
-      } catch (e) {
-        res.writeHead(500).end('Server error')
-      }
-    })
-    server.on('error', reject)
-    server.listen(0, HOST, () => resolve(server.address().port))
+    const file = fs.existsSync(full) && fs.statSync(full).isFile() ? full : path.join(DIST, 'index.html')
+    return net.fetch(pathToFileURL(file).toString())
   })
 }
 
 let win = null
 
-async function createWindow() {
-  let port
-  try {
-    port = await startServer()
-  } catch (e) {
-    dialog.showErrorBox('EVERYTINROOM POS',
-      'The till could not start its local server.\n\n' + e.message)
-    app.quit()
-    return
-  }
-
+function createWindow() {
   win = new BrowserWindow({
     width: 1280, height: 800,
     minWidth: 1024, minHeight: 700,
@@ -124,7 +101,7 @@ async function createWindow() {
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', (e, url) => {
-    if (!url.startsWith(`http://${HOST}:${port}`)) { e.preventDefault(); shell.openExternal(url) }
+    if (!url.startsWith(ORIGIN)) { e.preventDefault(); shell.openExternal(url) }
   })
 
   // Serial and USB are how the receipt printer and cash drawer are reached.
@@ -138,7 +115,7 @@ async function createWindow() {
     callback(ports.length ? ports[0].portId : '')
   })
 
-  win.loadURL(`http://${HOST}:${port}/`)
+  win.loadURL(`${ORIGIN}/`)
   win.on('closed', () => { win = null })
 }
 
@@ -153,6 +130,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null)
+    serveBundle()
     createWindow()
     app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
   })

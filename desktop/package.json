@@ -3,7 +3,7 @@
   "productName": "EVERYTINROOM POS",
   "version": "2.1.0",
   "private": true,
-  "description": "Till software for EVERYTINROOM — sells with or without internet.",
+  "description": "Till software for EVERYTINROOM \u2014 sells with or without internet.",
   "author": "EVERYTINROOM",
   "main": "main.js",
   "scripts": {
@@ -19,11 +19,26 @@
   "build": {
     "appId": "shop.everytinroom.pos",
     "productName": "EVERYTINROOM POS",
-    "directories": { "output": "release", "buildResources": "build" },
-    "files": ["main.js", "app/**/*", "build/icon.ico"],
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "app/**/*",
+      "build/icon.ico"
+    ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
-      "icon": "build/icon.ico"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "EVERYTINROOM-POS-${version}-x64.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -31,7 +46,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "EVERYTINROOM POS"
+      "shortcutName": "EVERYTINROOM POS",
+      "deleteAppDataOnUninstall": false,
+      "allowElevation": true,
+      "runAfterFinish": true
     }
   }
 }
