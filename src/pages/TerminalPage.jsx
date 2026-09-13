@@ -8,6 +8,7 @@ import {
 } from '../lib/hardware'
 import { pendingCount, flush, onPendingChange } from '../lib/offlineQueue'
 import WindowsInstaller from '../components/WindowsInstaller'
+import SystemStatus from '../components/SystemStatus'
 import toast from 'react-hot-toast'
 
 // Per-machine settings. These live in this browser only — two tills in the same
@@ -123,6 +124,8 @@ export default function TerminalPage() {
           Printer, cash drawer and till settings for <b>this machine</b> ({terminalId()})
         </p>
       </div>
+
+      <SystemStatus />
 
       <WindowsInstaller />
 
@@ -256,20 +259,7 @@ export default function TerminalPage() {
       </div>
 
       {/* ---- offline ---- */}
-      <div className={card}>
-        <h2 className="text-sm font-bold text-gray-800 mb-1">Unfiled sales</h2>
-        <p className="text-[11px] text-gray-400 mb-3">
-          Cash sales made while the internet was down are held on this machine until it can reach the server. They file themselves automatically.
-          <b> Do not clear this browser's data while any are waiting.</b>
-        </p>
-        <div className="flex items-center gap-3">
-          <div className={`text-2xl font-bold ${queued ? 'text-amber-600' : 'text-emerald-600'}`}>{queued}</div>
-          <button onClick={doFlush} disabled={busy || !queued}
-            className="h-11 px-4 bg-gray-900 text-white rounded-xl text-xs font-bold disabled:opacity-30">
-            {busy ? 'Sending…' : 'Send now'}
-          </button>
-        </div>
-      </div>
+      
 
       <div className={card}>
         <h2 className="text-sm font-bold text-gray-800 mb-1">Today on this till</h2>
