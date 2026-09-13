@@ -59,6 +59,40 @@ jobs:
           Write-Host "built: $($exe.Name)  ${mb} MB"
           if ($exe.Length -lt 40MB) { Write-Error 'Installer is suspiciously small'; exit 1 }
 
+      # Publish straight into the shop's own storage so an admin can install it
+      # from Terminal & Printer without ever opening GitHub. Needs two repo
+      # secrets; if they are absent the step is skipped and the artifact below
+      # is still there to upload by hand.
+      - name: Publish to the shop
+        if: env.SUPABASE_SERVICE_ROLE_KEY != ''
+        env:
+          SUPABASE_URL: https://noiiuwkovoojkcwzupye.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem release -Filter *.exe -Recurse | Select-Object -First 1
+          $ver = (Get-Content package.json | ConvertFrom-Json).version
+          $path = "windows/EVERYTINROOM-POS-$ver.exe"
+          $headers = @{
+            apikey        = $env:SUPABASE_SERVICE_ROLE_KEY
+            Authorization = "Bearer $($env:SUPABASE_SERVICE_ROLE_KEY)"
+            'x-upsert'    = 'true'
+          }
+          Invoke-RestMethod -Method Post -Uri "$($env:SUPABASE_URL)/storage/v1/object/app-releases/$path" `
+            -Headers $headers -ContentType 'application/vnd.microsoft.portable-executable' `
+            -InFile $exe.FullName
+          # Record it against the catalogue of builds. service_role bypasses the
+          # admin gate on publish_release, which is why this runs in CI and not
+          # from anything holding the anon key.
+          $body = @{ platform='windows'; version=$ver; object_path=$path
+                     size_bytes=$exe.Length; published_by='CI'; active=$true } | ConvertTo-Json
+          Invoke-RestMethod -Method Patch -Uri "$($env:SUPABASE_URL)/rest/v1/app_releases?platform=eq.windows&active=eq.true" `
+            -Headers $headers -ContentType 'application/json' -Body '{"active":false}'
+          Invoke-RestMethod -Method Post -Uri "$($env:SUPABASE_URL)/rest/v1/app_releases" `
+            -Headers $headers -ContentType 'application/json' -Body $body
+          Write-Host "published $ver to the shop's storage"
+
       - uses: actions/upload-artifact@v4
         with:
           name: everytinroom-pos-windows
