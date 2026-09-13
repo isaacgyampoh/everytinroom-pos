@@ -7,6 +7,7 @@ import {
   pairPrinter, printReceipt, kickDrawer, escposSupported,
 } from '../lib/hardware'
 import { pendingCount, flush, onPendingChange } from '../lib/offlineQueue'
+import WindowsInstaller from '../components/WindowsInstaller'
 import toast from 'react-hot-toast'
 
 // Per-machine settings. These live in this browser only — two tills in the same
@@ -122,6 +123,8 @@ export default function TerminalPage() {
           Printer, cash drawer and till settings for <b>this machine</b> ({terminalId()})
         </p>
       </div>
+
+      <WindowsInstaller />
 
       {/* ---- till identity ---- */}
       <div className={card}>
