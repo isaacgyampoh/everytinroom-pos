@@ -3,6 +3,7 @@ import { useStore } from '../hooks/useStore'
 import { getSupabase } from '../lib/supabase'
 import { Logo } from './Logo'
 import Numpad from './Numpad'
+import { rememberSignIn, offlineSignIn, knownOfflineUsers } from '../lib/offlineStore'
 
 export default function Login() {
   const [pins, setPins] = useState(['', '', '', ''])
@@ -46,6 +47,27 @@ export default function Login() {
 
   const tryLogin = async (pin) => {
     setLoading(true)
+
+    // No connection: verify_pin is unreachable, so fall back to whoever has
+    // signed in on this machine before. Without this a till that reboots
+    // during an outage shows a login screen nobody can get past.
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      const u = await offlineSignIn(pin)
+      if (u) {
+        try { if (!document.fullscreenElement && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen() } catch {}
+        login(u, u.role === 'Admin', null)
+        setPage(u.role === 'Admin' ? 'dash' : 'pos')
+        return
+      }
+      setLoading(false)
+      setBlocked(knownOfflineUsers().length
+        ? 'No internet. Only staff who have signed in on this till before can sign in now.'
+        : 'No internet, and nobody has signed in on this till yet.')
+      setPins(['', '', '', '']); refs[0].current?.focus()
+      setTimeout(() => setBlocked(''), 5000)
+      return
+    }
+
     try {
       const sb = getSupabase()
       const { data } = await sb.rpc('verify_pin', { p_pin: pin })
@@ -61,11 +83,22 @@ export default function Login() {
         // gesture browsers require. Removes the title bar / close button so the
         // POS runs like a kiosk until the machine is powered off. No keyboard needed.
         try { if (!document.fullscreenElement && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen() } catch {}
-        login({ id: data.id, name: data.name, role: data.role, permissions: data.permissions || [] }, isAdmin, data.token)
+        const u = { id: data.id, name: data.name, role: data.role, permissions: data.permissions || [] }
+        // So this person can still open the till if the line is down tomorrow.
+        rememberSignIn(pin, u)
+        login(u, isAdmin, data.token)
         setPage(isAdmin ? 'dash' : 'pos')
         return
       }
-    } catch {}
+    } catch {
+      // The request itself failed — treat it as an outage, not a wrong PIN.
+      const u = await offlineSignIn(pin)
+      if (u) {
+        login(u, u.role === 'Admin', null)
+        setPage(u.role === 'Admin' ? 'dash' : 'pos')
+        return
+      }
+    }
     setLoading(false)
     setError(true); setPins(['', '', '', '']); refs[0].current?.focus()
     setTimeout(() => setError(false), 2000)

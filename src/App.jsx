@@ -93,6 +93,7 @@ export default function App() {
   const lastActivityRef = useRef(Date.now())
   const [salePopup, setSalePopup] = useState(null)
   const [queued, setQueued] = useState(pendingCount())
+  const offlineCatalogue = useStore(st => st.offlineCatalogue)
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine)
 
   // Broadcast live cart to the customer-facing display (#/customer-display)
@@ -354,6 +355,15 @@ export default function App() {
 
       {/* Connection / unfiled-sales indicator. A till that has been offline for
           an hour must not look identical to one that is fine. */}
+      {/* Trading from a snapshot is safe, but only if the cashier knows. Stock
+          counts in particular are as of whenever this was captured. */}
+      {offlineCatalogue && (
+        <div className="fixed top-0 inset-x-0 z-[150] bg-[#b3402b] text-white text-center py-1.5 px-3 text-[12px] font-semibold">
+          Offline — prices and stock as of {new Date(offlineCatalogue).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.
+          Sales are saved and will file themselves.
+        </div>
+      )}
+
       {(!online || queued > 0) && (
         <button onClick={() => setPage('terminal')}
           className={`fixed bottom-[calc(150px+env(safe-area-inset-bottom))] md:bottom-24 right-4 md:right-6 z-[98] h-10 px-3.5 rounded-xl text-[11px] font-bold shadow-lg flex items-center gap-2 ${online ? 'bg-amber-500 text-white' : 'bg-red-600 text-white'}`}>
@@ -362,7 +372,7 @@ export default function App() {
         </button>
       )}
 
-      <main className="pt-14 md:pt-0 pb-24 md:pb-10 min-h-screen transition-all duration-200 content-shell">
+      <main className={`${offlineCatalogue ? "pt-[86px] md:pt-8" : "pt-14 md:pt-0"} pb-24 md:pb-10 min-h-screen transition-all duration-200 content-shell`}>
         <div className="px-3 sm:px-4 md:px-7 lg:px-9 py-3 md:py-5 max-w-[1600px] mx-auto">
           <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-7 h-7 border-[2.5px] border-stone-200 border-t-gray-800 rounded-full animate-spin" /></div>}>
             {pages[page] || <POS />}
