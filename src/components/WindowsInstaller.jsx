@@ -47,6 +47,12 @@ export default function WindowsInstaller() {
       const path = `windows/EVERYTINROOM-POS-${v}.exe`
       const { error: upErr } = await sb.storage.from(BUCKET)
         .upload(path, file, { upsert: true, contentType: 'application/vnd.microsoft.portable-executable' })
+      // Storage refuses anything over the project-wide limit, and says so in
+      // words no shopkeeper can act on. The installer is ~80 MB, so this is the
+      // error an admin is most likely to meet.
+      if (upErr && /exceeded the maximum allowed size|too large/i.test(upErr.message || '')) {
+        throw new Error('The file is bigger than storage currently accepts. Raise the storage limit to 150 MB in Supabase, then upload again.')
+      }
       if (upErr) throw new Error(upErr.message)
 
       const { data, error } = await sb.rpc('publish_release', {

@@ -63,8 +63,10 @@ function serveBundle() {
     if (!rel || rel === '/') rel = '/index.html'
 
     // Never serve outside the bundle, whatever the request says.
+    // path.sep matters: without it a sibling folder named `app-old` would pass
+    // a plain startsWith(DIST) check and be served.
     const full = path.normalize(path.join(DIST, rel))
-    if (!full.startsWith(DIST)) return new Response('Forbidden', { status: 403 })
+    if (full !== DIST && !full.startsWith(DIST + path.sep)) return new Response('Forbidden', { status: 403 })
 
     const file = fs.existsSync(full) && fs.statSync(full).isFile() ? full : path.join(DIST, 'index.html')
     return net.fetch(pathToFileURL(file).toString())
