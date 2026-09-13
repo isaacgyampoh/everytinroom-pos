@@ -143,7 +143,28 @@ export default function App() {
   useEffect(() => {
     startAutoFlush()
     const off = onPendingChange(setQueued)
-    const up = () => { setOnline(true); flush().then(r => { if (r.sent) { toast.success(`${r.sent} offline sale${r.sent > 1 ? 's' : ''} filed`); loadAll() } }) }
+    // On reconnect: file what is queued AND catch up on everything that
+    // happened while the line was down. Realtime only delivers events while
+    // connected, so website orders placed during an outage are simply missing
+    // until something re-reads them. This used to refresh only when there were
+    // offline sales to send, so a till that was offline with an empty queue
+    // never picked up the orders it had missed.
+    const up = () => {
+      setOnline(true)
+      flush()
+        .then(r => { if (r.sent) toast.success(`${r.sent} offline sale${r.sent > 1 ? 's' : ''} filed`) })
+        .catch(() => {})
+        .finally(() => {
+          try {
+            loadAll()
+            // loadAll's second phase is guarded by _secondaryLoaded and returns
+            // early once it has run, so it does NOT re-read orders. Website
+            // orders placed during the outage are exactly what we came back
+            // for, so ask for them directly.
+            useStore.getState().refreshWAOrders()
+          } catch {}
+        })
+    }
     const down = () => setOnline(false)
     window.addEventListener('online', up)
     window.addEventListener('offline', down)
@@ -151,6 +172,17 @@ export default function App() {
   }, []) // eslint-disable-line
 
   useEffect(() => { loadAll(); setupRealtime(); watchForUpdates() }, [])
+
+  // Safety net. A websocket can sit in a half-open state that neither fires an
+  // 'offline' event nor delivers rows, which would leave website orders
+  // invisible until somebody navigated. Re-read them periodically while online.
+  useEffect(() => {
+    if (!user) return
+    const t = setInterval(() => {
+      if (navigator.onLine !== false) { try { useStore.getState().refreshWAOrders() } catch {} }
+    }, 120000)
+    return () => clearInterval(t)
+  }, [user])
 
   // A new version waits until the till is idle. Swapping the JavaScript under a
   // cashier mid-sale reloads the page and takes the cart with it.
