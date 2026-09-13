@@ -1,5 +1,6 @@
 import { useStore } from '../hooks/useStore'
 import { useEffect, useState } from 'react'
+import { getSupabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { money, moneyShort, num, today, weekStartDate, monthStart, isoDate } from '../lib/utils'
 
@@ -105,7 +106,20 @@ export default function Dashboard() {
   }
   const uncostedPct = (revCosted + revUncosted) > 0
     ? (revUncosted / (revCosted + revUncosted)) * 100 : 0
-  const profitUnreliable = uncostedPct >= 10
+
+  // Asked of the server, over the real period. The till only keeps the last
+  // 150 sales, so anything computed from what is in memory describes a
+  // different window than the one on screen.
+  const [cover, setCover] = useState(null)
+  useEffect(() => {
+    const from = new Date(); from.setDate(from.getDate() - 90)
+    getSupabase().rpc('profit_report', {
+      p_from: from.toISOString().slice(0, 10),
+      p_to: new Date().toISOString().slice(0, 10),
+    }).then(({ data }) => setCover(data || null)).catch(() => {})
+  }, [])
+
+  const profitUnreliable = cover ? Number(cover.coverage) < 90 : uncostedPct >= 10
 
   const outOfStock = products.filter(p => p.quantity === 0)
   const lowStock = products.filter(p => p.quantity > 0 && p.quantity <= 5).sort((a, b) => a.quantity - b.quantity)
@@ -161,9 +175,17 @@ export default function Dashboard() {
           <div className="min-w-0">
             <div className="text-[14px] font-semibold text-gray-900">Profit figures are not reliable yet</div>
             <p className="text-[12.5px] text-gray-500 mt-1 leading-relaxed max-w-[62ch]">
-              <b className="text-[#b3402b]">{uncostedPct.toFixed(0)}%</b> of this month's takings came from
-              products with no cost price saved. For those the whole selling price is counted as
-              profit, so every profit and margin figure below reads higher than the truth.
+              {cover ? <>
+                Only <b className="text-[#b3402b]">{Number(cover.coverage).toFixed(0)}%</b> of the last 90 days&rsquo;
+                takings has a cost price behind it. On that part the real result is{' '}
+                <b className={Number(cover.measuredProfit) >= 0 ? 'text-gray-900' : 'text-[#b3402b]'}>
+                  {money(cover.measuredProfit)}
+                </b>. The remaining {money(cover.unbackedRevenue)} counts its whole selling price as
+                profit, so the figures below read far higher than the truth.
+              </> : <>
+                <b className="text-[#b3402b]">{uncostedPct.toFixed(0)}%</b> of this month&rsquo;s takings came from
+                products with no cost price saved, so the profit figures below read higher than the truth.
+              </>}
             </p>
             <button onClick={() => setPage('products')}
               className="mt-2.5 h-9 px-3.5 rounded-[10px] bg-[#16181d] text-white text-[12px] font-semibold">

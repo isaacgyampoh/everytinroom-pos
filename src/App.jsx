@@ -10,6 +10,7 @@ import CartDrawer from './components/CartDrawer'
 import ReceiptPreview from './components/ReceiptPreview'
 import { startAutoFlush, pendingCount, onPendingChange, flush } from './lib/offlineQueue'
 import { getSettings } from './lib/hardware'
+import { watchForUpdates, onUpdateReady, applyUpdate } from './lib/appUpdate'
 import toast from 'react-hot-toast'
 
 // Lazy load all pages — only loads when needed
@@ -101,6 +102,7 @@ export default function App() {
   const lastActivityRef = useRef(Date.now())
   const [salePopup, setSalePopup] = useState(null)
   const [queued, setQueued] = useState(pendingCount())
+  const [updateReady, setUpdateReady] = useState(false)
   const offlineCatalogue = useStore(st => st.offlineCatalogue)
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine)
 
@@ -148,7 +150,17 @@ export default function App() {
     return () => { off(); window.removeEventListener('online', up); window.removeEventListener('offline', down) }
   }, []) // eslint-disable-line
 
-  useEffect(() => { loadAll(); setupRealtime() }, [])
+  useEffect(() => { loadAll(); setupRealtime(); watchForUpdates() }, [])
+
+  // A new version waits until the till is idle. Swapping the JavaScript under a
+  // cashier mid-sale reloads the page and takes the cart with it.
+  useEffect(() => onUpdateReady(() => setUpdateReady(true)), [])
+  const cartCount = useStore(st => st.cart.length)
+  useEffect(() => {
+    if (!updateReady || cartOpen || cartCount > 0) return
+    const t = setTimeout(() => applyUpdate(), 1500)   // settle, then swap
+    return () => clearTimeout(t)
+  }, [updateReady, cartOpen, cartCount])
 
   // An installed app reopens on whatever URL its window was last left at. If
   // that was the storefront, the till opened on the customer site — the

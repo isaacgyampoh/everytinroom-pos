@@ -10,7 +10,7 @@
 // failure for a POS. API traffic is now explicitly never cached.
 // ============================================================================
 
-const CACHE = 'everytinroom-v5'
+const CACHE = 'everytinroom-v6'
 const SHELL = ['/', '/index.html', '/manifest.json', '/logo.svg', '/logo.png']
 
 // Live data. Stock levels, prices and orders must never come from a cache —
@@ -37,11 +37,15 @@ const isImmutableAsset = (url) =>
 
 self.addEventListener('install', (e) => {
   // Precache the shell so a till that reboots with no connection still opens.
+  //
+  // NOTE: no skipWaiting() here. Taking over immediately swaps the JavaScript
+  // under a cashier who is halfway through a sale — the page reloads and the
+  // cart is gone. The new worker now waits until the page asks for it, which
+  // the app only does when no sale is in progress.
   e.waitUntil(
     caches.open(CACHE)
       .then((c) => c.addAll(SHELL))
       .catch(() => {})       // a missing optional file must not block install
-      .then(() => self.skipWaiting())
   )
 })
 
@@ -132,6 +136,7 @@ self.addEventListener('message', (e) => {
     if (count > 0) self.registration.setAppBadge(count).catch(() => {})
     else self.registration.clearAppBadge().catch(() => {})
   }
+  // The page decides when it is safe to swap versions.
   if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting()
 })
 
