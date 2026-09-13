@@ -57,6 +57,14 @@ const idleMs = () => {
 // ever consulted ADMIN_PAGES — so `reports`, `receiving`, `dash`, `customers`,
 // `expenses`, `performance` and `wachats` were merely HIDDEN in the nav and
 // stayed reachable, and the `reports` permission was never actually enforced.
+// The customer-facing routes, matched on the FIRST PATH SEGMENT rather than
+// by substring. Anything else is the till.
+export function publicRoute(hash) {
+  const path = String(hash || '').replace(/^#\/?/, '').split('?')[0]
+  const head = path.split('/').filter(Boolean)[0] || ''
+  return ['customer-display', 'pay', 'deliver', 'details', 'catalog'].includes(head) ? head : null
+}
+
 // Every internal page id that a deep link may target. Kept next to PAGE_ACCESS
 // so the two cannot drift apart.
 const PAGES_BY_ID = new Set([
@@ -141,6 +149,27 @@ export default function App() {
   }, []) // eslint-disable-line
 
   useEffect(() => { loadAll(); setupRealtime() }, [])
+
+  // An installed app reopens on whatever URL its window was last left at. If
+  // that was the storefront, the till opened on the customer site — the
+  // reported "I click the app and the customer side appears". Clear a
+  // storefront hash on launch; the genuinely customer-facing links (a payment
+  // or delivery page opened from a message) are left alone.
+  useEffect(() => {
+    // ONLY when this is the till application — launched from its own icon, or
+    // running inside the Windows shell. A customer visiting the website on
+    // #/catalog must still get the shop; clearing the hash unconditionally
+    // broke the storefront, which the route tests caught.
+    const isTillApp =
+      new URLSearchParams(window.location.search).get('source') === 'pwa' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.matchMedia?.('(display-mode: standalone)').matches ||
+      window.matchMedia?.('(display-mode: fullscreen)').matches
+    if (!isTillApp) return
+    if (publicRoute(window.location.hash) === 'catalog') {
+      history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
+  }, [])
 
   // Global image fallback: any product image that fails to load (e.g. dead
   // Cloudinary links) is swapped for a clean neutral placeholder instead of
@@ -298,12 +327,21 @@ export default function App() {
     updateBadge(badge)
   }, [waOrders])
 
-  // Public pages - no login required
-  if (window.location.hash.includes('/customer-display')) return <Suspense fallback={<Loader />}><CustomerDisplay /></Suspense>
-  if (window.location.hash.includes('/pay/')) return <Suspense fallback={<Loader />}><InvoicePay /></Suspense>
-  if (window.location.hash.includes('/deliver/')) return <Suspense fallback={<Loader />}><DeliveryConfirm /></Suspense>
-  if (window.location.hash.includes('/details/')) return <Suspense fallback={<Loader />}><DeliveryDetails /></Suspense>
-  if (window.location.hash.includes('/catalog')) return <Suspense fallback={<Loader />}><Catalog /></Suspense>
+  // Pages a customer may open without signing in.
+  //
+  // These used to be matched with hash.includes(), which is why the till could
+  // open on the shop's website instead of the POS: any hash CONTAINING
+  // '/catalog' won, so '#/pos?ref=/catalog-promo' rendered the storefront, and
+  // an installed app relaunched on a stale '#/catalog' showed a signed-in
+  // cashier the customer site with no route back to the till. Matched on the
+  // first path segment now, and a signed-in session is never hijacked by the
+  // storefront.
+  const pub = publicRoute(window.location.hash)
+  if (pub === 'customer-display') return <Suspense fallback={<Loader />}><CustomerDisplay /></Suspense>
+  if (pub === 'pay') return <Suspense fallback={<Loader />}><InvoicePay /></Suspense>
+  if (pub === 'deliver') return <Suspense fallback={<Loader />}><DeliveryConfirm /></Suspense>
+  if (pub === 'details') return <Suspense fallback={<Loader />}><DeliveryDetails /></Suspense>
+  if (pub === 'catalog' && !user) return <Suspense fallback={<Loader />}><Catalog /></Suspense>
 
   if (loading) return <><Loader /><Toaster /></>
   if (!user) return <><Login /><Toaster /></>
