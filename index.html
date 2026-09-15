@@ -12,11 +12,57 @@
   <meta name="apple-mobile-web-app-title" content="EVERYTINROOM">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!--
+    Loaded without blocking the first paint.
+
+    As a plain stylesheet this was the single worst thing on the page for a
+    shop: the browser will not paint anything until a render-blocking
+    stylesheet resolves, and when the router is up but the line is down the
+    request does not fail, it hangs. Measured on the desktop till with the
+    font request left unanswered: no paint at all after 7.5 seconds — a white
+    window, on a till, with a customer waiting.
+
+    media="print" makes it non-blocking; onload promotes it once it arrives.
+    Every font stack here falls back to the system UI font, so until then the
+    till is readable rather than absent.
+  -->
+  <link rel="stylesheet" media="print" onload="this.media='all';this.onload=null"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
   <title>EVERYTINROOM POS</title>
+  <style>
+    /* Painted on the very first frame, before any bundle is parsed, so the
+       till never shows an empty window. React clears it when it mounts. */
+    #boot { position: fixed; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 22px;
+            background: #f6f6f5; color: #16181d;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+    #boot .mark { font-size: 15px; font-weight: 800; letter-spacing: .22em; }
+    #boot .bar { width: 132px; height: 3px; border-radius: 3px; background: #e3e3e0; overflow: hidden; }
+    #boot .bar i { display: block; width: 40%; height: 100%; border-radius: 3px; background: #16181d;
+                   animation: boot-slide 1.1s ease-in-out infinite; }
+    @keyframes boot-slide { 0% { transform: translateX(-100%) } 100% { transform: translateX(330%) } }
+    #boot .slow { min-height: 16px; font-size: 12px; color: #8a8a85; opacity: 0; transition: opacity .3s;
+                  max-width: 300px; text-align: center; line-height: 1.5; }
+    @media (prefers-reduced-motion: reduce) { #boot .bar i { animation: none; width: 100% } }
+  </style>
 </head>
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <div id="boot">
+      <div class="mark">EVERYTINROOM</div>
+      <div class="bar"><i></i></div>
+      <div class="slow" id="boot-slow">Still starting. If this stays on screen, close the till and open it again.</div>
+    </div>
+  </div>
+  <script>
+    // If the bundle is missing or broken, the bar would otherwise spin for
+    // ever and say nothing. Ten seconds is far longer than a healthy start.
+    setTimeout(function () {
+      var el = document.getElementById('boot-slow')
+      if (el) el.style.opacity = '1'
+    }, 10000)
+  </script>
   <script type="module" src="/src/main.jsx"></script>
   <script>
     if ('serviceWorker' in navigator) {

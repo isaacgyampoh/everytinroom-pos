@@ -10,7 +10,7 @@
 // failure for a POS. API traffic is now explicitly never cached.
 // ============================================================================
 
-const CACHE = 'everytinroom-v6'
+const CACHE = 'everytinroom-v7'
 const SHELL = ['/', '/index.html', '/manifest.json', '/logo.svg', '/logo.png']
 
 // Live data. Stock levels, prices and orders must never come from a cache —

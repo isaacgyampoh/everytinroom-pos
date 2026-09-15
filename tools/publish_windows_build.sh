@@ -49,6 +49,12 @@ curl -fsS -X PATCH "https://api.supabase.com/v1/projects/$REF/config/storage" \
 echo "==> pinning per-bucket limits (migration 029)"
 sql "$(cat supabase/migrations/029_bucket_size_limits.sql)" > /dev/null
 
+# Without the SELECT policy this adds, the upload below fails with "new row
+# violates row-level security policy" — because it upserts, and an upsert has
+# to read the row it might replace.
+echo "==> release bucket policies (migration 030)"
+sql "$(cat supabase/migrations/030_release_upload_policies.sql)" > /dev/null
+
 # 2. Upload. The anon key is enough: the bucket's insert policy allows it, and
 #    a stray object stays invisible to every till until the row below exists.
 echo "==> uploading"
