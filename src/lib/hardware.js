@@ -261,6 +261,40 @@ export async function kickDrawer() {
 // ---------------------------------------------------------------------------
 // Browser printing — hidden iframe, not a popup.
 // ---------------------------------------------------------------------------
+
+/**
+ * Print a complete HTML document without opening a window.
+ *
+ * Receipts have always gone out this way; delivery labels and stock sheets used
+ * window.open() and paid for it. A popup blocker, a kiosk-mode browser or the
+ * Windows shell all return null from window.open(), and the caller is left
+ * telling a shopkeeper to "allow popups" on a machine with no such setting.
+ * An iframe is same-origin and cannot be blocked.
+ */
+export function printHTML(html) {
+  return new Promise((resolve) => {
+    const frame = document.createElement('iframe')
+    frame.setAttribute('aria-hidden', 'true')
+    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden'
+    document.body.appendChild(frame)
+
+    const cleanup = () => { try { document.body.removeChild(frame) } catch {} }
+
+    frame.onload = () => {
+      try {
+        frame.contentWindow.focus()
+        frame.contentWindow.print()
+      } catch (e) { console.error('print failed', e) }
+      // Chrome's print dialog is modal; give it room before tearing the frame
+      // down, or the job is cancelled mid-spool.
+      setTimeout(() => { cleanup(); resolve({ ok: true }) }, 1500)
+    }
+
+    const doc = frame.contentWindow.document
+    doc.open(); doc.write(html); doc.close()
+  })
+}
+
 function printViaIframe(sale, settings) {
   const items = Array.isArray(sale?.items) ? sale.items : []
   const paper = settings.paperWidth === 58 ? { page: '58mm', body: '52mm', base: 11 }
@@ -320,30 +354,7 @@ function printViaIframe(sale, settings) {
     </div>
   </body></html>`
 
-  return new Promise((resolve) => {
-    // A same-origin iframe, not window.open. Kiosk mode and popup blockers
-    // stop the popup outright, which is how receipts silently stopped
-    // printing on a locked-down till.
-    const frame = document.createElement('iframe')
-    frame.setAttribute('aria-hidden', 'true')
-    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden'
-    document.body.appendChild(frame)
-
-    const cleanup = () => { try { document.body.removeChild(frame) } catch {} }
-
-    frame.onload = () => {
-      try {
-        frame.contentWindow.focus()
-        frame.contentWindow.print()
-      } catch (e) { console.error('print failed', e) }
-      // Chrome's print dialog is modal; give it room before tearing the frame
-      // down, or the job is cancelled mid-spool.
-      setTimeout(() => { cleanup(); resolve({ ok: true }) }, 1500)
-    }
-
-    const doc = frame.contentWindow.document
-    doc.open(); doc.write(html); doc.close()
-  })
+  return printHTML(html)
 }
 
 // ---------------------------------------------------------------------------

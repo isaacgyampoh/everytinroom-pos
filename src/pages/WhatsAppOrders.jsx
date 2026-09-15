@@ -6,6 +6,7 @@ import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
 import { rpcMessage } from '../lib/rpcError'
 import { rpcCompat } from '../lib/rpc'
+import { printHTML } from '../lib/hardware'
 
 export default function WhatsAppOrders() {
   const { waOrders, waFilter, setWAFilter, refreshWAOrders, user, token, setLoading, loadAll } = useStore()
@@ -215,8 +216,7 @@ export default function WhatsAppOrders() {
     const trackNo = o.trackingNo || o.orderNo
     const orderDate = new Date(o.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 
-    const w = window.open('', '_blank', 'width=420,height=700')
-    w.document.write(`<!DOCTYPE html><html><head><title>${trackNo}</title>
+    printHTML(`<!DOCTYPE html><html><head><title>${trackNo}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Helvetica Neue', 'Arial', sans-serif; width: 80mm; color: #000; }
@@ -307,9 +307,7 @@ export default function WhatsAppOrders() {
 
 </div>
 
-<script>setTimeout(() => { window.print(); }, 600);</script>
 </body></html>`)
-    w.document.close()
   }
 
   const statusColor = (s) => {

@@ -7,7 +7,8 @@
   "author": "EVERYTINROOM",
   "main": "main.js",
   "scripts": {
-    "prepare-app": "node prepare.js",
+    "build-web": "npm --prefix .. run build",
+    "prepare-app": "npm run build-web && node prepare.js",
     "start": "npm run prepare-app && electron .",
     "build:win": "npm run prepare-app && electron-builder --win --publish never",
     "build:dir": "npm run prepare-app && electron-builder --dir --publish never"

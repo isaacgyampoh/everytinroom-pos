@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import { IconClipboard, EmptyState } from '../components/Icons'
 import { rpcMessage } from '../lib/rpcError'
 import { rpcCompat, isMissingFunction } from '../lib/rpc'
+import { printHTML } from '../lib/hardware'
 
 export default function StockTakesPage() {
   const { stockTakes, stockAdjustments, products, user, token, isAdmin, refreshStockTakes, refreshStockAdjustments, refreshProducts, setLoading } = useStore()
@@ -79,12 +80,9 @@ export default function StockTakesPage() {
         <div class="sign">Counted by: ____________________</div>
         <div class="sign">Checked by: _____________________</div>
       </div>
-      <script>window.onload = function(){ window.print(); setTimeout(function(){ window.close() }, 300) }<\/script>
       </body></html>`
 
-    const w = window.open('', 'stock-sheet', 'width=360,height=640')
-    if (!w) { alert('Allow popups to print the stock sheet.'); return }
-    w.document.write(html); w.document.close()
+    printHTML(html)
   }
 
   const startStockTake = () => {

@@ -73,6 +73,101 @@ function serveBundle() {
   })
 }
 
+// ---------------------------------------------------------------------------
+// Behaviour a till needs that a browser tab got for free.
+// ---------------------------------------------------------------------------
+
+// shell.openExternal rejects when Windows has no handler for the URL or the
+// default browser is broken. Unhandled, that is an unhandled rejection in the
+// log and a link that does nothing at all for whoever clicked it.
+function openOutside(url) {
+  shell.openExternal(url).catch(() => {
+    dialog.showMessageBox(win, {
+      type: 'info',
+      title: 'EVERYTINROOM POS',
+      message: 'This machine could not open that link.',
+      detail: `${url}\n\nCopy it into a browser, or set a default browser in Windows settings.`,
+      buttons: ['OK'],
+    })
+  })
+}
+
+// window.open passes its placement as a features string. The customer display
+// works out which physical screen the customer is facing and asks for that
+// screen's exact rectangle, so those numbers have to survive.
+function childOptions(features) {
+  const f = {}
+  String(features || '').split(',').forEach((pair) => {
+    const [k, v] = pair.split('=').map((s) => (s || '').trim())
+    if (k) f[k.toLowerCase()] = v
+  })
+  const n = (k) => (Number.isFinite(Number(f[k])) && f[k] !== '' ? Number(f[k]) : undefined)
+  return {
+    x: n('left'), y: n('top'),
+    width: n('width') || 1280, height: n('height') || 800,
+    fullscreen: f.fullscreen === 'yes',
+    autoHideMenuBar: true,
+    backgroundColor: '#16181d',   // the customer display is a dark screen
+    webPreferences: { nodeIntegration: false, contextIsolation: true, spellcheck: false },
+  }
+}
+
+// F11 toggles fullscreen. Escape is deliberately left alone — the app uses it
+// to close the cart drawer and its modals, and stealing it here would break
+// them in the desktop build only.
+function allowFullScreenToggle(w) {
+  w.webContents.on('before-input-event', (e, input) => {
+    if (input.type === 'keyDown' && input.key === 'F11') {
+      e.preventDefault()
+      w.setFullScreen(!w.isFullScreen())
+    }
+  })
+}
+
+// A POS layout is fixed. On a touchscreen a stray two-finger pinch zooms the
+// page and there is no menu to undo it with, which looks exactly like the app
+// breaking.
+function lockZoom(wc) {
+  wc.setVisualZoomLevelLimits(1, 1).catch(() => {})
+  wc.on('did-finish-load', () => wc.setZoomFactor(1))
+}
+
+// A blank white window is the worst thing a till can show: nothing to read,
+// nothing to do. Say what happened and offer the one useful action.
+function watchForTrouble(w) {
+  w.webContents.on('did-fail-load', (_e, code, desc, url, isMainFrame) => {
+    if (!isMainFrame || code === -3) return   // -3 is an aborted navigation
+    dialog.showMessageBox(w, {
+      type: 'error',
+      title: 'EVERYTINROOM POS',
+      message: 'The till software could not start.',
+      detail: `${desc} (${code})\n${url}\n\nIf this keeps happening, reinstall from the admin page.`,
+      buttons: ['Try again', 'Close'],
+      defaultId: 0,
+    }).then(({ response }) => (response === 0 ? w.reload() : w.close()))
+  })
+
+  // The renderer died, so whatever was on screen is already gone. Reloading
+  // gets the cashier back to the PIN screen instead of a dead window.
+  w.webContents.on('render-process-gone', (_e, details) => {
+    if (details.reason === 'clean-exit') return
+    w.reload()
+  })
+
+  // Merely slow is not the same as dead, and reloading mid-sale would throw
+  // away a cart. Let whoever is standing at the till decide.
+  w.on('unresponsive', () => {
+    dialog.showMessageBox(w, {
+      type: 'warning',
+      title: 'EVERYTINROOM POS',
+      message: 'The till has stopped responding.',
+      detail: 'Waiting is usually enough. Restarting loses anything in the current cart.',
+      buttons: ['Keep waiting', 'Restart the till'],
+      defaultId: 0,
+    }).then(({ response }) => { if (response === 1) w.reload() })
+  })
+}
+
 let win = null
 
 function createWindow() {
@@ -93,18 +188,44 @@ function createWindow() {
     },
   })
 
-  // A till should fill the screen. Esc still gets you out for maintenance.
+  // A till should fill the screen. F11 gets you out again for maintenance —
+  // without it the window has no menu, no title bar and no way back to the
+  // Windows desktop short of Alt+F4.
   win.once('ready-to-show', () => { win.show(); win.setFullScreen(true) })
+  allowFullScreenToggle(win)
+  lockZoom(win.webContents)
 
   // Anything not the app itself — a customer's tracking link, a WhatsApp
   // message — opens in the real browser rather than hijacking the till.
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
-    return { action: 'deny' }
+  //
+  // The shop's OWN pages are a different matter. The customer display is a
+  // second window on the second screen, opened by the app with a
+  // everytinroom://pos URL. Denying every window.open (which is what this did)
+  // left the customer screen blank on the desktop till with nothing logged.
+  win.webContents.setWindowOpenHandler(({ url, features }) => {
+    if (!url.startsWith(ORIGIN)) { openOutside(url); return { action: 'deny' } }
+    return { action: 'allow', overrideBrowserWindowOptions: childOptions(features) }
   })
   win.webContents.on('will-navigate', (e, url) => {
-    if (!url.startsWith(ORIGIN)) { e.preventDefault(); shell.openExternal(url) }
+    if (!url.startsWith(ORIGIN)) { e.preventDefault(); openOutside(url) }
   })
+
+  // The customer display is a window in its own right and needs the same
+  // rules — it must not become a way to browse out of the till.
+  win.webContents.on('did-create-window', (child) => {
+    child.setMenuBarVisibility(false)
+    allowFullScreenToggle(child)
+    lockZoom(child.webContents)
+    child.webContents.setWindowOpenHandler(({ url }) => {
+      if (!url.startsWith(ORIGIN)) openOutside(url)
+      return { action: 'deny' }
+    })
+    child.webContents.on('will-navigate', (e, url) => {
+      if (!url.startsWith(ORIGIN)) { e.preventDefault(); openOutside(url) }
+    })
+  })
+
+  watchForTrouble(win)
 
   // Serial and USB are how the receipt printer and cash drawer are reached.
   // In a browser each needs a permission click; here the till is the shop's own
