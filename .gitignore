@@ -13,3 +13,6 @@ supabase/.branches/
 desktop/node_modules/
 desktop/app/
 desktop/release/
+
+# ...but the checked-in template that documents them is not a secret.
+!.env.example

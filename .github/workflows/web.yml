@@ -1,0 +1,55 @@
+# ============================================================================
+# Build the till's web app on every push.
+#
+# Vercel builds on deploy, but by then the broken build is already the thing a
+# shop is trying to open. This runs the same build on the same Node version as
+# the Vercel project, so a push that cannot compile is caught here instead of
+# at the counter.
+#
+# It also checks that the app still builds with the backend supplied through
+# the environment rather than the fallback — the whole point of VITE_SUPABASE_*
+# is that a deployment can be re-pointed, and that only holds if it is tested.
+# ============================================================================
+name: Web build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build with the default backend
+        run: npm run build
+
+      - name: Build with the backend overridden
+        env:
+          VITE_SUPABASE_URL: https://ci-placeholder.supabase.co
+          VITE_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+        run: npm run build
+
+      # If the overridden build still contains the fallback project, something
+      # has gone back to hardcoding a URL and the deployment is no longer
+      # re-pointable. Cheaper to fail here than to discover it after a move.
+      - name: Check nothing hardcodes the backend
+        run: |
+          if grep -rq 'noiiuwkovoojkcwzupye' dist/assets/; then
+            echo "::error::A hardcoded Supabase URL reached the bundle."
+            echo "Route it through fnUrl()/storageUrl() in src/lib/supabase.js."
+            grep -rl 'noiiuwkovoojkcwzupye' dist/assets/
+            exit 1
+          fi
+          echo "No hardcoded backend in the bundle."

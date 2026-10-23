@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { Toaster } from 'react-hot-toast'
-import { getSupabase } from './lib/supabase'
+import { getSupabase, fnUrl } from './lib/supabase'
 import { useStore } from './hooks/useStore'
 import { useCustomerDisplayBroadcast, broadcastDisplay } from './hooks/useCustomerDisplay'
 import Loader from './components/Loader'
+import ErrorBoundary from './components/ErrorBoundary'
 import Login from './components/Login'
 import Navigation from './components/Navigation'
 import CartDrawer from './components/CartDrawer'
@@ -243,21 +244,60 @@ export default function App() {
     return () => window.removeEventListener('error', onErr, true)
   }, [])
 
-  // App-wide payment auto-confirm: every 20s (from ANY screen, while logged in)
-  // ask NaloPay which recent pending orders actually paid, and mark them Paid.
-  // This means orders confirm themselves — staff shouldn't need to mark manually.
+  // App-wide payment auto-confirm: ask NaloPay which recent pending orders
+  // actually paid, and mark them Paid, from ANY screen while logged in. This
+  // means orders confirm themselves — staff shouldn't need to mark manually.
+  //
+  // It used to fire every 20 seconds unconditionally: 4,300 edge-function
+  // invocations a day per till, including all night on a till left signed in,
+  // and including while the machine was offline, where every call was a
+  // guaranteed failure. It now only runs when it can do something useful —
+  // online, and with the window actually in use — and eases off when the
+  // function is failing rather than hammering a backend that is already down.
   useEffect(() => {
     if (!user) return
-    const run = async () => {
-      try {
-        const r = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=reconcile-payments', { method: 'POST' })
-        const j = await r.json()
-        if (j?.confirmed > 0) { try { loadAll() } catch {} }
-      } catch {}
+    const BASE_MS = 20000
+    const MAX_MS = 160000
+    let timer = null
+    let stopped = false
+    let delay = BASE_MS
+
+    const schedule = () => {
+      if (stopped) return
+      clearTimeout(timer)
+      timer = setTimeout(run, delay)
     }
+
+    const run = async () => {
+      if (stopped) return
+      // A hidden window is a till nobody is looking at, and an offline one
+      // cannot reach the function at all. Wait for the next tick either way.
+      if (document.hidden || navigator.onLine === false) return schedule()
+      try {
+        const r = await fetch(fnUrl('charge-momo', 'reconcile-payments'), { method: 'POST' })
+        if (!r.ok) throw new Error(String(r.status))
+        const j = await r.json()
+        delay = BASE_MS                                   // healthy again
+        if (j?.confirmed > 0) { try { loadAll() } catch {} }
+      } catch {
+        delay = Math.min(delay * 2, MAX_MS)               // back off
+      }
+      schedule()
+    }
+
+    // Coming back to the window is exactly when a cashier wants the orders to
+    // be current, so check straight away rather than waiting out the interval.
+    const onWake = () => { if (!document.hidden) { delay = BASE_MS; run() } }
+
     run()
-    const iv = setInterval(run, 20000)
-    return () => clearInterval(iv)
+    document.addEventListener('visibilitychange', onWake)
+    window.addEventListener('online', onWake)
+    return () => {
+      stopped = true
+      clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onWake)
+      window.removeEventListener('online', onWake)
+    }
   }, [user]) // eslint-disable-line
 
   // Auto-logout on inactivity
@@ -381,11 +421,17 @@ export default function App() {
   // first path segment now, and a signed-in session is never hijacked by the
   // storefront.
   const pub = publicRoute(window.location.hash)
-  if (pub === 'customer-display') return <Suspense fallback={<Loader />}><CustomerDisplay /></Suspense>
-  if (pub === 'pay') return <Suspense fallback={<Loader />}><InvoicePay /></Suspense>
-  if (pub === 'deliver') return <Suspense fallback={<Loader />}><DeliveryConfirm /></Suspense>
-  if (pub === 'details') return <Suspense fallback={<Loader />}><DeliveryDetails /></Suspense>
-  if (pub === 'catalog' && !user) return <Suspense fallback={<Loader />}><Catalog /></Suspense>
+  // Wrapped in a boundary because these are the pages a CUSTOMER sees — a
+  // payment link, a delivery confirmation, the shop. A crash on one of those
+  // used to render a blank page to somebody who was trying to pay us.
+  const publicPage = (Page) => (
+    <ErrorBoundary><Suspense fallback={<Loader />}><Page /></Suspense></ErrorBoundary>
+  )
+  if (pub === 'customer-display') return publicPage(CustomerDisplay)
+  if (pub === 'pay') return publicPage(InvoicePay)
+  if (pub === 'deliver') return publicPage(DeliveryConfirm)
+  if (pub === 'details') return publicPage(DeliveryDetails)
+  if (pub === 'catalog' && !user) return publicPage(Catalog)
 
   if (loading) return <><Loader /><Toaster /></>
   if (!user) return <><Login /><Toaster /></>
@@ -456,9 +502,14 @@ export default function App() {
 
       <main className={`${offlineCatalogue ? "pt-[86px] md:pt-8" : "pt-14 md:pt-0"} pb-24 md:pb-10 min-h-screen transition-all duration-200 content-shell`}>
         <div className="px-3 sm:px-4 md:px-7 lg:px-9 py-3 md:py-5 max-w-[1600px] mx-auto">
-          <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-7 h-7 border-[2.5px] border-stone-200 border-t-gray-800 rounded-full animate-spin" /></div>}>
-            {pages[page] || <POS />}
-          </Suspense>
+          {/* Scoped to the page, not the whole till: a crash in Reports leaves
+              the nav, the basket and the till itself usable, and `key={page}`
+              clears the boundary as soon as the cashier navigates away. */}
+          <ErrorBoundary key={page} onReset={() => setPage('pos')}>
+            <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-7 h-7 border-[2.5px] border-stone-200 border-t-gray-800 rounded-full animate-spin" /></div>}>
+              {pages[page] || <POS />}
+            </Suspense>
+          </ErrorBoundary>
         </div>
       </main>
     </div>

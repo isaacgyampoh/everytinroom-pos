@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../hooks/useStore'
-import { getSupabase } from '../lib/supabase'
+import { getSupabase, fnUrl } from '../lib/supabase'
 import { money, num } from '../lib/utils'
 import { broadcastDisplay } from '../hooks/useCustomerDisplay'
 import { terminalLabel } from '../lib/hardware'
@@ -10,8 +10,6 @@ import Modal from './Modal'
 import Numpad from './Numpad'
 import toast from 'react-hot-toast'
 import { IconCart, EmptyState } from './Icons'
-
-const CHARGE_URL = 'https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo'
 
 export default function CartDrawer({ open, onClose, onReceipt }) {
   const { cart, updateCartQty, removeFromCart, clearCart, deductStock, user, mode, products } = useStore()
@@ -170,7 +168,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
     if (!moolreCtx || !otpValue.trim()) return
     setOtpSubmitting(true)
     try {
-      const mr = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=moolre-charge', {
+      const mr = await fetch(fnUrl('charge-momo', 'moolre-charge'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: moolreCtx.phone, amount: moolreCtx.amount, orderNo: moolreCtx.orderNo, externalref: moolreCtx.externalref || moolreCtx.orderNo, otpcode: otpValue.trim() })
       })
@@ -270,7 +268,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
       if (insErr || !inserted?.id) { setMomoStep('failed'); setMomoMessage('Could not create order: ' + (insErr?.message || '')); setProcessing(false); return }
       setPromptOrderId(inserted.id)
 
-      const r = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=nalopay-charge', {
+      const r = await fetch(fnUrl('charge-momo', 'nalopay-charge'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: phone.trim(), amount, reference: ref, orderNo: ref, orderId: inserted.id, customerName: 'Customer', description: 'POS sale ' + ref })
       })
@@ -293,7 +291,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
           if (st === 'Paid' || st === 'Completed') {
             clearInterval(pollRef.current)
             const saleData = await recordSale(isSplit ? 'Split' : 'Momo', isSplit ? { splitCash: num(splitCash), splitMomo: amount } : {})
-            try { fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=thankyou-sms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: phone.trim() }) }) } catch {}
+            try { fetch(fnUrl('charge-momo', 'thankyou-sms'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: phone.trim() }) }) } catch {}
             if (saleData) { toast.success('Paid! ' + saleData.receiptNo); finishSale(saleData) }
           }
         } catch {}
@@ -317,7 +315,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
       const extra = splitMode ? { splitCash: num(splitCash), splitMomo: splitRemainder } : {}
       const saleData = await recordSale(splitMode ? 'Split' : 'Momo', extra)
       if (saleData) {
-        try { fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=thankyou-sms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: phone.trim() }) }) } catch {}
+        try { fetch(fnUrl('charge-momo', 'thankyou-sms'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: phone.trim() }) }) } catch {}
         toast.success('Sale recorded! ' + saleData.receiptNo)
         setPromptOrderId(null)
         finishSale(saleData)
@@ -369,7 +367,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
       let smsOk = false
       if (localStorage.getItem('ussd-sms') === '1') {
         try {
-          const r = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=send-ussd-code', {
+          const r = await fetch(fnUrl('charge-momo', 'send-ussd-code'), {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ orderNo })
           })
@@ -387,7 +385,7 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
       let moolreRef = orderNo
       if (!isWhatsApp && localStorage.getItem('use-moolre') === '1') {
         try {
-          const mr = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=moolre-charge', {
+          const mr = await fetch(fnUrl('charge-momo', 'moolre-charge'), {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ phone: phone.trim(), amount, orderNo, externalref: orderNo })
           })

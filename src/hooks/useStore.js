@@ -348,6 +348,38 @@ export const useStore = create((set, get) => ({
   },
 }))
 
+// ---------------------------------------------------------------------------
+// KEEP THE OPEN BASKET ON DISK
+//
+// The cart was only written to localStorage by logout(), so it survived a
+// shift change and nothing else. A crash, an accidentally closed tab or a till
+// losing power took a half-rung basket with it — and a POS basket is somebody
+// standing at the counter with their shopping already on it.
+//
+// Saved on every change now, under the same per-cashier key login() restores
+// from, so nothing else had to change. Writes are coalesced on a short timer:
+// a cashier holding the + button must not touch localStorage on every frame.
+// ---------------------------------------------------------------------------
+let cartSaveTimer = null
+useStore.subscribe((state, prev) => {
+  if (state.cart === prev.cart) return
+  const uid = state.user?.id
+  if (!uid) return                       // nobody signed in; logout() stashed it
+  const snapshot = state.cart || []
+  clearTimeout(cartSaveTimer)
+  cartSaveTimer = setTimeout(() => {
+    // logout() stashes the basket and then clears it. If the shift ended while
+    // this write was still pending, writing the now-empty cart would undo that
+    // — so only write if the same cashier is still signed in.
+    if (useStore.getState().user?.id !== uid) return
+    try {
+      const saved = JSON.parse(localStorage.getItem('carts-by-cashier') || '{}')
+      saved[uid] = snapshot
+      localStorage.setItem('carts-by-cashier', JSON.stringify(saved))
+    } catch {}
+  }, 400)
+})
+
 // Dev-only handle so the running app can be driven from the console or a
 // headless browser (responsive checks, reproducing a state without a PIN).
 // Stripped from production builds by the import.meta.env.DEV guard.

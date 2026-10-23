@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getSupabase } from '../lib/supabase'
+import { getSupabase, fnUrl } from '../lib/supabase'
 import { SHOP } from '../lib/utils'
 import { LogoMark } from '../components/Logo'
 
@@ -68,7 +68,7 @@ export default function InvoicePay() {
     setPaying(true)
     setError('')
     try {
-      const res = await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/charge-momo?action=initialize', {
+      const res = await fetch(fnUrl('charge-momo', 'initialize'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phone: phone.trim() || order.customer_phone,
@@ -111,7 +111,7 @@ export default function InvoicePay() {
             const msg = `Hi${name}! Thank you for completing your payment.\n\nOrder ID: ${o.order_no}\nAmount: GHS ${Number(o.total).toFixed(2)}\n\nYour order will be packaged and our delivery team will contact you to arrange delivery and let you know the delivery fee to your location.\n\nThank you for shopping with EVERYTINROOM!`
             const phone = o.customer_phone.replace(/\D/g, '')
             const chatId = phone.startsWith('0') ? '233' + phone.slice(1) : phone
-            await fetch('https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/super-processor', {
+            await fetch(fnUrl('super-processor'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ action: 'send_confirmation', chatId, message: msg })

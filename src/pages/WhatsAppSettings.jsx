@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
-import { getSupabase } from '../lib/supabase'
+import { getSupabase, fnUrl } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
 // WhatsApp AI agent settings. Shows connection status + master on/off.
 // The WaSender + OpenAI keys live in Supabase secrets (never in the browser) —
 // this page checks the agent is reachable and lets you flip the master switch.
-const AGENT_URL = 'https://noiiuwkovoojkcwzupye.supabase.co/functions/v1/wa-agent'
+const AGENT_URL = fnUrl('wa-agent')
 
 export default function WhatsAppSettings() {
   const sb = getSupabase()
