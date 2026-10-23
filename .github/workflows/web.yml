@@ -32,6 +32,13 @@ jobs:
 
       - run: npm ci
 
+      # The money-critical logic: the offline sale queue and its idempotency
+      # key, the RPC migration fallback, and the rule deciding which pages a
+      # cashier may open. A regression in any of those is a sale lost, a sale
+      # rung up twice, or a cashier in the back office.
+      - name: Test
+        run: npm test
+
       - name: Build with the default backend
         run: npm run build
 

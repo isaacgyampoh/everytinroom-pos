@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { getSupabase, fnUrl } from './lib/supabase'
+import { publicRoute, PAGES_BY_ID, canOpenPage } from './lib/routes'
 import { useStore } from './hooks/useStore'
 import { useCustomerDisplayBroadcast, broadcastDisplay } from './hooks/useCustomerDisplay'
 import Loader from './components/Loader'
@@ -49,51 +50,6 @@ const CustomerDisplay = lazy(() => import('./pages/CustomerDisplay'))
 const idleMs = () => {
   const m = Number(getSettings().idleMinutes)
   return (Number.isFinite(m) && m > 0 ? m : 60) * 60 * 1000
-}
-
-// What each restricted page requires. 'admin' means admin only; anything else
-// is a permission key a cashier can be granted. Pages absent from this map are
-// open to any signed-in staff member (pos, receipts, refunds, whatsapp).
-//
-// This replaces a split ADMIN_PAGES / PAGE_PERMISSIONS pair where the guard only
-// ever consulted ADMIN_PAGES — so `reports`, `receiving`, `dash`, `customers`,
-// `expenses`, `performance` and `wachats` were merely HIDDEN in the nav and
-// stayed reachable, and the `reports` permission was never actually enforced.
-// The customer-facing routes, matched on the FIRST PATH SEGMENT rather than
-// by substring. Anything else is the till.
-export function publicRoute(hash) {
-  const path = String(hash || '').replace(/^#\/?/, '').split('?')[0]
-  const head = path.split('/').filter(Boolean)[0] || ''
-  return ['customer-display', 'pay', 'deliver', 'details', 'catalog'].includes(head) ? head : null
-}
-
-// Every internal page id that a deep link may target. Kept next to PAGE_ACCESS
-// so the two cannot drift apart.
-const PAGES_BY_ID = new Set([
-  'dash','pos','whatsapp','wachats','receiving','wasettings','receipts','products',
-  'staff','expenses','customers','bundles','performance','refunds','reports',
-  'promos','invoices','stocktakes','stockadjustments','restock','terminal','stockinsights',
-])
-
-const PAGE_ACCESS = {
-  dash: 'admin',
-  customers: 'admin',
-  bundles: 'admin',
-  promos: 'admin',
-  invoices: 'admin',
-  expenses: 'admin',
-  performance: 'admin',
-  wachats: 'admin',
-  wasettings: 'admin',
-  staff: 'admin',
-  products: 'product_management',
-  restock: 'product_receiving',
-  receiving: 'product_receiving',
-  stocktakes: 'stock_taking',
-  stockinsights: 'inventory_view',
-  stockadjustments: 'stock_taking',
-  reports: 'reports',
-  refunds: 'refunds',
 }
 
 export default function App() {
@@ -329,8 +285,7 @@ export default function App() {
     const apply = () => {
       const id = (window.location.hash || '').replace(/^#\/?/, '').split('?')[0]
       if (!id || !PAGES_BY_ID.has(id)) return
-      const needed = PAGE_ACCESS[id]
-      if (needed && !isAdmin && (needed === 'admin' || !can(needed))) return
+      if (!canOpenPage(id, { isAdmin, can })) return
       setPage(id)
     }
     apply()
@@ -340,10 +295,8 @@ export default function App() {
 
   // Guard restricted pages — admins pass, everyone else needs the page's permission.
   useEffect(() => {
-    if (!user || isAdmin) return
-    const needed = PAGE_ACCESS[page]
-    if (!needed) return                 // open page
-    if (needed !== 'admin' && can(needed)) return
+    if (!user) return
+    if (canOpenPage(page, { isAdmin, can })) return
     setPage('pos')
     toast.error('You do not have access to this page')
   }, [page, user, isAdmin, can, setPage])

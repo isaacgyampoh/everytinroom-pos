@@ -35,7 +35,10 @@ import { Component } from 'react'
 // is not. The module-specific wording is what tells the two apart.
 const CHUNK_RE = /dynamically imported module|importing a module script failed|chunkloaderror|loading chunk \d+ failed/i
 
-const isChunkError = (err) =>
+// Exported so the classification is tested: it decides whether a till
+// reloads itself, and getting it wrong either strands a stale build or
+// reboots a working till in front of a customer.
+export const isChunkError = (err) =>
   CHUNK_RE.test(String(err?.name || '') + ' ' + String(err?.message || ''))
 
 // One automatic reload per browser tab. A deploy that is genuinely broken
