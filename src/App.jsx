@@ -13,6 +13,7 @@ import ReceiptPreview from './components/ReceiptPreview'
 import { startAutoFlush, pendingCount, onPendingChange, flush } from './lib/offlineQueue'
 import { getSettings } from './lib/hardware'
 import { watchForUpdates, onUpdateReady, applyUpdate } from './lib/appUpdate'
+import { useDockedCart } from './hooks/useDockedCart'
 import toast from 'react-hot-toast'
 
 // Lazy load all pages — only loads when needed
@@ -55,6 +56,11 @@ const idleMs = () => {
 export default function App() {
   const { user, page, setPage, loading, loadAll, logout, isAdmin, can, darkMode } = useStore()
   const [cartOpen, setCartOpen] = useState(false)
+  // On a wide screen the basket lives beside the grid instead of behind a
+  // button. `cartOpen` stays the user's own intent either way, which is what
+  // the update-when-idle check below reads — docking must not look like a
+  // cashier mid-sale and block every deploy.
+  const cartDocked = useDockedCart()
   const [receipt, setReceipt] = useState(null)
   const lastActivityRef = useRef(Date.now())
   const [salePopup, setSalePopup] = useState(null)
@@ -417,8 +423,8 @@ export default function App() {
   return (
     <div className="min-h-screen">
       <Toaster position="top-center" toastOptions={{ duration: 2000, style: { borderRadius: '14px', padding: '12px 20px', fontWeight: 600, fontSize: '13px', background: darkMode ? '#222' : '#fff', color: darkMode ? '#eee' : '#1a1a1a' } }} />
-      <Navigation onOpenCart={() => setCartOpen(true)} />
-      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} onReceipt={setReceipt} />
+      <Navigation onOpenCart={cartDocked ? null : () => setCartOpen(true)} />
+      <CartDrawer open={cartOpen || cartDocked} docked={cartDocked} onClose={() => setCartOpen(false)} onReceipt={setReceipt} />
       {receipt && <ReceiptPreview sale={receipt} onClose={() => setReceipt(null)} />}
 
       {/* Sale Notification */}

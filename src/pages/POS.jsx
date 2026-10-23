@@ -1,4 +1,4 @@
-import { useState, useMemo, memo, useCallback } from 'react'
+import { useState, useMemo, memo, useCallback, useRef, useEffect } from 'react'
 import { useStore } from '../hooks/useStore'
 import { getSupabase } from '../lib/supabase'
 import { money, num, today, thumb } from '../lib/utils'
@@ -122,6 +122,32 @@ export default function POS() {
 
   useBarcodeScanner(onScan)
 
+  // Reaching the search box without a mouse. Back-office machines and the
+  // Windows shell have a keyboard; the counter touchscreen does not, which is
+  // also why the box is NOT auto-focused — on a touch till that summons the
+  // operating system's on-screen keyboard over the products.
+  //
+  // F-keys only, deliberately. A printable shortcut like "/" is indistinguishable
+  // from a character inside a barcode, and the scanner sends those in a burst —
+  // binding one would let a stray "/" mid-scan steal focus and split the code.
+  const searchRef = useRef(null)
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'F2') {
+        e.preventDefault()
+        searchRef.current?.focus()
+        searchRef.current?.select()
+        return
+      }
+      if (e.key === 'Escape' && document.activeElement === searchRef.current) {
+        setQuery('')
+        searchRef.current?.blur()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   const promoCount = Object.keys(promoPriceMap).length
 
   return (
@@ -134,6 +160,7 @@ export default function POS() {
         <div className="relative flex-1 min-w-0">
           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-300 pointer-events-none"><IconSearch size={18} /></span>
           <input
+            ref={searchRef}
             className="w-full h-12 md:h-12 pl-11 pr-4 panel text-[15px] font-medium placeholder:text-stone-300 focus:outline-none focus:border-gray-900 transition"
             placeholder="Search or scan a barcode" value={query}
             onChange={e => { setQuery(e.target.value); const v = e.target.value.trim(); if (v.length > 3) { const ex = products.find(p => p.name.toLowerCase() === v.toLowerCase()); if (ex && searchAdd(ex)) setQuery('') } }}
@@ -175,7 +202,7 @@ export default function POS() {
       )}
 
       {/* Grid */}
-      <div className="grid grid-cols-2 min-[420px]:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2 sm:gap-2.5">
+      <div className="product-grid grid grid-cols-2 min-[420px]:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2 sm:gap-2.5">
         {filtered.length === 0 && <div className="col-span-full"><EmptyState icon={IconSearch} title={query ? `Nothing matches "${query}"` : 'No products yet'} hint={query ? 'Check the spelling, or scan the barcode' : 'Add products from the Products page'} /></div>}
         {filtered.map((item, idx) => {
           if (mode === 'bundle') return (

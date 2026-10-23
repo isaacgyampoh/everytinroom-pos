@@ -11,7 +11,7 @@ import Numpad from './Numpad'
 import toast from 'react-hot-toast'
 import { IconCart, EmptyState } from './Icons'
 
-export default function CartDrawer({ open, onClose, onReceipt }) {
+export default function CartDrawer({ open, docked = false, onClose, onReceipt }) {
   const { cart, updateCartQty, removeFromCart, clearCart, deductStock, user, mode, products } = useStore()
   const [discount, setDiscount] = useState(0)
   const [phone, setPhone] = useState('')
@@ -479,10 +479,13 @@ export default function CartDrawer({ open, onClose, onReceipt }) {
 
   return (
     <>
-      {open && <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[300]" onClick={onClose} />}
-      <div className={`cart-drawer fixed bottom-0 left-0 right-0 md:left-auto md:top-0 md:w-[400px] bg-white md:border-l border-gray-200 max-h-[92vh] md:max-h-full z-[301] flex flex-col transition-transform duration-300 ${open ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:translate-y-0 md:translate-x-full'} md:rounded-none rounded-t-2xl shadow-2xl`}>
+      {/* A docked basket is part of the screen, not something laid over it:
+          no backdrop to dim the products the cashier is still picking from,
+          no drop shadow, and nothing to dismiss. */}
+      {open && !docked && <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[300]" onClick={onClose} />}
+      <div className={`cart-drawer fixed bottom-0 left-0 right-0 md:left-auto md:top-0 md:w-[400px] bg-white md:border-l border-gray-200 max-h-[92vh] md:max-h-full z-[301] flex flex-col ${docked ? 'translate-y-0 md:translate-x-0' : `transition-transform duration-300 shadow-2xl ${open ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:translate-y-0 md:translate-x-full'}`} md:rounded-none rounded-t-2xl`}>
 
-        <div className="md:hidden w-10 h-1 bg-gray-200 rounded-full mx-auto mt-2.5" />
+        {!docked && <div className="md:hidden w-10 h-1 bg-gray-200 rounded-full mx-auto mt-2.5" />}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2.5">
             <h3 className="text-lg font-bold text-gray-900">Cart</h3>

@@ -318,3 +318,22 @@ body.dark .border-violet-100,body.dark .border-violet-200 { border-color: rgba(1
 @media (min-width: 768px) {
   .content-shell { margin-left: var(--sidebar-w, 68px); transition: margin-left 0.2s; }
 }
+
+/* When the basket is docked it is still position:fixed, so the grid has to be
+   told not to run underneath it. Reserving the gutter here rather than on the
+   element keeps the transition from fighting the sidebar's own margin. */
+body.cart-docked .content-shell { margin-right: var(--cart-w, 400px); transition: margin-right 0.2s; }
+
+/* The product grid's column counts are viewport breakpoints, but a docked
+   basket takes 400px out of the row. Left alone, a 1280px till would try to
+   fit six columns into ~780px and hand the cashier 130px-wide tiles. These
+   override the Tailwind counts whenever the basket is docked. */
+@media (min-width: 1280px) {
+  body.cart-docked .product-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-width: 1600px) {
+  body.cart-docked .product-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+@media (min-width: 1900px) {
+  body.cart-docked .product-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}

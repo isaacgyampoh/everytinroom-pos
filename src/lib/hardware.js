@@ -37,6 +37,12 @@ const DEFAULTS = {
   // which meant a cashier serving a slow customer had to re-enter their PIN
   // mid-sale. An hour suits a staffed counter; drop it for an unattended one.
   idleMinutes: 60,
+  // Keep the basket on screen beside the grid instead of behind a button.
+  // 'auto' docks it when the window is wide enough (>=1280px, which is what
+  // the desktop shell opens at); 'off' keeps the slide-over everywhere, 'on'
+  // forces it even on a narrow till. A cashier who can see the running total
+  // without opening anything makes fewer mistakes and taps less.
+  dockCart: 'auto',
 }
 
 export function getSettings() {
@@ -47,6 +53,9 @@ export function getSettings() {
 export function saveSettings(patch) {
   const next = { ...getSettings(), ...patch }
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(next))
+  // Only once the write has landed — a listener re-reads getSettings(), so
+  // firing first would hand it the value we are in the middle of replacing.
+  try { window.dispatchEvent(new Event('pos-settings-changed')) } catch {}
   return next
 }
 

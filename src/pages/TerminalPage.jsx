@@ -239,6 +239,21 @@ export default function TerminalPage() {
         </Row>
       </div>
 
+      {/* ---- layout ---- */}
+      <div className={card}>
+        <h2 className="text-sm font-bold text-gray-800 mb-3">Screen</h2>
+        <Row label="Basket on screen" hint="Keep the basket beside the products instead of behind the cart button, so the running total is always visible. Automatic uses it on wide screens and keeps the slide-over on a small till.">
+          <div className="flex gap-2 flex-wrap">
+            {[['auto', 'Automatic'], ['on', 'Always'], ['off', 'Never']].map(([v, l]) => (
+              <button key={v} onClick={() => set({ dockCart: v })}
+                className={`h-10 px-3.5 rounded-xl text-xs font-bold border-2 transition ${(s.dockCart || 'auto') === v ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500'}`}>
+                {l}
+              </button>
+            ))}
+          </div>
+        </Row>
+      </div>
+
       {/* ---- security ---- */}
       <div className={card}>
         <h2 className="text-sm font-bold text-gray-800 mb-3">Locking</h2>
