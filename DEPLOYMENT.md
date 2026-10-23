@@ -65,6 +65,32 @@ variables and a deploy. Nothing in `src/` needs editing.
       project had SSO protection on everything except custom domains; with it
       on, a preview URL asks a cashier to log into Vercel.
 
+## The one migration that goes AFTER the deploy
+
+`supabase/migrations/032_sales_history_private.sql` closes the `sales` table to
+the public anon key. Every other migration goes before the frontend; this one
+goes after, because the frontend falls back to reading the table directly when
+`list_sales` is missing — and once `032` has run, that fallback still *succeeds*,
+returning only a two-day window. Reports would look wrong rather than fail.
+
+Order:
+
+1. Run `031` (additive — only adds functions, safe at any time).
+2. Deploy the frontend.
+3. Open Reports and Receipts and confirm sales still appear. The browser console
+   must NOT be showing `list_sales: pre-031 schema`.
+4. Run `032`.
+5. Re-check Reports, and ring up a test sale to confirm the sale confirmation
+   still pops — that one depends on Realtime, which depends on the window `032`
+   leaves open.
+
+To undo `032`, restore the old policy:
+
+```sql
+DROP POLICY IF EXISTS "sales_select_recent" ON sales;
+CREATE POLICY "sales_select" ON sales FOR SELECT TO anon, authenticated USING (true);
+```
+
 ## Why the version on the counter can lag
 
 A till is a PWA that can stay open for days. The service worker only swaps to a

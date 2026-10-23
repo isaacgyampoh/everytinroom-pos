@@ -27,8 +27,12 @@ for running it.
 
 1. **Make the GitHub repo private** (Settings → General → Danger Zone), or
    accept that everything above stays permanently visible in the history.
-2. **Run every migration from `015` to `030`**, in numerical order, in the
-   Supabase SQL editor. Order matters: `018` hashes the PINs using the session
+2. **Run every migration from `015` to `031`**, in numerical order, in the
+   Supabase SQL editor. **`032` is deliberately not in that list** — it closes
+   the `sales` table and must be run only after the frontend that reads through
+   `list_sales` is deployed and verified. Its header says how to check. Running
+   it early does not break the till loudly; it makes every report quietly
+   wrong, which is worse. Order matters: `018` hashes the PINs using the session
    machinery `015` sets up, and `020` rebuilds a view `019` creates.
    **Do not stop at `020`** — `021` is the migration that closes the tables
    behind the approval functions, and without it the gated functions can simply
@@ -130,14 +134,29 @@ for running it.
 
 ## Known gaps still open
 
-- **The `sales` table is readable by every till.** `sales_select` is still
-  `FOR SELECT TO anon USING (true)` from migration `004`, so a cashier can read
-  the shop's whole sales history — though no longer its margins, since `019`
-  moved profit server-side and `021` stripped `costPrice` out of the historical
-  receipt lines. Closing this needs the till to read sales through a view or a
-  function that scopes rows to the signed-in cashier.
+- **The `sales` table is readable with the anon key until you run `032`.**
+  `sales_select` has been `FOR SELECT TO anon USING (true)` since `004`. The
+  anon key ships in the browser bundle, so this is not "a cashier sees too
+  much" — it is the whole ledger, readable by anyone who copies the key out of
+  devtools. Margins are already out of reach (`019`, `021`); the transactions
+  are not.
+
+  `031` adds the fix and `032` applies it: reads go through `list_sales` and
+  `find_sale_by_receipt`, which require a staff session, and the table keeps
+  only a two-day window for the anon role. **The window is not laziness** —
+  `sales` is in the `supabase_realtime` publication and the till subscribes to
+  INSERTs for the sale confirmation, the till sound and the customer display;
+  Realtime applies RLS as the subscribing role, so revoking SELECT outright
+  stops those events silently. Closing the last two days means moving the sale
+  notification to Realtime Broadcast from a trigger — a separate job, and not a
+  security fix by itself.
+
+  Why a function and not a per-cashier RLS policy: sign-in is a PIN that issues
+  a row in `staff_sessions`, not Supabase Auth, so Postgres sees `anon` for
+  every cashier and `auth.uid()` is meaningless. RLS cannot tell cashiers apart
+  here.
 
 Everything else from the first audit is closed; see the section above. Two
-items listed here as open had in fact been closed by migration `021` — if you
-are working from an older copy of this file, check the migrations before
+items once listed here as open had in fact been closed by migration `021` — if
+you are working from an older copy of this file, check the migrations before
 redoing the work.

@@ -5,7 +5,7 @@ import { money, num, fmtDate, today, isoDate } from '../lib/utils'
 import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
 import { rpcMessage } from '../lib/rpcError'
-import { rpcCompat } from '../lib/rpc'
+import { rpcCompat, isMissingFunction } from '../lib/rpc'
 
 export default function RefundsPage() {
   const { refunds, user, token, setLoading, loadAll } = useStore()
@@ -21,11 +21,28 @@ export default function RefundsPage() {
     if (!receiptNo.trim()) { toast.error('Enter receipt'); return }
     setLoading(true, 'Searching...')
     const sb = getSupabase()
-    const { data, error } = await sb.from('sales').select('*').eq('receipt_no', receiptNo.trim()).single()
+    // Looking a receipt up goes through a session-gated function (migration
+    // 031). A refund has to reach a sale of any age, which is exactly what 032
+    // stops the anon key doing — and the lookup checks the same `refunds`
+    // permission process_refund does, so it cannot be used to read the ledger
+    // one receipt at a time instead.
+    let found = null
+    let failure = 'Sale not found'
+    const { data: res, error } = await sb.rpc('find_sale_by_receipt',
+      { p_token: token, p_receipt_no: receiptNo.trim() })
+    if (isMissingFunction(error)) {
+      // Pre-031: read the table, which is how this worked before.
+      const r = await sb.from('sales').select('*').eq('receipt_no', receiptNo.trim()).single()
+      found = r.error ? null : r.data
+    } else if (res?.success) {
+      found = res.sale
+    } else {
+      failure = rpcMessage(error, res, 'Sale not found')
+    }
     setLoading(false)
-    if (error || !data) { toast.error('Sale not found'); return }
-    const items = typeof data.items === 'string' ? JSON.parse(data.items) : (data.items || [])
-    setSale(data)
+    if (!found) { toast.error(failure); return }
+    const items = typeof found.items === 'string' ? JSON.parse(found.items) : (found.items || [])
+    setSale(found)
     setSaleItems(items.map(it => ({ ...it, checked: true, refundQty: it.qty })))
   }
 

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { getSupabase } from '../lib/supabase'
 import { num } from '../lib/utils'
 import { saveCatalogue, loadCatalogue } from '../lib/offlineStore'
+import { isMissingFunction } from '../lib/rpc'
 
 const mapProduct = p => ({ id: p.id, name: p.name, category: p.category || '', costPrice: num(p.cost_price), price: num(p.price), wholesalePrice: num(p.wholesale_price), wholesaleMinQty: num(p.wholesale_min_qty) || 0, quantity: num(p.quantity), image: p.image || '', groupTag: (p.group_tag || '').trim().toLowerCase(), barcode: String(p.barcode || '').trim() })
 
@@ -112,6 +113,31 @@ const qFallback = async (sb, primary, fallback, opts = {}) => {
   return q(sb, fallback.table, { ...opts, select: fallback.select })
 }
 
+// ---------------------------------------------------------------------------
+// READING THE BOOKS
+//
+// `sales` is the shop's ledger, and the anon key that reads it is compiled into
+// the browser bundle — so until migration 031 anyone who copied that key out of
+// devtools could read every sale the shop had ever made. Sales now come from
+// `list_sales`, which requires a valid staff session and returns profit only to
+// someone allowed to see cost.
+//
+// The fallback to a direct table read is what makes the rollout safe: this code
+// running against a database that has not had 031 behaves exactly as it did
+// before. It is also why migration 032, which closes the table, must not be run
+// until this function is answering — on the fallback, 032 would quietly return
+// a single day of sales and make every report wrong rather than broken.
+// ---------------------------------------------------------------------------
+const loadSales = async (sb, token, limit, select) => {
+  const { data, error } = await sb.rpc('list_sales', { p_token: token, p_limit: limit })
+  if (!isMissingFunction(error)) {
+    if (error) { console.error(`[load] list_sales: ${error.message || error}`); return [] }
+    return Array.isArray(data) ? data : []
+  }
+  console.warn('list_sales: pre-031 schema — reading the sales table directly. Run migration 031.')
+  return q(sb, 'sales', { select, order: 'date', limit })
+}
+
 export const useStore = create((set, get) => ({
   products: [], bundles: [], sales: [], staff: [], expenses: [],
   customers: [], waOrders: [], refunds: [], promos: [], invoices: [], stockTakes: [], stockAdjustments: [],
@@ -172,7 +198,13 @@ export const useStore = create((set, get) => ({
     // The first load happens before anyone has signed in, so it deliberately
     // asks for the no-cost column set. Now that we know who this is, refetch
     // with margins if they are allowed to see them.
-    if (get().canSeeCost()) { get().refreshProducts(); get().refreshSales() }
+    if (get().canSeeCost()) { get().refreshProducts() }
+    // Sales are ALWAYS refetched, not just for someone who can see cost. The
+    // first load runs before sign-in, and since migration 031 reading the
+    // ledger needs a session — so that load comes back empty and
+    // _secondaryLoaded stops it being retried. Without this a cashier's
+    // Receipts page would simply be blank.
+    get().refreshSales()
   },
   logout: () => {
     const { user, cart, token } = get()
@@ -302,7 +334,7 @@ export const useStore = create((set, get) => ({
     const sb = getSupabase(); if (!sb) return
     try {
       const [saleData, expData, custData, waData, refData, invData, stData, adjData] = await Promise.all([
-        q(sb, 'sales', { select: get()._saleSelect(), order: 'date', limit: 150 }),
+        loadSales(sb, get().token, 150, get()._saleSelect()),
         q(sb, 'expenses', { select: 'id,date,category,description,amount', order: 'date', limit: 100 }),
         q(sb, 'customers', { select: 'id,phone,visit_count,total_spent,last_visit', order: 'total_spent', limit: 300 }),
         q(sb, 'whatsapp_orders', { select: 'id,order_no,date,customer_name,customer_phone,items,subtotal,delivery_fee,total,status,ussd_code,paystack_ref,address,notes,paid_at,source,details_filled,tracking_no,delivery_status,delivery_guy', order: 'date', limit: 200 }),
@@ -326,7 +358,7 @@ export const useStore = create((set, get) => ({
   },
 
   refreshProducts: async () => { const sb = getSupabase(); if (!sb) return; const d = await qFallback(sb, get()._productSource(), get()._productFallback(), { order: 'name', asc: true }); set({ products: d.map(mapProduct) }) },
-  refreshSales: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'sales', { select: get()._saleSelect(), order: 'date', limit: 300 }); set({ sales: d.map(mapSale) }) },
+  refreshSales: async () => { const sb = getSupabase(); if (!sb) return; const d = await loadSales(sb, get().token, 300, get()._saleSelect()); set({ sales: d.map(mapSale) }) },
   refreshWAOrders: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'whatsapp_orders', { order: 'date', limit: 500 }); set({ waOrders: d.map(mapWAOrder) }) },
   refreshStaff: async () => { const sb = getSupabase(); if (!sb) return; const d = await qFallback(sb, { table: 'staff_safe', select: 'id,name,role,active,permissions' }, { table: 'staff', select: 'id,name,role,active' }); set({ staff: d.map(mapStaff) }) },
   refreshBundles: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'bundles'); set({ bundles: d.map(mapBundle) }) },
