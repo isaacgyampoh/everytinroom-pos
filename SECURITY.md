@@ -27,12 +27,20 @@ for running it.
 
 1. **Make the GitHub repo private** (Settings → General → Danger Zone), or
    accept that everything above stays permanently visible in the history.
-2. **Run the migrations** `015` → `016` → `017` → `018` → `019` → `020`, in
-   that order, in the Supabase SQL editor. Order matters: `018` hashes the PINs
-   using the session machinery `015` sets up, and `020` rebuilds a view `019`
-   creates. **Deploy the frontend only after they have all run** — the new code
-   calls `save_staff`, `end_session`, `next_ussd_code` and `find_by_barcode`,
-   which do not exist until then.
+2. **Run every migration from `015` to `030`**, in numerical order, in the
+   Supabase SQL editor. Order matters: `018` hashes the PINs using the session
+   machinery `015` sets up, and `020` rebuilds a view `019` creates.
+   **Do not stop at `020`** — `021` is the migration that closes the tables
+   behind the approval functions, and without it the gated functions can simply
+   be skipped. **Deploy the frontend only after they have all run** — the new
+   code calls `save_staff`, `end_session`, `next_ussd_code` and
+   `find_by_barcode`, which do not exist until then.
+
+   The frontend tolerates a half-migrated database rather than dying on it:
+   `src/lib/rpc.js` falls back to the pre-migration signature when a function
+   is genuinely missing, and only then — a real "Not authorised" is never
+   bypassed. That is a safety net for a deploy that gets ahead of the SQL, not
+   a reason to leave migrations unrun.
 3. **Change every staff PIN** from Staff & Roles. Do this *after* 015, so the
    new PINs are never exposed. Pick PINs that are not `1024`.
 4. **Rotate the NaloPay keys** in the NaloPay dashboard, then:
@@ -105,14 +113,31 @@ for running it.
   the nav, and the RPC itself. Existing staff who could already sell keep it, so
   nothing stops working mid-trading — revoke it deliberately from Staff & Roles.
 
+- **The tables behind the gated functions are no longer writable.** `018`
+  gated the approval *functions*, but the tables were still `FOR ALL USING
+  (true)`, so the anon key could skip the function and `UPDATE receivings SET
+  status='approved'` or forge rows in `stock_ledger` — an audit ledger anyone
+  can write to is not an audit ledger. `021` revokes INSERT/UPDATE/DELETE on
+  `stock_ledger`, `receivings`, `suppliers` and `stock_adjustments`, leaves
+  `receivings` insertable only with `status = 'pending'`, and adds
+  `reject_receiving` so rejecting a delivery is attributed instead of being a
+  direct table write. `028` revoked UPDATE on `sales`, which `004` had left
+  open — sale totals were editable with the public key.
+- **Historical cost prices are out of the receipt lines.** `021` §7 runs the
+  `UPDATE` that strips `costPrice` from every pre-`019` row in `sales.items`.
+  It is no longer an optional step you have to remember; it fires with the
+  migration.
+
 ## Known gaps still open
 
-- **`sales.items` on historical rows still contains cost prices.** Migration
-  `019` ends with a one-line `UPDATE` to strip them, left commented out because
-  it rewrites history. Run it when you are ready.
-- **`stock_ledger`, `receivings` and `suppliers` still carry `USING (true)`
-  policies**, so the anon key can read and write those tables directly even
-  though the approval *functions* are now gated. Tighten them the same way
-  `staff` was tightened in `015`.
-- **The `sales` table is readable by every till.** A cashier can still read the
-  shop's whole sales history, just not its margins.
+- **The `sales` table is readable by every till.** `sales_select` is still
+  `FOR SELECT TO anon USING (true)` from migration `004`, so a cashier can read
+  the shop's whole sales history — though no longer its margins, since `019`
+  moved profit server-side and `021` stripped `costPrice` out of the historical
+  receipt lines. Closing this needs the till to read sales through a view or a
+  function that scopes rows to the signed-in cashier.
+
+Everything else from the first audit is closed; see the section above. Two
+items listed here as open had in fact been closed by migration `021` — if you
+are working from an older copy of this file, check the migrations before
+redoing the work.
