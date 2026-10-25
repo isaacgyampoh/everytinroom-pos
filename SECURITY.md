@@ -132,6 +132,25 @@ for running it.
   It is no longer an optional step you have to remember; it fires with the
   migration.
 
+## Check it, don't read it
+
+```
+npm run audit:backend
+```
+
+Asks the live database what the public anon key actually reaches, and exits
+non-zero if anything is exposed. Read-only: it counts rows and checks whether
+functions resolve, never writes, and never prints a row.
+
+Use it rather than trusting the sections below. This file has been wrong
+before — it spent weeks listing three open gaps when migration `021` had closed
+two of them, and telling people to stop at migration `020`, one short of the
+one that closes the tables. Prose drifts; the database does not.
+
+It deliberately does not probe `record_sale`. PostgREST resolves an RPC by its
+exact named-argument set, so a partial probe reports a working function as
+missing — and a complete one would record a sale.
+
 ## Known gaps still open
 
 - **The `sales` table is readable with the anon key until you run `032`.**

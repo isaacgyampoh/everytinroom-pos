@@ -61,6 +61,7 @@ variables and a deploy. Nothing in `src/` needs editing.
       If it is cached, deploys stop reaching installed tills:
       `curl -sI https://<deployment>/sw.js | grep -i cache-control`
 - [ ] `/assets/<something>.js` responds with `max-age=31536000, immutable`.
+- [ ] `npm run audit:backend` passes, or you know why it does not.
 - [ ] Deployment protection is **off** for the production domain. The old
       project had SSO protection on everything except custom domains; with it
       on, a preview URL asks a cashier to log into Vercel.

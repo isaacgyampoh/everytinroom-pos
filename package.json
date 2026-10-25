@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "audit:backend": "node tools/audit-backend.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
