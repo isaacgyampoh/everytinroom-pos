@@ -31,7 +31,11 @@ export const isoToday = () => new Date().toISOString().slice(0, 10)
 // trades in Accra (UTC+0) but a till can be set to anything.
 const day = (v) => (typeof v === 'string' ? v.slice(0, 10) : v ? String(v).slice(0, 10) : null)
 
-const items = (p) => {
+export function promoItems(p) {
+  return itemsOf(p)
+}
+
+const itemsOf = (p) => {
   const raw = p?.items
   if (Array.isArray(raw)) return raw
   if (typeof raw === 'string') { try { const v = JSON.parse(raw); return Array.isArray(v) ? v : [] } catch { return [] } }
@@ -61,7 +65,7 @@ export function promoPriceFor(promos, productId, channel, today = isoToday()) {
   let best = null
   for (const p of promos || []) {
     if (!promoApplies(p, channel, today)) continue
-    for (const it of items(p)) {
+    for (const it of itemsOf(p)) {
       if (String(it?.productId ?? '') !== String(productId)) continue
       const price = Number(it?.promoPrice ?? it?.promo_price ?? it?.price)
       if (!Number.isFinite(price) || price <= 0) continue
@@ -77,7 +81,7 @@ export function promoPriceMap(promos, channel, today = isoToday()) {
   const map = {}
   for (const p of promos || []) {
     if (!promoApplies(p, channel, today)) continue
-    for (const it of items(p)) {
+    for (const it of itemsOf(p)) {
       const id = it?.productId
       if (!id) continue
       const price = Number(it?.promoPrice ?? it?.promo_price ?? it?.price)

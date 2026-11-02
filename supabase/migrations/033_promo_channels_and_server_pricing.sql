@@ -159,6 +159,7 @@ DECLARE
   v_fee      NUMERIC;
   v_order_no TEXT;
   v_id       TEXT;
+  v_ussd     INTEGER;
 BEGIN
   IF p_items IS NULL OR jsonb_typeof(p_items) <> 'array' OR jsonb_array_length(p_items) = 0 THEN
     RETURN jsonb_build_object('success', false, 'error', 'Your basket is empty');
@@ -206,17 +207,29 @@ BEGIN
 
   v_order_no := 'ETR-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8));
 
+  -- The pay code comes from the counter in migration 016, not from the browser.
+  -- The storefront was reading MAX(ussd_code) and adding one, which is the race
+  -- 016 exists to close — two checkouts a moment apart can read the same
+  -- maximum and both claim it, and 016's own comment says that already
+  -- happened. If the function is missing, a NULL code is better than a
+  -- duplicate one: nothing about the order is wrong, it just has no code yet.
+  BEGIN
+    v_ussd := next_ussd_code();
+  EXCEPTION WHEN undefined_function THEN
+    v_ussd := NULL;
+  END;
+
   INSERT INTO whatsapp_orders (
     order_no, date, customer_name, customer_phone, items,
-    subtotal, delivery_fee, total, address, notes, status, source, details_filled
+    subtotal, delivery_fee, total, address, notes, status, source, details_filled, ussd_code
   ) VALUES (
     v_order_no, now(), NULLIF(btrim(COALESCE(p_customer_name, '')), ''), btrim(p_customer_phone),
     v_lines, v_subtotal, v_fee, v_subtotal + v_fee,
-    NULLIF(btrim(COALESCE(p_address, '')), ''), p_notes, 'Pending', 'web', true
+    NULLIF(btrim(COALESCE(p_address, '')), ''), p_notes, 'Pending', 'web', true, v_ussd
   ) RETURNING id INTO v_id;
 
   RETURN jsonb_build_object(
-    'success', true, 'orderId', v_id, 'orderNo', v_order_no,
+    'success', true, 'orderId', v_id, 'orderNo', v_order_no, 'ussdCode', v_ussd,
     'subtotal', v_subtotal, 'deliveryFee', v_fee, 'total', v_subtotal + v_fee,
     'items', v_lines
   );
