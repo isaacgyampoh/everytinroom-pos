@@ -1,4 +1,5 @@
 import { useStore } from '../hooks/useStore'
+import { useHiddenFigures } from '../hooks/useHiddenFigures'
 import { useEffect, useState } from 'react'
 import { getSupabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
@@ -30,6 +31,11 @@ const Spark = ({ days, max }) => {
 export default function Dashboard() {
   const { sales, expenses, products, waOrders, setPage, shopOpen, shopSettingLoaded, fetchShopOpen, setShopOpen } = useStore()
   const [toggling, setToggling] = useState(false)
+  // `m` and `mShort` blank themselves when the privacy screen is on. Everything
+  // below formats money through them rather than money() directly.
+  const { hidden, toggle: toggleFigures, hide } = useHiddenFigures()
+  const m = hide(money)
+  const mShort = hide(moneyShort)
   useEffect(() => { fetchShopOpen() }, []) // eslint-disable-line
 
   const onToggleShop = async () => {
@@ -150,6 +156,27 @@ export default function Dashboard() {
           <h1 className="text-[24px] md:text-[28px] font-bold tracking-tight leading-none">Today</h1>
           <p className="text-[13px] text-gray-400 mt-1.5">{dateLine}</p>
         </div>
+        <div className="flex items-center gap-2">
+        {/* The privacy screen. A till faces into the shop, so the takings, the
+            margin and the value of the stock in the building are all readable
+            by whoever is standing at the counter. */}
+        <button onClick={toggleFigures}
+          title={hidden ? 'Show the figures' : 'Hide the figures'}
+          aria-label={hidden ? 'Show the figures' : 'Hide the figures'}
+          aria-pressed={hidden}
+          className="panel flex items-center gap-2 h-11 px-3.5 transition hover:border-gray-300 shrink-0">
+          {hidden ? (
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+              <path d="M1 1l22 22" />
+            </svg>
+          ) : (
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+            </svg>
+          )}
+          <span className="text-[13px] font-semibold text-gray-700 hidden sm:inline">{hidden ? 'Figures hidden' : 'Hide figures'}</span>
+        </button>
         <button onClick={onToggleShop} disabled={toggling || !shopSettingLoaded}
           className="panel flex items-center gap-3 h-11 pl-3.5 pr-2 disabled:opacity-50 transition hover:border-gray-300">
           <span className={`w-2 h-2 rounded-full ${shopOpen ? 'bg-emerald-500' : 'bg-gray-300'}`} />
@@ -160,6 +187,7 @@ export default function Dashboard() {
             <span className={`absolute top-[3px] w-[18px] h-[18px] bg-white rounded-full shadow-sm transition-all ${shopOpen ? 'left-[23px]' : 'left-[3px]'}`} />
           </span>
         </button>
+        </div>
       </div>
 
       {/* Profit here is only as good as the cost prices behind it. An honest
@@ -179,8 +207,8 @@ export default function Dashboard() {
                 Only <b className="text-[#b3402b]">{Number(cover.coverage).toFixed(0)}%</b> of the last 90 days&rsquo;
                 takings has a cost price behind it. On that part the real result is{' '}
                 <b className={Number(cover.measuredProfit) >= 0 ? 'text-gray-900' : 'text-[#b3402b]'}>
-                  {money(cover.measuredProfit)}
-                </b>. The remaining {money(cover.unbackedRevenue)} counts its whole selling price as
+                  {m(cover.measuredProfit)}
+                </b>. The remaining {m(cover.unbackedRevenue)} counts its whole selling price as
                 profit, so the figures below read far higher than the truth.
               </> : <>
                 <b className="text-[#b3402b]">{uncostedPct.toFixed(0)}%</b> of this month&rsquo;s takings came from
@@ -205,7 +233,7 @@ export default function Dashboard() {
               <div className="panel-head">Taken today</div>
               <div className="flex items-baseline gap-2.5 mt-2.5">
                 <span className="text-[13px] font-semibold text-gray-400">GHS</span>
-                <span className="figure text-[42px] md:text-[54px] text-gray-900">{moneyShort(todayRev)}</span>
+                <span className="figure text-[42px] md:text-[54px] text-gray-900">{mShort(todayRev)}</span>
               </div>
               <div className="flex items-center gap-2.5 mt-3 text-[12px]">
                 <span className="text-gray-500 font-medium">{todaySales.length} sale{todaySales.length === 1 ? '' : 's'}</span>
@@ -222,9 +250,9 @@ export default function Dashboard() {
             </div>
             <div className="text-right shrink-0">
               <div className="panel-head">Profit</div>
-              <div className="figure text-[24px] mt-2 text-gray-900">{money(todayProfit)}</div>
+              <div className="figure text-[24px] mt-2 text-gray-900">{m(todayProfit)}</div>
               <div className={`text-[12px] font-semibold mt-1.5 ${todayProfit - todayExp >= 0 ? 'text-gray-500' : 'text-[#b3402b]'}`}>
-                {money(todayProfit - todayExp)} after expenses
+                {m(todayProfit - todayExp)} after expenses
               </div>
             </div>
           </div>
@@ -237,7 +265,7 @@ export default function Dashboard() {
               {last7.map((d, i) => (
                 <div key={i} className="flex-1 text-center">
                   <div className={`text-[10px] font-bold ${i === last7.length - 1 ? 'text-gray-900' : 'text-gray-300'}`}>{d.full}</div>
-                  <div className={`text-[10px] tnum ${i === last7.length - 1 ? 'text-gray-500' : 'text-gray-300'}`}>{d.revenue ? moneyShort(d.revenue) : '–'}</div>
+                  <div className={`text-[10px] tnum ${i === last7.length - 1 ? 'text-gray-500' : 'text-gray-300'}`}>{d.revenue ? mShort(d.revenue) : '–'}</div>
                 </div>
               ))}
             </div>
@@ -301,12 +329,12 @@ export default function Dashboard() {
       {/* ── Period figures. A compact strip, not four more big cards. ───── */}
       <div className="panel mb-4 grid grid-cols-2 md:grid-cols-4">
         {[
-          { label: 'This week', value: money(weekRev), sub: `${weekSales.length} sales` },
-          { label: 'This month', value: money(monthRev), sub: `${monthSales.length} sales` },
+          { label: 'This week', value: m(weekRev), sub: `${weekSales.length} sales` },
+          { label: 'This month', value: m(monthRev), sub: `${monthSales.length} sales` },
           { label: 'Month margin', value: profitUnreliable ? '—' : margin.toFixed(1) + '%',
-            sub: profitUnreliable ? 'needs cost prices' : money(monthProfit) + ' profit',
+            sub: profitUnreliable ? 'needs cost prices' : m(monthProfit) + ' profit',
             tone: profitUnreliable ? 'text-[#b3402b]' : margin >= 30 ? 'text-emerald-600' : margin >= 15 ? 'text-amber-600' : 'text-[#b3402b]' },
-          { label: 'Stock on hand', value: money(stockValue), sub: `${products.length} products` },
+          { label: 'Stock on hand', value: m(stockValue), sub: `${products.length} products` },
         ].map((c, i) => (
           <div key={i} className={`px-4 md:px-5 py-4 border-[rgba(16,24,29,.07)] ${i % 2 === 1 ? 'border-l' : ''} ${i >= 2 ? 'border-t' : ''} md:border-t-0 ${i > 0 ? "md:border-l" : "md:border-l-0"}`}>
             <div className="panel-head">{c.label}</div>
@@ -391,19 +419,19 @@ export default function Dashboard() {
                   <div key={r.label} className="flex items-center gap-2.5 text-[12px]">
                     <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: r.c }} />
                     <span className="flex-1 text-gray-500">{r.label}</span>
-                    <span className="tnum font-semibold text-gray-800">{money(r.v)}</span>
+                    <span className="tnum font-semibold text-gray-800">{m(r.v)}</span>
                   </div>
                 ))}
               </div>
               <div className="rule mt-3.5 pt-3 space-y-1.5">
                 <div className="flex justify-between text-[12px]">
                   <span className="text-gray-400">Expenses</span>
-                  <span className="tnum font-semibold text-[#b3402b]">−{money(monthExp)}</span>
+                  <span className="tnum font-semibold text-[#b3402b]">−{m(monthExp)}</span>
                 </div>
                 <div className="flex justify-between text-[13px]">
                   <span className="font-semibold text-gray-600">Net this month</span>
                   <span className={`tnum font-bold ${monthProfit - monthExp >= 0 ? 'text-gray-900' : 'text-[#b3402b]'}`}>
-                    {money(monthProfit - monthExp)}
+                    {m(monthProfit - monthExp)}
                   </span>
                 </div>
               </div>
@@ -425,7 +453,7 @@ export default function Dashboard() {
                 <span className="text-[12px] font-mono text-gray-400 w-[92px] sm:w-[104px] shrink-0 truncate">{s.receiptNo}</span>
                 <span className="text-[12px] text-gray-500 flex-1 truncate">{s.cashier || '—'}</span>
                 <span className="hidden sm:block text-[11px] text-gray-400 w-16 shrink-0">{s.payment}</span>
-                <span className="text-[13px] font-bold text-gray-900 tnum shrink-0">{money(s.total)}</span>
+                <span className="text-[13px] font-bold text-gray-900 tnum shrink-0">{m(s.total)}</span>
               </div>
             ))}
           </div>

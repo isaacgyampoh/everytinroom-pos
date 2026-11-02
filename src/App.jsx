@@ -60,7 +60,12 @@ export default function App() {
   // button. `cartOpen` stays the user's own intent either way, which is what
   // the update-when-idle check below reads — docking must not look like a
   // cashier mid-sale and block every deploy.
-  const cartDocked = useDockedCart()
+  const cartDockable = useDockedCart()
+  // ...but only where a sale is actually made. Docking it everywhere took 400px
+  // off the Dashboard and the reports to show an empty basket on a page you
+  // cannot sell from. The floating cart button was only ever on the till screen
+  // for the same reason.
+  const cartDocked = cartDockable && page === 'pos'
   const [receipt, setReceipt] = useState(null)
   const lastActivityRef = useRef(Date.now())
   const [salePopup, setSalePopup] = useState(null)

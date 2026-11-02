@@ -43,6 +43,10 @@ const DEFAULTS = {
   // forces it even on a narrow till. A cashier who can see the running total
   // without opening anything makes fewer mistakes and taps less.
   dockCart: 'auto',
+  // Blank the money on the dashboard. A till screen faces into the shop, and
+  // the day's takings should not be readable by whoever is standing at the
+  // counter. Per terminal, because a back-office machine has no such problem.
+  hideFigures: false,
 }
 
 export function getSettings() {
