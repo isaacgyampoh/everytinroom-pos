@@ -60,12 +60,9 @@ export function useDockedCart() {
     }
   }, [])
 
-  // The main content reserves its right-hand gutter in CSS, which needs to
-  // know outside of React's tree.
-  useEffect(() => {
-    document.body.classList.toggle('cart-docked', docked)
-    return () => document.body.classList.remove('cart-docked')
-  }, [docked])
-
+  // Deliberately NOT setting the `cart-docked` body class here. This hook only
+  // answers "is there room?" — whether the basket is actually docked also
+  // depends on which page is open, which only App knows. Claiming the gutter
+  // from here left the Dashboard with a 400px empty margin on the right.
   return docked
 }

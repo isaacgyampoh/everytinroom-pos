@@ -66,6 +66,14 @@ export default function App() {
   // cannot sell from. The floating cart button was only ever on the till screen
   // for the same reason.
   const cartDocked = cartDockable && page === 'pos'
+
+  // The grid's right-hand gutter is reserved in CSS, which lives outside
+  // React's tree — so it is toggled here, from the state that actually decides
+  // whether a basket is on screen.
+  useEffect(() => {
+    document.body.classList.toggle('cart-docked', cartDocked)
+    return () => document.body.classList.remove('cart-docked')
+  }, [cartDocked])
   const [receipt, setReceipt] = useState(null)
   const lastActivityRef = useRef(Date.now())
   const [salePopup, setSalePopup] = useState(null)
