@@ -3,6 +3,7 @@ import { useStore } from '../hooks/useStore'
 import { getSupabase } from '../lib/supabase'
 import { money, num, today, thumb } from '../lib/utils'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
+import { promoPriceMap as channelPromoMap, bundleApplies } from '../lib/promoPricing'
 import { beep } from '../lib/hardware'
 import toast from 'react-hot-toast'
 import { IconTag, IconSearch, IconImage, EmptyState } from '../components/Icons'
@@ -61,20 +62,16 @@ export default function POS() {
 
   const categories = useMemo(() => ['all', ...new Set(products.filter(p => p.category).map(p => p.category))], [products])
 
-  const promoPriceMap = useMemo(() => {
-    const map = {}; const t = today()
-    for (const p of promos) {
-      if (!p.active || p.startDate > t || p.endDate < t) continue
-      for (const it of p.items) { const pr = num(it.promoPrice); if (pr > 0 && (!map[it.productId] || pr < map[it.productId])) map[it.productId] = pr }
-    }
-    return map
-  }, [promos])
+  // 'shop' — this is the counter. A website-only promotion must not cut the
+  // price here, which until migration 033 it had no way of avoiding: both apps
+  // read the same promos rows and neither could tell them apart.
+  const promoPriceMap = useMemo(() => channelPromoMap(promos, 'shop', today()), [promos])
 
   const getPrice = (p) => promoPriceMap[p.id] || (mode === 'wholesale' && p.wholesalePrice > 0 ? p.wholesalePrice : p.price)
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase()
-    if (mode === 'bundle') return bundles.filter(b => b.active && (!q || b.name.toLowerCase().includes(q)))
+    if (mode === 'bundle') return bundles.filter(b => bundleApplies(b, 'shop') && (!q || b.name.toLowerCase().includes(q)))
     return products.filter(p => (!q || p.name.toLowerCase().includes(q) || (p.barcode && p.barcode.includes(q))) && (selectedCat === 'all' || p.category === selectedCat))
   }, [products, bundles, mode, query, selectedCat])
 

@@ -59,14 +59,14 @@ function applyWholesale_DISABLED(cart, products) {
     return { ...c, price: newPrice, lineTotal: c.qty * newPrice }
   })
 }
-const mapBundle = b => ({ id: b.id, name: b.name, products: typeof b.products === 'string' ? JSON.parse(b.products) : (b.products || []), bundlePrice: num(b.bundle_price), active: b.active })
+const mapBundle = b => ({ id: b.id, name: b.name, products: typeof b.products === 'string' ? JSON.parse(b.products) : (b.products || []), bundlePrice: num(b.bundle_price), active: b.active, channel: b.channel || 'both' })
 const mapSale = s => ({ id: s.id, receiptNo: s.receipt_no, date: s.date, items: typeof s.items === 'string' ? JSON.parse(s.items) : (s.items || []), subtotal: num(s.subtotal), discount: num(s.discount), total: num(s.total), profit: num(s.profit), payment: s.payment, splitCash: num(s.split_cash), splitMomo: num(s.split_momo), customer: s.customer || 'Walk-in', type: s.type || 'Retail', cashier: s.cashier || '', voided: s.voided })
 const mapStaff = s => ({ id: s.id, name: s.name, role: s.role, active: s.active, permissions: Array.isArray(s.permissions) ? s.permissions : [] })
 const mapExpense = e => ({ id: e.id, date: e.date, category: e.category, description: e.description, amount: num(e.amount) })
 const mapCustomer = c => ({ id: c.id, phone: c.phone, visitCount: num(c.visit_count), totalSpent: num(c.total_spent), lastVisit: c.last_visit })
 const mapWAOrder = o => ({ id: o.id, orderNo: o.order_no, date: o.date, customerName: o.customer_name, customerPhone: o.customer_phone, items: typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || []), subtotal: num(o.subtotal), deliveryFee: num(o.delivery_fee), total: num(o.total), address: o.address, notes: o.notes, status: o.status, paystackRef: o.paystack_ref, paidAt: o.paid_at, processedBy: o.processed_by, processedAt: o.processed_at, ussdCode: o.ussd_code, trackingNo: o.tracking_no || '', deliveryStatus: o.delivery_status || '', deliveryGuy: o.delivery_guy || '', deliveredAt: o.delivered_at, deliveryNotes: o.delivery_notes || '', source: o.source || (String(o.order_no||'').startsWith('WEB-') ? 'web' : String(o.order_no||'').startsWith('WA-') ? 'whatsapp' : 'walkin'), detailsFilled: !!o.details_filled })
 const mapRefund = r => ({ id: r.id, refundNo: r.refund_no, date: r.date, originalReceiptNo: r.original_receipt_no, items: typeof r.items === 'string' ? JSON.parse(r.items) : (r.items || []), refundAmount: num(r.refund_amount), reason: r.reason, processedBy: r.processed_by, customer: r.customer, status: r.status })
-const mapPromo = p => ({ id: p.id, name: p.name, startDate: p.start_date, endDate: p.end_date, items: typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || []), active: p.active })
+const mapPromo = p => ({ id: p.id, name: p.name, startDate: p.start_date, endDate: p.end_date, items: typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || []), active: p.active, channel: p.channel || 'both' })
 const mapInvoice = i => ({ id: i.id, invoiceId: i.invoice_id, date: i.date, supplier: i.supplier, amount: num(i.amount), notes: i.notes, image: i.image || '' })
 const mapStockTake = s => ({ id: s.id, date: s.date, items: typeof s.items === 'string' ? JSON.parse(s.items) : (s.items || []), notes: s.notes, conductedBy: s.conducted_by, status: s.status || 'approved', approvedBy: s.approved_by, rejectReason: s.reject_reason })
 const mapStockAdj = a => ({ id: a.id, date: a.date, productId: a.product_id, productName: a.product_name, qty: num(a.qty), reason: a.reason, notes: a.notes, adjustedBy: a.adjusted_by })
@@ -286,8 +286,8 @@ export const useStore = create((set, get) => ({
       const [prodData, staffData, bunData, promoData] = await Promise.all([
         qFallback(sb, get()._productSource(), get()._productFallback(), { order: 'name', asc: true }),
         qFallback(sb, { table: 'staff_safe', select: 'id,name,role,active,permissions' }, { table: 'staff', select: 'id,name,role,active' }),
-        q(sb, 'bundles', { select: 'id,name,products,bundle_price,active' }),
-        q(sb, 'promos', { select: 'id,name,start_date,end_date,items,active', limit: 50 }),
+        q(sb, 'bundles', {}),            // likewise — see mapBundle's channel default
+        q(sb, 'promos', { limit: 50 }),   // no column list: `channel` only exists after migration 033
       ])
 
       // A load that comes back with nothing is not a load. Offline, every query

@@ -5,23 +5,63 @@ import { money, num, fmtDate, today } from '../lib/utils'
 import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
 import { IconTag, EmptyState } from '../components/Icons'
+import { CHANNELS } from '../lib/promoPricing'
 
 export default function PromosPage() {
   const { promos, bundles, products, refreshPromos, refreshBundles, setLoading } = useStore()
   const [tab, setTab] = useState('promos')
   // Promo state
   const [modal, setModal] = useState(false)
-  const [form, setForm] = useState({ id: '', name: '', startDate: '', endDate: '', items: [] })
+  const [form, setForm] = useState({ id: '', name: '', startDate: '', endDate: '', items: [], channel: 'both' })
   // Bundle state
   const [bunModal, setBunModal] = useState(false)
-  const [bunForm, setBunForm] = useState({ id: '', name: '', price: '', items: [] })
+  const [bunForm, setBunForm] = useState({ id: '', name: '', price: '', items: [], channel: 'both' })
+
+  // `channel` only exists after migration 033. Writing it to a database that
+  // has not run yet rejects the WHOLE row, so saving a promotion would simply
+  // fail. Retry without it and say so, rather than losing the admin's work.
+  const saveRow = async (table, data, id) => {
+    const sb = getSupabase()
+    const run = (payload) => id
+      ? sb.from(table).update(payload).eq('id', id)
+      : sb.from(table).insert(payload)
+    let r = await run(data)
+    if (r.error && /channel/i.test(r.error.message || '')) {
+      const { channel, ...withoutChannel } = data
+      console.warn(`${table}.channel does not exist — run migration 033. Saved without a channel, so it applies everywhere.`)
+      r = await run(withoutChannel)
+      if (!r.error) toast('Saved — but channels need migration 033', { icon: '!' })
+    }
+    return r
+  }
+
+  const CHANNEL_LABEL = { shop: 'Shop only', web: 'Website only', both: 'Shop + Website' }
+  const CHANNEL_HINT = {
+    shop: 'Only at the counter. Online prices are untouched.',
+    web: 'Only on the website. The till charges the normal price.',
+    both: 'Everywhere — the counter and the website.',
+  }
+  const ChannelPicker = ({ value, onChange }) => (
+    <div>
+      <label className="block text-xs font-semibold text-gray-500 mb-1.5">Where does this apply?</label>
+      <div className="flex gap-2">
+        {CHANNELS.map(c => (
+          <button key={c} type="button" onClick={() => onChange(c)}
+            className={`flex-1 h-11 px-2 rounded-xl text-xs font-bold border-2 transition ${value === c ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+            {CHANNEL_LABEL[c]}
+          </button>
+        ))}
+      </div>
+      <p className="text-[11px] text-gray-400 mt-1.5">{CHANNEL_HINT[value] || CHANNEL_HINT.both}</p>
+    </div>
+  )
 
   const isActive = (p) => { const t = today(); return p.active && p.startDate <= t && p.endDate >= t }
   const activeCount = promos.filter(isActive).length
 
   // Promo functions
-  const openNewPromo = () => { setForm({ id: '', name: '', startDate: today(), endDate: '', items: [] }); setModal(true) }
-  const openEditPromo = (p) => { setForm({ id: p.id, name: p.name, startDate: p.startDate || '', endDate: p.endDate || '', items: [...p.items] }); setModal(true) }
+  const openNewPromo = () => { setForm({ id: '', name: '', startDate: today(), endDate: '', items: [], channel: 'both' }); setModal(true) }
+  const openEditPromo = (p) => { setForm({ id: p.id, name: p.name, startDate: p.startDate || '', endDate: p.endDate || '', items: [...p.items], channel: p.channel || 'both' }); setModal(true) }
   const addPromoItem = (pid) => {
     if (!pid) return; const p = products.find(x => x.id === pid); if (!p) return
     const items = [...form.items]; if (items.find(x => x.productId === pid)) return
@@ -31,22 +71,24 @@ export default function PromosPage() {
     if (!form.name.trim() || !form.startDate || !form.endDate || !form.items.length) { toast.error('Fill all fields'); return }
     for (const it of form.items) { if (!num(it.promoPrice)) { toast.error('Set price for ' + it.name); return } }
     setLoading(true, 'Saving...'); const sb = getSupabase()
-    const data = { name: form.name.trim(), start_date: form.startDate, end_date: form.endDate, items: form.items.map(i => ({ productId: i.productId, name: i.name, originalPrice: num(i.originalPrice), promoPrice: num(i.promoPrice) })), active: true }
-    if (form.id) await sb.from('promos').update(data).eq('id', form.id); else await sb.from('promos').insert(data)
+    const data = { name: form.name.trim(), start_date: form.startDate, end_date: form.endDate, items: form.items.map(i => ({ productId: i.productId, name: i.name, originalPrice: num(i.originalPrice), promoPrice: num(i.promoPrice) })), active: true, channel: form.channel || 'both' }
+    const { error } = await saveRow('promos', data, form.id)
+    if (error) { setLoading(false); toast.error('Could not save: ' + (error.message || '')); return }
     await refreshPromos(); setLoading(false); setModal(false); toast.success('Saved')
   }
   const togglePromo = async (id, active) => { const sb = getSupabase(); await sb.from('promos').update({ active: !active }).eq('id', id); refreshPromos() }
   const delPromo = async (id) => { if (!confirm('Delete?')) return; setLoading(true); await getSupabase().from('promos').delete().eq('id', id); await refreshPromos(); setLoading(false); toast.success('Deleted') }
 
   // Bundle functions
-  const openNewBundle = () => { setBunForm({ id: '', name: '', price: '', items: [] }); setBunModal(true) }
-  const openEditBundle = (b) => { setBunForm({ id: b.id, name: b.name, price: b.bundlePrice, items: [...b.products] }); setBunModal(true) }
+  const openNewBundle = () => { setBunForm({ id: '', name: '', price: '', items: [], channel: 'both' }); setBunModal(true) }
+  const openEditBundle = (b) => { setBunForm({ id: b.id, name: b.name, price: b.bundlePrice, items: [...b.products], channel: b.channel || 'both' }); setBunModal(true) }
   const addBunItem = (pid) => { if (!pid) return; const items = [...bunForm.items]; const ex = items.find(x => x.productId === pid); if (ex) ex.qty++; else items.push({ productId: pid, qty: 1 }); setBunForm({ ...bunForm, items }) }
   const saveBundle = async () => {
     if (!bunForm.name.trim() || !bunForm.items.length || !num(bunForm.price)) { toast.error('Fill all fields'); return }
     setLoading(true, 'Saving...'); const sb = getSupabase()
-    const data = { name: bunForm.name.trim(), bundle_price: num(bunForm.price), products: bunForm.items, active: true }
-    if (bunForm.id) await sb.from('bundles').update(data).eq('id', bunForm.id); else await sb.from('bundles').insert(data)
+    const data = { name: bunForm.name.trim(), bundle_price: num(bunForm.price), products: bunForm.items, active: true, channel: bunForm.channel || 'both' }
+    const { error } = await saveRow('bundles', data, bunForm.id)
+    if (error) { setLoading(false); toast.error('Could not save: ' + (error.message || '')); return }
     await refreshBundles(); setLoading(false); setBunModal(false); toast.success('Saved')
   }
   const delBundle = async (id) => { if (!confirm('Delete?')) return; setLoading(true); await getSupabase().from('bundles').delete().eq('id', id); await refreshBundles(); setLoading(false); toast.success('Deleted') }
@@ -90,6 +132,13 @@ export default function PromosPage() {
               <div key={p.id} className={`bg-white rounded-2xl p-5 border-l-4 ${active ? 'border-gray-500' : 'border-gray-300 opacity-60'}`}>
                 <div className="flex justify-between items-start flex-wrap gap-3 mb-3">
                   <div><h3 className="font-bold">{p.name}</h3><p className="text-xs text-gray-400">{fmtDate(p.startDate)} → {fmtDate(p.endDate)}</p></div>
+                  {/* Which channel a promotion touches is worth seeing
+                      without opening it: a discount running in the wrong
+                      place costs money quietly. */}
+                  <span className={`px-2.5 py-1 mr-2 rounded-full text-[11px] font-bold border ${
+                    (p.channel || 'both') === 'shop' ? 'bg-amber-50 text-amber-700 border-amber-200'
+                    : (p.channel || 'both') === 'web' ? 'bg-sky-50 text-sky-700 border-sky-200'
+                    : 'bg-stone-50 text-stone-600 border-stone-200'}`}>{CHANNEL_LABEL[p.channel || 'both']}</span>
                   <span className={`px-3 py-1 rounded-full text-xs font-bold ${active ? 'bg-gray-50 text-gray-700' : 'bg-gray-100 text-gray-500'}`}>{active ? 'Active' : 'Off'}</span>
                 </div>
                 {p.items.map((it, i) => (
@@ -130,6 +179,9 @@ export default function PromosPage() {
             <div><label className="block text-xs font-semibold text-gray-500 mb-1">Start</label><input type="date" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} /></div>
             <div><label className="block text-xs font-semibold text-gray-500 mb-1">End</label><input type="date" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} /></div>
           </div>
+          <div className="pt-1">
+            <ChannelPicker value={form.channel} onChange={c => setForm({ ...form, channel: c })} />
+          </div>
           <select className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" onChange={e => { addPromoItem(e.target.value); e.target.value = '' }}><option value="">Add product...</option>{products.map(p => <option key={p.id} value={p.id}>{p.name} ({money(p.price)})</option>)}</select>
           <div className="bg-gray-50 rounded-xl p-3 min-h-[60px]">
             {form.items.length === 0 ? <div className="text-center text-gray-400 py-5 text-sm">No products</div> : form.items.map((it, i) => (
@@ -149,6 +201,7 @@ export default function PromosPage() {
         <div className="space-y-4">
           <input className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" value={bunForm.name} onChange={e => setBunForm({...bunForm, name: e.target.value})} placeholder="Bundle name" />
           <input type="number" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" value={bunForm.price} onChange={e => setBunForm({...bunForm, price: e.target.value})} placeholder="Bundle price (GHS)" />
+          <ChannelPicker value={bunForm.channel} onChange={c => setBunForm({ ...bunForm, channel: c })} />
           <select className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" onChange={e => { addBunItem(e.target.value); e.target.value = '' }}><option value="">Add product...</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
           <div className="bg-gray-50 rounded-xl p-3 min-h-[60px]">
             {bunForm.items.length === 0 ? <div className="text-center text-gray-400 py-5 text-sm">No products</div> : bunForm.items.map((it, i) => {
