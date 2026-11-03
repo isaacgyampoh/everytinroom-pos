@@ -62,6 +62,24 @@ function serveBundle() {
     try { rel = decodeURIComponent(new URL(request.url).pathname) } catch { rel = '/' }
     if (!rel || rel === '/') rel = '/index.html'
 
+    // The one thing the page cannot work out for itself.
+    //
+    // This bundle is served from disk inside the installer, which is what lets
+    // the till open and trade with no line — and it also means a web deploy
+    // never reaches it. The only way a packaged till gets a fix is somebody
+    // running a newer installer, and until now nothing told them one existed.
+    // The app compares this against the latest published release and says so.
+    //
+    // A virtual route rather than a preload script: no IPC, no contextBridge,
+    // nothing added to what the page is allowed to do.
+    if (rel === '/__app.json') {
+      return new Response(JSON.stringify({
+        packaged: true,
+        version: app.getVersion(),
+        platform: process.platform,
+      }), { headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } })
+    }
+
     // Never serve outside the bundle, whatever the request says.
     // path.sep matters: without it a sibling folder named `app-old` would pass
     // a plain startsWith(DIST) check and be served.
@@ -233,9 +251,40 @@ function createWindow() {
   win.webContents.session.setPermissionCheckHandler((_wc, permission) =>
     ['serial', 'usb', 'hid', 'clipboard-read', 'clipboard-sanitized-write'].includes(permission))
   win.webContents.session.setDevicePermissionHandler(() => true)
+  // Picking the receipt printer.
+  //
+  // This used to answer with ports[0] whatever was plugged in. On a counter
+  // with a printer AND a USB-serial cash drawer — or a scanner that presents
+  // as a serial device — that is a coin toss, and the cashier has no way to
+  // say "the other one": Terminal & printer never sees a chooser because the
+  // choice was already made here.
+  //
+  // One port is still answered instantly, because that is the common case and
+  // a dialog for a question with one answer is just a click. More than one and
+  // the person at the till decides.
   win.webContents.session.on('select-serial-port', (event, ports, callback) => {
     event.preventDefault()
-    callback(ports.length ? ports[0].portId : '')
+
+    if (ports.length === 0) { callback(''); return }
+    if (ports.length === 1) { callback(ports[0].portId); return }
+
+    const label = (p) => {
+      const name = p.displayName || p.portName || 'Serial device'
+      const ids = [p.vendorId, p.productId].filter(Boolean).join(':')
+      return ids ? `${name}  (${ids})` : name
+    }
+    dialog.showMessageBox(win, {
+      type: 'question',
+      title: 'EVERYTINROOM POS',
+      message: 'Which device is the receipt printer?',
+      detail: 'More than one serial device is connected to this till.',
+      buttons: [...ports.map(label), 'Cancel'],
+      cancelId: ports.length,
+      defaultId: 0,
+      noLink: true,
+    }).then(({ response }) => {
+      callback(response >= 0 && response < ports.length ? ports[response].portId : '')
+    }).catch(() => callback(''))
   })
 
   win.loadURL(`${ORIGIN}/`)

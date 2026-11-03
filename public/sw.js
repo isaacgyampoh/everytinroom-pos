@@ -17,6 +17,12 @@ const SHELL = ['/', '/index.html', '/manifest.json', '/logo.svg', '/logo.png']
 // a till showing yesterday's numbers with no way to tell is the worst possible
 // failure. This is about the API SPECIFICALLY, not about the whole Supabase
 // domain: product images are served from the same host and they ARE cacheable.
+// What version this till is running, answered by the desktop shell. It must
+// never be cached: the service worker's cache survives a reinstall, because the
+// origin does not change — so a cached copy would hand back the OLD version
+// after an upgrade and leave the update banner up for ever.
+const isAppInfo = (url) => url.pathname === '/__app.json'
+
 const isApi = (url) =>
   url.pathname.startsWith('/rest/') ||
   url.pathname.startsWith('/functions/') ||
@@ -65,7 +71,7 @@ self.addEventListener('fetch', (e) => {
 
   // Backend traffic: straight to the network, never stored. If it fails, the
   // app's own offline queue handles it — a cached reply would be a lie.
-  if (isApi(url)) return
+  if (isApi(url) || isAppInfo(url)) return
 
   // Product images: cache-first, fill in behind. Once a photo has been seen on
   // this till it keeps showing even when the connection is down.

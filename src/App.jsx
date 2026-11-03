@@ -14,6 +14,7 @@ import { startAutoFlush, pendingCount, onPendingChange, flush } from './lib/offl
 import { getSettings } from './lib/hardware'
 import { watchForUpdates, onUpdateReady, applyUpdate } from './lib/appUpdate'
 import { useDockedCart } from './hooks/useDockedCart'
+import { useDesktopUpdate } from './hooks/useDesktopUpdate'
 import toast from 'react-hot-toast'
 
 // Lazy load all pages — only loads when needed
@@ -61,6 +62,9 @@ export default function App() {
   // the update-when-idle check below reads — docking must not look like a
   // cashier mid-sale and block every deploy.
   const cartDockable = useDockedCart()
+  // The Windows till serves its bundle from disk, so a deploy never reaches it.
+  // This is the only thing that tells a shop a newer installer exists.
+  const { update: desktopUpdate, snooze: snoozeUpdate } = useDesktopUpdate()
   // ...but only where a sale is actually made. Docking it everywhere took 400px
   // off the Dashboard and the reports to show an empty basket on a page you
   // cannot sell from. The floating cart button was only ever on the till screen
@@ -461,6 +465,25 @@ export default function App() {
         <div className="fixed top-0 inset-x-0 z-[150] bg-[#b3402b] text-white text-center py-1.5 px-3 text-[12px] font-semibold">
           Offline — prices and stock as of {new Date(offlineCatalogue).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.
           Sales are saved and will file themselves.
+        </div>
+      )}
+
+      {/* A packaged till cannot update itself. Not a modal and not blocking:
+          a cashier mid-queue should be able to ignore it until closing. */}
+      {desktopUpdate && (
+        <div className={`${offlineCatalogue ? 'top-[30px]' : 'top-0'} fixed inset-x-0 z-[149] bg-[#16181d] text-white px-4 py-2 flex items-center justify-center gap-3 text-[12px] font-semibold`}>
+          <span>
+            A newer till version is available — {desktopUpdate.version}
+            <span className="text-white/50 font-normal"> (this one is {desktopUpdate.running})</span>
+          </span>
+          <button onClick={() => { snoozeUpdate(); setPage('terminal') }}
+            className="h-7 px-3 rounded-lg bg-white text-[#16181d] text-[11px] font-bold">
+            Get it
+          </button>
+          <button onClick={snoozeUpdate} aria-label="Dismiss until next time"
+            className="h-7 px-2 rounded-lg text-white/60 hover:text-white text-[11px] font-bold">
+            Later
+          </button>
         </div>
       )}
 
