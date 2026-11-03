@@ -5,7 +5,8 @@ import { money, num, fmtDate, today } from '../lib/utils'
 import Modal from '../components/Modal'
 import toast from 'react-hot-toast'
 import { IconTag, EmptyState } from '../components/Icons'
-import { CHANNELS } from '../lib/promoPricing'
+import { CHANNELS, promoApplies } from '../lib/promoPricing'
+import ProductPicker from '../components/ProductPicker'
 
 export default function PromosPage() {
   const { promos, bundles, products, refreshPromos, refreshBundles, setLoading } = useStore()
@@ -56,19 +57,62 @@ export default function PromosPage() {
     </div>
   )
 
-  const isActive = (p) => { const t = today(); return p.active && p.startDate <= t && p.endDate >= t }
+  // Nobody sets six hundred prices by hand. A promotion is almost always "this
+  // much off these things", so the percentage is the control and a per-item
+  // price is the exception you override afterwards.
+  const applyPercent = (pct) => {
+    const n = num(pct)
+    if (!(n > 0 && n < 100)) { toast.error('Enter a discount between 1 and 99'); return }
+    setForm(f => ({
+      ...f,
+      items: f.items.map(it => ({
+        ...it,
+        promoPrice: Math.max(0, Math.round(num(it.originalPrice) * (1 - n / 100) * 100) / 100),
+      })),
+    }))
+  }
+
+  const togglePromoProduct = (pr) => setForm(f => {
+    const items = [...f.items]
+    const i = items.findIndex(x => x.productId === pr.id)
+    if (i >= 0) items.splice(i, 1)
+    else items.push({ productId: pr.id, name: pr.name, originalPrice: pr.price, promoPrice: '' })
+    return { ...f, items }
+  })
+
+  const addPromoProducts = (list) => setForm(f => {
+    const have = new Set(f.items.map(x => x.productId))
+    return { ...f, items: [...f.items, ...list.filter(pr => !have.has(pr.id))
+      .map(pr => ({ productId: pr.id, name: pr.name, originalPrice: pr.price, promoPrice: '' }))] }
+  })
+
+  const toggleBundleProduct = (pr) => setBunForm(f => {
+    const items = [...f.items]
+    const i = items.findIndex(x => x.productId === pr.id)
+    if (i >= 0) items.splice(i, 1); else items.push({ productId: pr.id, qty: 1 })
+    return { ...f, items }
+  })
+
+  const addBundleProducts = (list) => setBunForm(f => {
+    const have = new Set(f.items.map(x => x.productId))
+    return { ...f, items: [...f.items, ...list.filter(pr => !have.has(pr.id)).map(pr => ({ productId: pr.id, qty: 1 }))] }
+  })
+
+  // The one rule, from the shared module. The copy that used to live here read
+  // `p.endDate >= today`, and `null >= '2026-11-03'` is false — so a promotion
+  // with no end date, which runs until you switch it off, displayed as "Off"
+  // while the till was happily applying it.
+  const isActive = (p) => promoApplies(p, 'shop') || promoApplies(p, 'web')
   const activeCount = promos.filter(isActive).length
 
   // Promo functions
   const openNewPromo = () => { setForm({ id: '', name: '', startDate: today(), endDate: '', items: [], channel: 'both' }); setModal(true) }
   const openEditPromo = (p) => { setForm({ id: p.id, name: p.name, startDate: p.startDate || '', endDate: p.endDate || '', items: [...p.items], channel: p.channel || 'both' }); setModal(true) }
-  const addPromoItem = (pid) => {
-    if (!pid) return; const p = products.find(x => x.id === pid); if (!p) return
-    const items = [...form.items]; if (items.find(x => x.productId === pid)) return
-    items.push({ productId: pid, name: p.name, originalPrice: p.price, promoPrice: '' }); setForm({ ...form, items })
-  }
   const savePromo = async () => {
-    if (!form.name.trim() || !form.startDate || !form.endDate || !form.items.length) { toast.error('Fill all fields'); return }
+    if (!form.name.trim()) { toast.error('Give the promotion a name'); return }
+    if (!form.startDate) { toast.error('Set a start date'); return }
+    if (!form.items.length) { toast.error('Choose at least one product'); return }
+    if (form.endDate && form.endDate < form.startDate) { toast.error('The end date is before the start date'); return }
     for (const it of form.items) { if (!num(it.promoPrice)) { toast.error('Set price for ' + it.name); return } }
     setLoading(true, 'Saving...'); const sb = getSupabase()
     const data = { name: form.name.trim(), start_date: form.startDate, end_date: form.endDate, items: form.items.map(i => ({ productId: i.productId, name: i.name, originalPrice: num(i.originalPrice), promoPrice: num(i.promoPrice) })), active: true, channel: form.channel || 'both' }
@@ -82,7 +126,6 @@ export default function PromosPage() {
   // Bundle functions
   const openNewBundle = () => { setBunForm({ id: '', name: '', price: '', items: [], channel: 'both' }); setBunModal(true) }
   const openEditBundle = (b) => { setBunForm({ id: b.id, name: b.name, price: b.bundlePrice, items: [...b.products], channel: b.channel || 'both' }); setBunModal(true) }
-  const addBunItem = (pid) => { if (!pid) return; const items = [...bunForm.items]; const ex = items.find(x => x.productId === pid); if (ex) ex.qty++; else items.push({ productId: pid, qty: 1 }); setBunForm({ ...bunForm, items }) }
   const saveBundle = async () => {
     if (!bunForm.name.trim() || !bunForm.items.length || !num(bunForm.price)) { toast.error('Fill all fields'); return }
     setLoading(true, 'Saving...'); const sb = getSupabase()
@@ -177,16 +220,46 @@ export default function PromosPage() {
           <input className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Promo name" />
           <div className="grid grid-cols-2 gap-3">
             <div><label className="block text-xs font-semibold text-gray-500 mb-1">Start</label><input type="date" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} /></div>
-            <div><label className="block text-xs font-semibold text-gray-500 mb-1">End</label><input type="date" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} /></div>
+            <div><label className="block text-xs font-semibold text-gray-500 mb-1">End <span className="font-normal text-gray-300">— optional</span></label><input type="date" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} /></div>
           </div>
           <div className="pt-1">
             <ChannelPicker value={form.channel} onChange={c => setForm({ ...form, channel: c })} />
           </div>
-          <select className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" onChange={e => { addPromoItem(e.target.value); e.target.value = '' }}><option value="">Add product...</option>{products.map(p => <option key={p.id} value={p.id}>{p.name} ({money(p.price)})</option>)}</select>
+          <ProductPicker
+            products={products}
+            selectedIds={new Set(form.items.map(i => i.productId))}
+            onToggle={togglePromoProduct}
+            onAddMany={addPromoProducts} />
+
+          {form.items.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-gray-500">Take</span>
+              {[5, 10, 15, 20, 25, 30, 50].map(pc => (
+                <button key={pc} type="button" onClick={() => applyPercent(pc)}
+                  className="h-8 px-2.5 rounded-lg border border-gray-200 text-[12px] font-bold text-gray-600 hover:border-gray-900 hover:text-gray-900 transition">
+                  {pc}%
+                </button>
+              ))}
+              <span className="text-xs text-gray-400">off all {form.items.length}</span>
+            </div>
+          )}
           <div className="bg-gray-50 rounded-xl p-3 min-h-[60px]">
             {form.items.length === 0 ? <div className="text-center text-gray-400 py-5 text-sm">No products</div> : form.items.map((it, i) => (
               <div key={i} className="flex items-center gap-2 p-2.5 bg-white rounded-lg mb-2">
-                <div className="flex-1"><div className="text-sm font-semibold">{it.name}</div><div className="text-xs text-gray-400">Was: {money(it.originalPrice)}</div></div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold truncate">{it.name}</div>
+                  <div className="text-xs text-gray-400">
+                    Was {money(it.originalPrice)}
+                    {num(it.promoPrice) > 0 && num(it.originalPrice) > 0 && (
+                      <span className={num(it.promoPrice) >= num(it.originalPrice) ? 'text-[#b3402b] font-semibold' : 'text-emerald-600 font-semibold'}>
+                        {' · '}
+                        {num(it.promoPrice) >= num(it.originalPrice)
+                          ? 'not a discount'
+                          : `${Math.round((1 - num(it.promoPrice) / num(it.originalPrice)) * 100)}% off`}
+                      </span>
+                    )}
+                  </div>
+                </div>
                 <input type="number" className="w-20 h-8 px-2 text-center border border-gray-300 rounded-lg text-sm font-bold text-gray-700" placeholder="Price" value={it.promoPrice} onChange={e => { const items = [...form.items]; items[i].promoPrice = e.target.value; setForm({ ...form, items }) }} />
                 <button onClick={() => { const items = [...form.items]; items.splice(i, 1); setForm({ ...form, items }) }} className="w-7 h-7 bg-red-50 text-red-500 rounded-md text-xs flex items-center justify-center">✕</button>
               </div>
@@ -202,7 +275,12 @@ export default function PromosPage() {
           <input className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" value={bunForm.name} onChange={e => setBunForm({...bunForm, name: e.target.value})} placeholder="Bundle name" />
           <input type="number" className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" value={bunForm.price} onChange={e => setBunForm({...bunForm, price: e.target.value})} placeholder="Bundle price (GHS)" />
           <ChannelPicker value={bunForm.channel} onChange={c => setBunForm({ ...bunForm, channel: c })} />
-          <select className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm" onChange={e => { addBunItem(e.target.value); e.target.value = '' }}><option value="">Add product...</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+          <ProductPicker
+            products={products}
+            selectedIds={new Set(bunForm.items.map(i => i.productId))}
+            onToggle={toggleBundleProduct}
+            onAddMany={addBundleProducts}
+            label="Products in this bundle" />
           <div className="bg-gray-50 rounded-xl p-3 min-h-[60px]">
             {bunForm.items.length === 0 ? <div className="text-center text-gray-400 py-5 text-sm">No products</div> : bunForm.items.map((it, i) => {
               const p = products.find(x => x.id === it.productId)
