@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "audit:backend": "node tools/audit-backend.mjs"
+    "audit:backend": "node tools/audit-backend.mjs",
+    "migrate:pending": "node tools/pending-sql.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

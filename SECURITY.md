@@ -132,6 +132,22 @@ for running it.
   It is no longer an optional step you have to remember; it fires with the
   migration.
 
+## Run what is outstanding
+
+```
+npm run migrate:pending
+```
+
+Asks the database which migrations are actually missing and writes exactly
+those into one file to paste into the Supabase SQL editor — in order, with the
+additive ones together and anything that CLOSES access separated out with what
+has to be true before you run it.
+
+The two files it produces are committed as `supabase/PENDING-1-additive.sql`
+and `supabase/PENDING-2-closing.sql`, so you can open one and copy it without
+running anything first. Both are idempotent; re-running a migration that has
+already been applied does nothing.
+
 ## Check it, don't read it
 
 ```
