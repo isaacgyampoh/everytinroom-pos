@@ -67,6 +67,7 @@ describe('canOpenPage', () => {
   it('enforces each named permission rather than just hiding the page', () => {
     const cases = {
       products: 'product_management',
+      costs: 'product_management',
       restock: 'product_receiving',
       receiving: 'product_receiving',
       stocktakes: 'stock_taking',

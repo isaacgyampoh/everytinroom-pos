@@ -26,6 +26,7 @@ const ReceivingPage = lazy(() => import('./pages/ReceivingPage'))
 const WhatsAppSettings = lazy(() => import('./pages/WhatsAppSettings'))
 const Receipts = lazy(() => import('./pages/Receipts'))
 const Products = lazy(() => import('./pages/Products'))
+const CostPricesPage = lazy(() => import('./pages/CostPricesPage'))
 const StaffPage = lazy(() => import('./pages/StaffPage'))
 const ExpensesPage = lazy(() => import('./pages/ExpensesPage'))
 const CustomersPage = lazy(() => import('./pages/CustomersPage'))
@@ -421,6 +422,7 @@ export default function App() {
     wasettings: <WhatsAppSettings />,
     receipts: <Receipts onPrintReceipt={(s) => setReceipt({ receiptNo: s.receiptNo, date: s.date, customer: s.customer, cashier: s.cashier, payment: s.payment, type: s.type, items: s.items, total: s.total, discount: s.discount })} />,
     products: <Products />,
+    costs: <CostPricesPage />,
     staff: <StaffPage />,
     expenses: <ExpensesPage />,
     customers: <CustomersPage />,

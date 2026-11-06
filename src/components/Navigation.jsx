@@ -14,6 +14,7 @@ const icons = {
   receipts: <I d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8" />,
   refunds: <I d="M3 10h10a8 8 0 0 1 8 8v2M3 10l6 6M3 10l6-6" />,
   performance: <I d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />,
+  costs: <I d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />,
   products: <I d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />,
   promos: <I d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82zM7 7h.01" />,
   restock: <I d="M1 3h15v13H1zM16 8h4l3 3v5h-7V8zM5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z" />,
@@ -39,6 +40,7 @@ const NAV_GROUPS = [
   ]},
   { section: 'Inventory', items: [
     { id: 'products', label: 'Products', perm: 'product_management' },
+    { id: 'costs', label: 'Cost Prices', perm: 'product_management' },
     { id: 'stockinsights', label: 'Stock Insights', perm: 'inventory_view' },
     { id: 'stocktakes', label: 'Stock & Adjust', perm: 'stock_taking' },
     { id: 'restock', label: 'Restock', perm: 'product_receiving' },
@@ -70,7 +72,7 @@ const MOB = [
   { id: 'dash', label: 'More', admin: true },
 ]
 
-const AP = ['dash','products','bundles','staff','expenses','reports','customers','performance','promos','invoices','stocktakes','restock','stockadjustments']
+const AP = ['dash','products','costs','bundles','staff','expenses','reports','customers','performance','promos','invoices','stocktakes','restock','stockadjustments']
 
 export default function Navigation({ onOpenCart }) {
   const [pinned, setPinned] = useState(() => { try { return localStorage.getItem('sidebar-pinned') === '1' } catch { return false } })

@@ -30,7 +30,7 @@ export function publicRoute(hash) {
 export const PAGES_BY_ID = new Set([
   'dash','pos','whatsapp','wachats','receiving','wasettings','receipts','products',
   'staff','expenses','customers','bundles','performance','refunds','reports',
-  'promos','invoices','stocktakes','stockadjustments','restock','terminal','stockinsights',
+  'promos','invoices','stocktakes','stockadjustments','restock','terminal','stockinsights','costs',
 ])
 
 // What each restricted page requires. 'admin' means admin only; anything else
@@ -48,6 +48,7 @@ export const PAGE_ACCESS = {
   wasettings: 'admin',
   staff: 'admin',
   products: 'product_management',
+  costs: 'product_management',
   restock: 'product_receiving',
   receiving: 'product_receiving',
   stocktakes: 'stock_taking',

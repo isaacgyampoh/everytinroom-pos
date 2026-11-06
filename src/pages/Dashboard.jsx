@@ -215,7 +215,7 @@ export default function Dashboard() {
                 products with no cost price saved, so the profit figures below read higher than the truth.
               </>}
             </p>
-            <button onClick={() => setPage('products')}
+            <button onClick={() => setPage('costs')}
               className="mt-2.5 h-9 px-3.5 rounded-[10px] bg-[#16181d] text-white text-[12px] font-semibold">
               Add cost prices
             </button>
