@@ -301,6 +301,32 @@ body.dark textarea::placeholder { color: #6b6f7a !important; }
 /* glass header/footer on mobile */
 body.dark .glass { background: rgba(20,22,28,.92) !important; }
 
+/* Gaps the audit found — utilities the screens added this week use that the
+   block above never covered. Each one is a light surface or an invisible
+   outline on a dark page, not a nicety.
+
+   The translucent ones matter most: a `/70` or `/95` opacity variant is a
+   DIFFERENT class name, so `.bg-stone-200` never matched `bg-stone-200/70`
+   and every segmented control stayed a pale pill on a dark screen. */
+body.dark .bg-white\/95,
+body.dark .bg-white\/90 { background-color: rgba(25,27,31,.95) !important; }
+body.dark .bg-stone-200\/70 { background-color: rgba(44,47,53,.75) !important; }
+body.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+body.dark .divide-stone-100 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(255,255,255,.08) !important; }
+body.dark .border-gray-300,
+body.dark .border-gray-400,
+body.dark .border-stone-300,
+body.dark .border-stone-400 { border-color: rgba(255,255,255,.14) !important; }
+
+/* A near-black focus ring is invisible on a near-black page. Focus has to be
+   visible for anyone driving this from a keyboard, and the cost-price screen
+   is entirely keyboard-driven. */
+body.dark .focus\:border-gray-900:focus,
+body.dark .border-gray-900 { border-color: rgba(255,255,255,.55) !important; }
+body.dark .hover\:border-gray-900:hover,
+body.dark .hover\:border-gray-400:hover,
+body.dark .hover\:border-stone-400:hover { border-color: rgba(255,255,255,.3) !important; }
+
 /* hover states */
 body.dark .hover\:bg-stone-100:hover,
 body.dark .hover\:bg-stone-50:hover,
