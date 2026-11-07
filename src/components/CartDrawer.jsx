@@ -483,7 +483,7 @@ export default function CartDrawer({ open, docked = false, onClose, onReceipt })
           no backdrop to dim the products the cashier is still picking from,
           no drop shadow, and nothing to dismiss. */}
       {open && !docked && <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[300]" onClick={onClose} />}
-      <div className={`cart-drawer fixed bottom-0 left-0 right-0 md:left-auto md:top-0 md:w-[400px] bg-white md:border-l border-gray-200 max-h-[92vh] md:max-h-full z-[301] flex flex-col ${docked ? 'translate-y-0 md:translate-x-0' : `transition-transform duration-300 shadow-2xl ${open ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:translate-y-0 md:translate-x-full'}`} md:rounded-none rounded-t-2xl`}>
+      <div className={`cart-drawer fixed bottom-0 left-0 right-0 md:left-auto md:top-0 md:w-[400px] bg-white md:border-l border-gray-200 max-h-[92vh] md:max-h-full z-[301] flex flex-col transition-transform duration-300 ${docked ? '' : 'shadow-2xl'} ${open ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:translate-y-0 md:translate-x-full'} md:rounded-none rounded-t-2xl`}>
 
         {!docked && <div className="md:hidden w-10 h-1 bg-gray-200 rounded-full mx-auto mt-2.5" />}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
@@ -496,7 +496,7 @@ export default function CartDrawer({ open, docked = false, onClose, onReceipt })
               Held{heldCarts.length > 0 && <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-gray-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{heldCarts.length}</span>}
             </button>
             <button onClick={holdCart} disabled={!cart.length} className="h-9 px-3 rounded-lg text-xs font-semibold bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100 transition disabled:opacity-30">Hold</button>
-            <button onClick={() => { if (cart.length && confirm('Clear cart?')) clearCart() }} className="h-9 px-3 rounded-lg text-xs font-semibold bg-red-50 text-red-500 border border-red-100 hover:bg-red-100 transition">Clear</button>
+            <button onClick={() => { if (cart.length && confirm('Clear cart?')) { clearCart(); onClose() } }} className="h-9 px-3 rounded-lg text-xs font-semibold bg-red-50 text-red-500 border border-red-100 hover:bg-red-100 transition">Clear</button>
           </div>
         </div>
 

@@ -369,7 +369,10 @@ body.dark .border-violet-100,body.dark .border-violet-200 { border-color: rgba(1
 /* When the basket is docked it is still position:fixed, so the grid has to be
    told not to run underneath it. Reserving the gutter here rather than on the
    element keeps the transition from fighting the sidebar's own margin. */
-body.cart-docked .content-shell { margin-right: var(--cart-w, 400px); transition: margin-right 0.2s; }
+body.cart-docked .content-shell { margin-right: var(--cart-w, 400px); }
+/* Matched to the panel's own 300ms slide so the grid and the basket finish
+   together rather than the gutter snapping open ahead of it. */
+.content-shell { transition: margin-left 0.2s, margin-right 0.3s; }
 
 /* The product grid's column counts are viewport breakpoints, but a docked
    basket takes 400px out of the row. Left alone, a 1280px till would try to

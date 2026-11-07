@@ -70,7 +70,13 @@ export default function App() {
   // off the Dashboard and the reports to show an empty basket on a page you
   // cannot sell from. The floating cart button was only ever on the till screen
   // for the same reason.
-  const cartDocked = cartDockable && page === 'pos'
+  const cartCount = useStore(st => st.cart.length)
+  // ...and only once there is something in it. An empty 400px panel on a
+  // screen where no sale has started is just a narrower product grid, so the
+  // basket arrives with the first item and leaves when the sale is rung up or
+  // cleared. The floating cart button covers the empty case, which is how a
+  // cashier still reaches the held baskets.
+  const cartDocked = cartDockable && page === 'pos' && cartCount > 0
 
   // The grid's right-hand gutter is reserved in CSS, which lives outside
   // React's tree — so it is toggled here, from the state that actually decides
@@ -168,7 +174,6 @@ export default function App() {
   // A new version waits until the till is idle. Swapping the JavaScript under a
   // cashier mid-sale reloads the page and takes the cart with it.
   useEffect(() => onUpdateReady(() => setUpdateReady(true)), [])
-  const cartCount = useStore(st => st.cart.length)
   useEffect(() => {
     if (!updateReady || cartOpen || cartCount > 0) return
     const t = setTimeout(() => applyUpdate(), 1500)   // settle, then swap
