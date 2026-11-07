@@ -4,7 +4,7 @@ import { getSupabase } from '../lib/supabase'
 import { money, num, today, thumb } from '../lib/utils'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
 import { promoPriceMap as channelPromoMap, bundleApplies } from '../lib/promoPricing'
-import { beep } from '../lib/hardware'
+import { beep, getSettings, saveSettings } from '../lib/hardware'
 import toast from 'react-hot-toast'
 import { IconTag, IconSearch, IconImage, EmptyState } from '../components/Icons'
 
@@ -56,9 +56,46 @@ const ProductCard = memo(({ item, price, hasPromo, onAdd }) => {
   )
 })
 
+// The same product as one line. No photo square, so three times as many fit on
+// a screen — which is the only way to scan a catalogue where most items have
+// no picture and names differ by a digit at the end.
+const ProductRow = memo(({ item, price, hasPromo, onAdd }) => {
+  const out = item.quantity === 0
+  const low = item.quantity > 0 && item.quantity <= 5
+  const noPrice = Number(price) <= 0
+  return (
+    <button onClick={onAdd} disabled={out}
+      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left bg-white border-b border-stone-100 last:border-0 transition
+        ${out ? 'opacity-45 pointer-events-none' : 'active:bg-stone-50'}`}>
+      <div className="thumb-shot w-10 h-10 rounded-lg shrink-0 flex items-center justify-center overflow-hidden">
+        {item.image
+          ? <img src={thumb(item.image, 96)} alt="" loading="lazy" decoding="async" />
+          : <span className="text-stone-300"><IconImage size={15} /></span>}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[13.5px] font-semibold text-gray-900 leading-tight truncate">{item.name}</div>
+        <div className="text-[11px] text-stone-400 truncate">
+          {out ? <span className="text-[#b3402b] font-semibold">Out of stock</span>
+            : low ? <span className="text-[#b3402b] font-semibold">{item.quantity} left</span>
+            : item.category || ''}
+          {hasPromo && <span className="ml-1.5 text-[#16181d] font-bold">PROMO</span>}
+        </div>
+      </div>
+      <div className="text-right shrink-0">
+        <div className={`figure text-[15px] ${noPrice ? 'text-[#b3402b]' : 'text-gray-900'}`}>
+          {noPrice ? 'No price' : money(price)}
+        </div>
+        {hasPromo && !noPrice && <div className="text-[11px] text-stone-300 line-through tnum">{money(item.price)}</div>}
+      </div>
+    </button>
+  )
+})
+
 export default function POS() {
   const { products, bundles, promos, mode, setMode, selectedCat, setCat, addToCart, refreshProducts } = useStore()
   const [query, setQuery] = useState('')
+  const [view, setView] = useState(() => (getSettings().posView === 'list' ? 'list' : 'grid'))
+  const setViewMode = (v) => { setView(v); saveSettings({ posView: v }) }
 
   const categories = useMemo(() => ['all', ...new Set(products.filter(p => p.category).map(p => p.category))], [products])
 
@@ -153,6 +190,17 @@ export default function POS() {
           rows stacked on top of each other. On a 1024x768 till those ate a
           third of the screen before a single product appeared — and the page
           title told the cashier something they already knew. */}
+      {/* Search and the mode switch stay put.
+          On a till, searching or scanning is the action — everything else is a
+          consequence of it. These used to scroll away with the grid, so with
+          665 products a cashier had to scroll back to the top of the page
+          before they could look anything up, mid-queue. It is worst on a phone,
+          where a screen holds about four rows, but it was wrong everywhere.
+
+          Sits under the fixed header on mobile and at the top of the content
+          column on desktop, where the nav is a sidebar and there is no header
+          to clear. */}
+      <div className="sticky top-topbar md:top-0 z-[90] -mx-3 sm:-mx-4 md:-mx-7 lg:-mx-9 px-3 sm:px-4 md:px-7 lg:px-9 pt-1 pb-1.5 content-band">
       <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-2.5 mb-2.5">
         <div className="relative flex-1 min-w-0">
           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-300 pointer-events-none"><IconSearch size={18} /></span>
@@ -167,6 +215,21 @@ export default function POS() {
             <button onClick={() => setQuery('')} aria-label="Clear search"
               className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg text-stone-400 hover:bg-stone-100 flex items-center justify-center text-sm">✕</button>
           )}
+        </div>
+
+        {/* Grid or list. Most of this catalogue has no photo, so the grid spends
+            a square of every card on a grey placeholder and fits about four
+            rows on a phone. The list reads by name and fits three times as
+            many — which is what you want when there is no picture to
+            recognise. Remembered per terminal. */}
+        <div className="flex p-1 bg-stone-200/70 rounded-[12px] shrink-0 self-start lg:self-auto">
+          {[['grid', 'Grid', 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z'],
+            ['list', 'List', 'M3 6h18M3 12h18M3 18h18']].map(([v, label, d]) => (
+            <button key={v} onClick={() => setViewMode(v)} title={label} aria-label={label} aria-pressed={view === v}
+              className={`h-10 lg:h-9 px-3 rounded-[9px] transition ${view === v ? 'bg-white text-gray-900 shadow-sm' : 'text-stone-500'}`}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
+            </button>
+          ))}
         </div>
 
         {/* Segmented control. Modes change what you are selling, so they read
@@ -197,9 +260,15 @@ export default function POS() {
           )}
         </div>
       )}
+      </div>
+
 
       {/* Grid */}
-      <div className="product-grid grid grid-cols-2 min-[420px]:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2 sm:gap-2.5">
+      {/* Bundles are typographic cards with no photo, so the list view has
+          nothing to save them — they stay a grid whichever view is selected. */}
+      <div className={view === 'list' && mode !== 'bundle'
+        ? 'panel overflow-hidden'
+        : 'product-grid grid grid-cols-2 min-[420px]:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2 sm:gap-2.5'}>
         {filtered.length === 0 && <div className="col-span-full"><EmptyState icon={IconSearch} title={query ? `Nothing matches "${query}"` : 'No products yet'} hint={query ? 'Check the spelling, or scan the barcode' : 'Add products from the Products page'} /></div>}
         {filtered.map((item, idx) => {
           if (mode === 'bundle') return (
@@ -214,7 +283,8 @@ export default function POS() {
               <div className="figure text-[17px] text-gray-900 mt-3">{money(item.bundlePrice)}</div>
             </button>
           )
-          return <ProductCard key={item.id} item={item} price={getPrice(item)} hasPromo={!!promoPriceMap[item.id]} onAdd={() => doAdd(item)} />
+          const P = view === 'list' ? ProductRow : ProductCard
+          return <P key={item.id} item={item} price={getPrice(item)} hasPromo={!!promoPriceMap[item.id]} onAdd={() => doAdd(item)} />
         })}
       </div>
     </div>

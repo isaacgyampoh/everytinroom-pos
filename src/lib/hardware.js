@@ -47,6 +47,11 @@ const DEFAULTS = {
   // the day's takings should not be readable by whoever is standing at the
   // counter. Per terminal, because a back-office machine has no such problem.
   hideFigures: false,
+  // 'grid' is photo-led and right when products have photos. Most of this
+  // catalogue has none, so a grid of grey placeholders shows about four rows a
+  // screen; 'list' shows three times as many and reads by name, which is how
+  // you find something that has no picture.
+  posView: 'grid',
 }
 
 export function getSettings() {

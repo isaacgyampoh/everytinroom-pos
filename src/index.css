@@ -158,6 +158,27 @@ body.dark .rule { border-color: rgba(255,255,255,.07); }
 
 @layer utilities {
   .safe-top { padding-top: env(safe-area-inset-top); }
+
+  /* The mobile header is h-14 PLUS the safe-area inset, but the page below it
+     was padded by a flat 3.5rem — so on any phone with a notch the two did not
+     agree and the first row of products slid under the header. One value, used
+     by both, and by the sticky toolbar that has to sit directly beneath it. */
+  :root { --topbar-h: calc(3.5rem + env(safe-area-inset-top, 0px)); }
+  .pt-topbar { padding-top: var(--topbar-h); }
+  .top-topbar { top: var(--topbar-h); }
+
+  /* The surface behind the sticky POS toolbar. A class rather than a Tailwind
+     arbitrary colour because it has to follow dark mode — products scrolling
+     under a hardcoded light band is exactly the sort of thing that only shows
+     up after the shop switches the theme. */
+  .content-band { background: rgba(246,246,245,.94); }
+  @supports (backdrop-filter: blur(8px)) {
+    .content-band { background: rgba(246,246,245,.82); backdrop-filter: blur(10px); }
+  }
+  body.dark .content-band { background: rgba(16,17,21,.94); }
+  @supports (backdrop-filter: blur(8px)) {
+    body.dark .content-band { background: rgba(16,17,21,.82); }
+  }
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
   .glass { background: rgba(245,245,243,.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
   .scrollbar-hide::-webkit-scrollbar { display: none; }

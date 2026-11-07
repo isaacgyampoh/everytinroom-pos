@@ -497,7 +497,7 @@ export default function App() {
         </button>
       )}
 
-      <main className={`${offlineCatalogue ? "pt-[86px] md:pt-8" : "pt-14 md:pt-0"} pb-24 md:pb-10 min-h-screen transition-all duration-200 content-shell`}>
+      <main className={`${offlineCatalogue ? "pt-[86px] md:pt-8" : "pt-topbar md:pt-0"} pb-24 md:pb-10 min-h-screen transition-all duration-200 content-shell`}>
         <div className="px-3 sm:px-4 md:px-7 lg:px-9 py-3 md:py-5 max-w-[1600px] mx-auto">
           {/* Scoped to the page, not the whole till: a crash in Reports leaves
               the nav, the basket and the till itself usable, and `key={page}`
