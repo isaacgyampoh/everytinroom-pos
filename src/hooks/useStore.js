@@ -358,7 +358,16 @@ export const useStore = create((set, get) => ({
   },
 
   refreshProducts: async () => { const sb = getSupabase(); if (!sb) return; const d = await qFallback(sb, get()._productSource(), get()._productFallback(), { order: 'name', asc: true }); set({ products: d.map(mapProduct) }) },
-  refreshSales: async () => { const sb = getSupabase(); if (!sb) return; const d = await loadSales(sb, get().token, 300, get()._saleSelect()); set({ sales: d.map(mapSale) }) },
+  // How many sales are held in memory. Everything that reads `sales` — the
+  // receipts list, the reports, the dashboard — can only see this many, which
+  // is why the number is on screen rather than implied.
+  salesLimit: 300,
+  refreshSales: async (limit) => {
+    const sb = getSupabase(); if (!sb) return
+    const n = Math.max(Number(limit) || get().salesLimit || 300, 1)
+    const d = await loadSales(sb, get().token, n, get()._saleSelect())
+    set({ sales: d.map(mapSale), salesLimit: n })
+  },
   refreshWAOrders: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'whatsapp_orders', { order: 'date', limit: 500 }); set({ waOrders: d.map(mapWAOrder) }) },
   refreshStaff: async () => { const sb = getSupabase(); if (!sb) return; const d = await qFallback(sb, { table: 'staff_safe', select: 'id,name,role,active,permissions' }, { table: 'staff', select: 'id,name,role,active' }); set({ staff: d.map(mapStaff) }) },
   refreshBundles: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'bundles'); set({ bundles: d.map(mapBundle) }) },
