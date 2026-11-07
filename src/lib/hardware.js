@@ -52,6 +52,11 @@ const DEFAULTS = {
   // screen; 'list' shows three times as many and reads by name, which is how
   // you find something that has no picture.
   posView: 'grid',
+  // 'auto' follows the pointer: the counter touchscreen gets the on-screen
+  // keypad, a machine with a keyboard does not. 'always'/'never' are what the
+  // sign-in screen writes when somebody overrides it, because a wrong guess on
+  // a keyboard-less till means nobody can sign in at all.
+  loginKeypad: 'auto',
 }
 
 export function getSettings() {

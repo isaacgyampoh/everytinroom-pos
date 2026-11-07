@@ -4,6 +4,25 @@ import { getSupabase } from '../lib/supabase'
 import { Logo } from './Logo'
 import Numpad from './Numpad'
 import { rememberSignIn, offlineSignIn, knownOfflineUsers } from '../lib/offlineStore'
+import { getSettings, saveSettings } from '../lib/hardware'
+import { SHOP } from '../lib/utils'
+
+// Does this machine's primary input have a fingertip on the end of it?
+//
+// `pointer: coarse` describes the PRIMARY pointer, so a touchscreen laptop
+// with a trackpad still reports fine and gets the typing layout, which is what
+// somebody with a keyboard wants. The counter till reports coarse and keeps
+// its keypad.
+//
+// This is a DEFAULT, never a lock-in. Get it wrong on a machine with no
+// keyboard and nobody can sign in at all, so there is always a way to summon
+// the pad, and the choice sticks on that terminal once made.
+const prefersKeypad = () => {
+  const saved = getSettings().loginKeypad
+  if (saved === 'always') return true
+  if (saved === 'never') return false
+  try { return window.matchMedia('(pointer: coarse)').matches } catch { return true }
+}
 
 export default function Login() {
   const [pins, setPins] = useState(['', '', '', ''])
@@ -11,9 +30,15 @@ export default function Login() {
   const [blocked, setBlocked] = useState('')
   const [loading, setLoading] = useState(false)
   const refs = [useRef(), useRef(), useRef(), useRef()]
+  const [keypad, setKeypad] = useState(prefersKeypad)
+  const showKeypad = (on) => { setKeypad(on); saveSettings({ loginKeypad: on ? 'always' : 'never' }) }
   const { login, setPage } = useStore()
 
-  useEffect(() => { refs[0].current?.focus() }, [])
+  // Focus the first box only where somebody can actually type into it.
+  // Focusing a text input on a touchscreen summons the operating system's own
+  // keyboard, which on the counter till slides up over the keypad this screen
+  // just drew. The keypad writes the digits itself and needs no focus.
+  useEffect(() => { if (!keypad) refs[0].current?.focus() }, [keypad]) // eslint-disable-line
 
   const handleInput = (i, val) => {
     if (!/^\d*$/.test(val)) return
@@ -105,67 +130,112 @@ export default function Login() {
   }
 
   const filled = pins.filter(p => p).length
+  const terminal = (getSettings().terminalName || '').trim()
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-[#f6f6f5] px-6 py-6 overflow-y-auto">
-      <div className="w-full max-w-[330px] text-center my-auto">
+    // ========================================================================
+    // THE LOCK SCREEN
+    //
+    // It was a pale grey page with a centred column and a white calculator
+    // pinned to it — the same screen any admin template ships with, and on a
+    // wide monitor a small box marooned in empty space.
+    //
+    // It is the shop's ink now, edge to edge. A locked till should not look
+    // like a working one: dark means not trading, and the moment a PIN lands
+    // the app comes up light. On a laptop the brand takes the left and the
+    // entry takes the right, so the width is used rather than padded around.
+    //
+    // The keypad only appears where there is no keyboard — see prefersKeypad.
+    // ========================================================================
+    <div className="fixed inset-0 z-[1000] overflow-y-auto bg-[#101116] text-white">
+      {/* A warm lift behind the brand so the ink reads as a surface, not a void. */}
+      <div aria-hidden className="pointer-events-none fixed inset-0"
+        style={{ background: 'radial-gradient(1100px 620px at 50% -12%, rgba(154,157,163,.16), transparent 62%)' }} />
 
-        {/* Logo */}
-        <div className="mb-8 flex justify-center">
-          <Logo height={72} tagline={true} />
+      <div className="relative min-h-full flex flex-col lg:flex-row">
+
+        {/* Brand. A band on a phone, half the screen on a laptop. */}
+        <div className="lg:w-[46%] lg:min-h-full flex flex-col items-center justify-center text-center px-8 pt-12 pb-6 lg:py-16 lg:border-r border-white/10">
+          <Logo height={64} color="#ffffff" accent="#9a9da3" tagline={false} className="lg:hidden" />
+          <Logo height={92} color="#ffffff" accent="#9a9da3" tagline={false} className="hidden lg:block" />
+          {/* Which shop, and which till. A cashier walking up to one of several
+              counters should not have to guess, and it is the one thing this
+              screen knows that the working app hides behind a settings page. */}
+          <p className="mt-6 text-[12px] tracking-[.18em] uppercase text-white/35 hidden lg:block">{SHOP.address}</p>
+          {terminal && (
+            <span className="mt-5 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/12 text-[11px] font-semibold tracking-wide text-white/55">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#8fb39e]" />
+              {terminal}
+            </span>
+          )}
         </div>
 
-        {/* PIN */}
-        <div>
-          <p className="text-[#5e6b62] text-[14px] mb-5 font-medium">Enter your staff PIN</p>
+        {/* Entry. */}
+        <div className="flex-1 flex items-center justify-center px-6 pb-10 lg:py-16">
+          <div className="w-full max-w-[320px]">
+            <p className="text-center text-[13px] tracking-[.16em] uppercase text-white/45 mb-7">Enter your staff PIN</p>
 
-          {/* Fixed-height slot. Without it the whole keypad jumped down the
-              screen the moment a PIN was mistyped, under the cashier's finger. */}
-          <div className="h-[42px] mb-2 flex items-center justify-center">
-            {(error || blocked) && (
-              <div className="w-full bg-[#fbeae6] text-[#c0492f] px-4 py-2.5 rounded-xl text-[13px] font-semibold">
-                {blocked || 'Incorrect PIN — try again'}
+            {/* Four dots, not four boxes. A PIN is a secret of a known length,
+                which is all this needs to say. */}
+            <div className="flex gap-4 justify-center mb-6">
+              {pins.map((v, i) => (
+                <div key={i} className="relative">
+                  <input
+                    ref={refs[i]}
+                    type="tel" inputMode="numeric" maxLength={1} value={v}
+                    aria-label={`PIN digit ${i + 1}`}
+                    className="peer w-[46px] h-[54px] rounded-2xl text-center bg-transparent border-0 focus:outline-none"
+                    style={{ color: 'transparent', caretColor: 'transparent' }}
+                    onChange={e => handleInput(i, e.target.value)}
+                    onKeyDown={e => handleKeyDown(i, e)}
+                  />
+                  <span aria-hidden className={`pointer-events-none absolute inset-0 rounded-2xl border transition-all duration-200
+                    ${v ? 'border-white/0 bg-white/[.10]' : i === filled ? 'border-[#8fb39e]/70' : 'border-white/12'}`} />
+                  <span aria-hidden className={`pointer-events-none absolute inset-0 flex items-center justify-center transition-all duration-200
+                    ${v ? 'scale-100 opacity-100' : 'scale-50 opacity-0'}`}>
+                    <span className="w-2.5 h-2.5 rounded-full bg-white" />
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Reserved so a wrong PIN never shifts the keypad under a finger
+                that is already on its way down. */}
+            <div className="h-[44px] mb-3 flex items-start justify-center">
+              {(error || blocked) && (
+                <div className="w-full text-center bg-[#b3402b]/15 border border-[#b3402b]/35 text-[#f0b4a6] px-4 py-2.5 rounded-xl text-[12.5px] font-semibold">
+                  {blocked || 'Incorrect PIN — try again'}
+                </div>
+              )}
+            </div>
+
+            {loading ? (
+              <div className="flex justify-center h-[248px] items-start pt-10">
+                <div className="w-6 h-6 border-[2.5px] border-white/20 border-t-white rounded-full animate-spin" />
+              </div>
+            ) : keypad ? (
+              <>
+                <div className="max-w-[270px] mx-auto">
+                  <Numpad surface="dark" onKey={padKey} onBackspace={padBack}
+                    onClear={() => { setPins(['', '', '', '']); refs[0].current?.focus() }} />
+                </div>
+                <button type="button" onClick={() => showKeypad(false)}
+                  className="mt-6 w-full text-[11.5px] font-semibold tracking-wide text-white/30 hover:text-white/60 transition">
+                  Hide the keypad — I have a keyboard
+                </button>
+              </>
+            ) : (
+              <div className="text-center">
+                <p className="text-[12.5px] text-white/35">Type your PIN, or</p>
+                {/* The escape hatch. If the guess about this machine is wrong,
+                    a keyboard-less till would otherwise have no way in. */}
+                <button type="button" onClick={() => { showKeypad(true); refs[filled < 4 ? filled : 3].current?.focus() }}
+                  className="mt-1.5 h-10 px-4 rounded-xl border border-white/15 text-[12.5px] font-semibold text-white/75 hover:bg-white/[.06] transition">
+                  use the on-screen keypad
+                </button>
               </div>
             )}
           </div>
-
-          <div className="flex gap-3.5 justify-center mb-7">
-            {pins.map((v, i) => (
-              <div key={i} className="relative">
-                <input
-                  ref={refs[i]}
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={1}
-                  value={v}
-                  className="w-[52px] h-[52px] rounded-[14px] text-center border-2 focus:outline-none transition-all duration-200"
-                  style={{
-                    borderColor: v ? '#16181d' : i === filled ? '#8fb39e' : '#dde2dc',
-                    background: v ? '#16181d' : '#fafafa',
-                    color: 'transparent',
-                    caretColor: 'transparent',
-                  }}
-                  onChange={e => handleInput(i, e.target.value)}
-                  onKeyDown={e => handleKeyDown(i, e)}
-                />
-                {v && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-2 h-2 rounded-full bg-white" />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {loading ? (
-            <div className="flex justify-center h-[248px] items-start pt-8">
-              <div className="w-6 h-6 border-[2.5px] border-[#dde2dc] border-t-[#16181d] rounded-full animate-spin" />
-            </div>
-          ) : (
-            <div className="max-w-[264px] mx-auto">
-              <Numpad onKey={padKey} onBackspace={padBack} onClear={() => { setPins(['', '', '', '']); refs[0].current?.focus() }} />
-            </div>
-          )}
         </div>
       </div>
     </div>

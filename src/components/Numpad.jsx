@@ -10,7 +10,11 @@
 // deliberate press), not for a mouse.
 // ============================================================================
 
-export default function Numpad({ onKey, onBackspace, onClear, onEnter, decimal = false, enterLabel = 'Enter', disabled = false }) {
+// `surface` is light by default so the payment sheet is untouched. 'dark' is
+// for the lock screen, where the keys sit on the brand's ink rather than on a
+// white card.
+export default function Numpad({ onKey, onBackspace, onClear, onEnter, decimal = false, enterLabel = 'Enter', disabled = false, surface = 'light' }) {
+  const dark = surface === 'dark'
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
 
   const Key = ({ children, onClick, tone = 'plain', wide = false }) => (
