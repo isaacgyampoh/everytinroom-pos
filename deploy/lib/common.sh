@@ -41,6 +41,8 @@ die() {
     for line in "$@"; do printf '    - %s\n' "$line" >&2; done
   fi
   printf '\n' >&2
+  # Tells an EXIT trap that this exit was deliberate and already explained.
+  DIED_CLEANLY=1
   exit 1
 }
 

@@ -22,6 +22,27 @@
 
 SCRIPT_NAME="bootstrap.sh"
 HERE="$(cd "$(dirname "$0")" && pwd)"
+
+# Report an exit that did not go through die().
+#
+# Twice now this script has ended non-zero while printing nothing at all --
+# once because a `grep` in a pipeline found no matches and `set -o pipefail`
+# turned that into a fatal error. "bootstrap.sh exited non-zero" with no
+# message is the least useful failure there is, so any unhandled exit now
+# names the line it happened on.
+DIED_CLEANLY=0
+_on_exit() {
+  rc=$?
+  [ "$rc" = "0" ] && return 0
+  [ "$DIED_CLEANLY" = "1" ] && return 0
+  printf '\n%s%s UNEXPECTED EXIT %s\n' "${C_RED:-}" "${C_BLD:-}" "${C_RESET:-}" >&2
+  printf '  %s stopped at line %s with status %s, without reporting why.\n' \
+    "$SCRIPT_NAME" "${BASH_LINENO[0]:-?}" "$rc" >&2
+  printf '  This is a bug in the script, not something you did.\n' >&2
+  printf '  A common cause is a command in a pipeline failing under\n' >&2
+  printf '  `set -o pipefail` -- for instance grep finding no matches.\n\n' >&2
+}
+trap _on_exit EXIT
 . "$HERE/lib/common.sh"
 . "$HERE/lib/tuning.sh"
 
@@ -516,7 +537,12 @@ SET log_statement = 'none';
 ALTER ROLE central_monitor PASSWORD '${MON_PW}';
 EOSQL
     printf '%s\n' "$ROLES_OUT" > "$ROOT_DIR/logs/central-roles.log" 2>/dev/null || true
-    printf '%s' "$ROLES_OUT" | grep -i 'WARNING' | head -4 | while IFS= read -r w; do warn "$w"; done
+    # `|| true` is load-bearing. With `set -o pipefail`, grep finding NOTHING
+    # exits 1, the pipeline fails, and `set -e` kills the script -- so a run
+    # with no warnings aborted silently right here, printing neither success
+    # nor a failure message. A clean result must not be an error.
+    printf '%s' "$ROLES_OUT" | grep -i 'WARNING' | head -4 \
+      | while IFS= read -r w; do warn "$w"; done || true
 
     # The server must still be ALIVE afterwards. A GRANT ... WITH ADMIN OPTION
     # on a reserved role used to crash the backend here: psql answered before
