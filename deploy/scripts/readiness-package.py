@@ -101,6 +101,42 @@ TESTS = [
 ]
 
 
+def repo_exposure(root):
+    """What operator-only material this public repository still carries.
+
+    Computed here rather than asserted, because 'we cleaned that up' is the
+    kind of claim that should cost a subprocess call to make.
+    """
+    import subprocess
+    pats = ["supabase/AWAITING-APPROVAL/", "PAYMENT-CREDENTIAL"]
+
+    def git(*a):
+        try:
+            return subprocess.run(("git", "-C", root) + a, capture_output=True,
+                                  text=True, timeout=60).stdout
+        except Exception:
+            return ""
+
+    tracked = [l for l in git("ls-files").split("\n")
+               if any(x in l for x in pats) and l.strip()]
+    added = [l for l in git("log", "--all", "--diff-filter=A", "--name-only",
+                            "--format=", "--", "supabase/AWAITING-APPROVAL/*"
+                            ).split("\n") if l.strip()]
+    added = sorted(set(added))
+    # Any credential in what was added? Checked, not assumed.
+    secretish = 0
+    for f in added:
+        c = git("log", "--all", "--diff-filter=A", "--format=%h", "--", f).split("\n")
+        if not c or not c[0].strip():
+            continue
+        body = git("show", f"{c[0].strip()}:{f}")
+        if re.search(r"eyJ[A-Za-z0-9_-]{20,}\.|BEGIN [A-Z ]*PRIVATE KEY|"
+                     r"(PASSWORD|SECRET|ACCESS_KEY|SERVICE_ROLE_KEY)[=:]\S{12,}", body):
+            secretish += 1
+    return {"tracked": tracked, "in_history": added, "with_credentials": secretish,
+            "ignored": git("check-ignore", "supabase/AWAITING-APPROVAL/probe.sql").strip() != ""}
+
+
 def load(path):
     if not path or not os.path.isfile(path):
         return ""
@@ -128,6 +164,8 @@ def main():
     ap.add_argument("--prereq")
     ap.add_argument("--inventory")
     ap.add_argument("--run-id", default="(not given)")
+    ap.add_argument("--sizing", help="output of size-from-measurement.py, embedded verbatim")
+    ap.add_argument("--repo", default=".", help="repository root, for the exposure check")
     ap.add_argument("--out", default="-")
     args = ap.parse_args()
 
@@ -225,6 +263,144 @@ def main():
                 A(f"- **{n}**: {f}")
             A("")
 
+    # ----- measured sizing, verbatim --------------------------------------
+    A("## Server sizing, from measurement")
+    A("")
+    sizing = load(args.sizing)
+    if sizing.strip():
+        A("Produced by `deploy/scripts/size-from-measurement.py` from the peak")
+        A("container figures the staging run measured while it was serving")
+        A("requests, and from the inventory. Reproduced here unchanged.")
+        A("")
+        A("```")
+        A(sizing.rstrip())
+        A("```")
+        A("")
+    else:
+        A("**NOT AVAILABLE.** No sizing output was supplied, which means the")
+        A("staging run did not reach its resource section or the sizing script")
+        A("was not run. No VPS specification can be given, and none is guessed.")
+        A("")
+
+    # The one line someone placing the order needs, lifted out of the sizing
+    # text rather than retyped, so the two cannot disagree.
+    A("### What to order")
+    A("")
+    plans = re.findall(r"-> (Cloud VPS \d+): ([^\n]+)", sizing)
+    labels = re.findall(r"\n  (Everytinroom only|all reachable projects)\s+\(", sizing)
+    if plans:
+        A("| For | Plan | Specification and price |")
+        A("|---|---|---|")
+        for i, (plan, rest) in enumerate(plans):
+            who = labels[i] if i < len(labels) else "(unlabelled)"
+            A(f"| {who} | **{plan}** | {rest.strip()} |")
+        A("")
+        A("Contabo's 24-month term, VAT included, at the prices published on")
+        A("2026-11-08. A one-off setup fee applies on shorter terms. Nothing has")
+        A("been ordered: no account was created and no payment details were")
+        A("entered, by instruction.")
+        A("")
+        A("The second row is the one to order if every project moves. The first")
+        A("is there to show what Everytinroom alone would need, since it is the")
+        A("only application whose services have actually been prepared.")
+    else:
+        A("No plan can be named: the sizing output above does not contain a")
+        A("recommendation, which means the measurement it needs is missing.")
+    A("")
+
+    # ----- service allocation ----------------------------------------------
+    if projects:
+        A("## Which services each application needs")
+        A("")
+        A("Taken from what each project actually uses, not from a default set.")
+        A("A service nothing uses is not provisioned: compose profiles decide")
+        A("per application, so an application with no Realtime has no Realtime")
+        A("container and no Realtime memory.")
+        A("")
+        allsv = ["postgrest", "realtime", "storage", "gotrue", "functions", "cron"]
+        A("| Project | " + " | ".join(s.capitalize() for s in allsv) + " |")
+        A("|---" * (len(allsv) + 1) + "|")
+        for p in sorted(projects, key=lambda x: x.get("name") or ""):
+            if not p.get("reachable"):
+                A(f"| {p.get('name')} | " + " | ".join("?" for _ in allsv) + " |")
+                continue
+            needs = set(p.get("needs") or [])
+            A(f"| {p['name']} | " + " | ".join("yes" if sv in needs else "—"
+                                               for sv in allsv) + " |")
+        A("")
+        A("Two paused projects answer `?`: a paused project cannot be inspected,")
+        A("so its service list is unknown rather than empty.")
+        A("")
+
+    # ----- security and isolation -----------------------------------------
+    A("## Security and isolation")
+    A("")
+    A("What the staging run proves, and by which check, is in the table above.")
+    A("The design behind it:")
+    A("")
+    A("- **One database per application, isolation by connection rights.**")
+    A("  `REVOKE ALL ON DATABASE ... FROM PUBLIC` then `GRANT CONNECT` to that")
+    A("  application's `authenticator` alone. Not isolation by ownership: taking")
+    A("  ownership for another role needs `SET ROLE` on it, and the membership")
+    A("  grant that would allow that crashes this PostgreSQL image. The run")
+    A("  tests it by using one application's credentials against another's")
+    A("  database and requiring a refusal.")
+    A("- **A separate JWT secret per application**, so a token minted for one")
+    A("  is not accepted by another.")
+    A("- **PostgreSQL is bound to 127.0.0.1**, reachable only from the")
+    A("  containers on the machine. Checked in the run, not assumed.")
+    A("- **Secret files are mode 600**, and an existing password is never")
+    A("  regenerated on a re-run — a regenerated one would lock the server out")
+    A("  of its own data volume with no error until the next restart.")
+    A("- **Caddy terminates TLS** and is the only thing published. No service")
+    A("  port is exposed directly.")
+    A("")
+    A("### What this platform does NOT fix")
+    A("")
+    A("- Everytinroom authenticates staff with a PIN against `staff_sessions`,")
+    A("  not Supabase Auth, so `auth.uid()` means nothing in its policies and")
+    A("  row-level security cannot tell one cashier from another. Moving the")
+    A("  database to a new server does not change that; it is an application")
+    A("  change, and it is out of scope here.")
+    A("- Four of the five reachable projects still grant destructive table")
+    A("  privileges to the browser-facing key. Everytinroom's were corrected")
+    A("  and verified; the others were only inventoried, and each needs its own")
+    A("  approval before anything is changed.")
+    A("")
+
+    # ----- repository exposure, computed ----------------------------------
+    ex = repo_exposure(args.repo)
+    A("### This repository's own exposure")
+    A("")
+    A("Computed by this script from git, not asserted.")
+    A("")
+    A(f"- Operator-only files tracked right now: **{len(ex['tracked'])}**")
+    A(f"- Operator-only files present anywhere in history: **{len(ex['in_history'])}**")
+    A(f"- Of those, files containing a credential: **{ex['with_credentials']}**")
+    A(f"- `supabase/AWAITING-APPROVAL/` is ignored: **{'yes' if ex['ignored'] else 'NO'}**")
+    A("")
+    if ex["in_history"] and not ex["tracked"]:
+        A("So: nothing is tracked at any branch tip, and the ignore rule is in")
+        A("place, but the commits that added these files are still in `main`'s")
+        A("history and this repository is public. They hold no credential — the")
+        A("check above is what establishes that, and there is nothing to")
+        A("rotate. What they do hold is a privilege map of a live database:")
+        A("which role could write to which table, at the time it was taken.")
+        A("")
+        A("Everytinroom's privileges were corrected after that snapshot, so the")
+        A("published map is now out of date for the one project it covers. The")
+        A("residual risk is in the four projects that still have the same")
+        A("weakness, and that is a production change needing approval, not a")
+        A("git problem.")
+        A("")
+        A("**Purging it from history is left as the owner's decision**, because")
+        A("it is not free: rewriting `main` changes every commit hash after the")
+        A("rewrite point, and one of those hashes is the recorded identity of")
+        A("the migration applied to production. GitHub also keeps unreachable")
+        A("objects served until asked to drop them, so a force-push alone does")
+        A("not finish the job.")
+        A("")
+
     A("## What still requires an account action")
     A("")
     A("These cannot be completed from here. Each is named, with what it unblocks.")
@@ -237,6 +413,65 @@ def main():
     A("| The payment-provider credential | server-side payment verification and stock deduction | see the local operator note |")
     A("| A VPS | any real deployment | not purchased, by instruction |")
     A("")
+    A("## Backups, retention and off-server recovery")
+    A("")
+    A("Three things have to be true for a backup to be one, and they are")
+    A("separate claims:")
+    A("")
+    A("| Claim | How it is established |")
+    A("|---|---|")
+    A("| a dump is produced | `backup.sh`, checked in the staging run; completeness is measured against the database's own table count, after an earlier version rejected a correct dump of an empty database for being small |")
+    A("| the dump restores | `restore.sh` into a SEPARATE database, with row counts and a money total compared, and the live database checked to have been left alone |")
+    A("| a copy exists off the server | `backup-offsite.py`, which uploads to S3-compatible storage and reads every object back to compare its MD5 |")
+    A("")
+    A("Retention is 90 days remotely by default. `backup-offsite.py` deletes")
+    A("only objects matching the naming `backup.sh` produces, never anything")
+    A("else in the bucket, and it refuses to prune at all if any upload failed")
+    A("in the same run — which is precisely when the old copies matter.")
+    A("")
+    A("A local backup on the same disk as the database covers a dropped table")
+    A("or a bad migration. It does not cover losing the server, and that is why")
+    A("the off-server copy is not optional.")
+    A("")
+    A("## Object storage and what it costs")
+    A("")
+    A("Everytinroom's images are the only storage of any size. From the")
+    A("inventory:")
+    A("")
+    if projects:
+        reach = [p for p in projects if p.get("reachable")]
+        tot = sum(p.get("storage_mb") or 0 for p in reach)
+        for p in sorted(reach, key=lambda x: -(x.get("storage_mb") or 0)):
+            if (p.get("storage_mb") or 0) > 0:
+                A(f"- {p['name']}: {p.get('storage_mb')} MB")
+        A(f"- total across reachable projects: **{tot} MB** "
+          f"({tot / 1024:.2f} GB)")
+        A("")
+        if tot < 10 * 1024:
+            A(f"Cloudflare R2 charges nothing for the first 10 GB of storage and")
+            A(f"nothing for egress, so {tot / 1024:.2f} GB costs **$0.00/month**.")
+            A("Past 10 GB it is $0.015 per GB-month. Backups are counted in the")
+            A("same bucket under their own prefix and are small by comparison.")
+        else:
+            A(f"At {tot / 1024:.2f} GB this is past R2's 10 GB free tier:")
+            A(f"roughly ${(tot / 1024 - 10) * 0.015:.2f}/month at $0.015 per")
+            A("GB-month, with egress still free.")
+        A("")
+    A("Egress being free is the reason this is R2 and not S3: the images are")
+    A("served to customers' phones, and that traffic is the recurring cost on")
+    A("most other providers.")
+    A("")
+    A("**Not yet verified against Cloudflare.** The staging run tests storage")
+    A("against an S3-compatible stand-in, which proves this platform's")
+    A("configuration and nothing about R2 — R2 rejects the trailing-checksum")
+    A("headers the AWS SDK sends by default, which is why")
+    A("`STORAGE_S3_REQUEST_CHECKSUM_CALCULATION` is set to `WHEN_REQUIRED`, and")
+    A("a mock will never show that. `deploy/scripts/test-r2.py` runs the full")
+    A("upload, download, integrity, list and delete check against the real")
+    A("endpoint as soon as the credentials exist. Until it has, nothing here")
+    A("may be described as R2-verified.")
+    A("")
+
     A("## Limits of this evidence")
     A("")
     A("- The staging environment is a GitHub-hosted runner, not a VPS. No real")

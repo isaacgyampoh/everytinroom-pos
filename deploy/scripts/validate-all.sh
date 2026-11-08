@@ -185,6 +185,29 @@ HITS="$(grep -rIlE 'eyJ[A-Za-z0-9_-]{20,}\.|BEGIN [A-Z ]*PRIVATE KEY|(PASSWORD|S
 [ -z "$HITS" ] && ok "nothing that looks like a live credential" \
                || bad "possible secrets in: $HITS"
 
+hdr "No operator-only material is tracked"
+# This repository is public. A `git add -A` once committed five files of local
+# operator material to it: two privilege snapshots of the live database, the
+# SQL that corrected them, its rollback, and a table-drop script. They carried
+# no credential, but a published map of which role may write to which table in
+# a running system is not something to publish, and .gitignore does not stop
+# `git add -f`. So it is checked rather than trusted.
+ROOT="$(cd "$DEPLOY/.." && pwd)"
+OPS="$(cd "$ROOT" && git ls-files 2>/dev/null \
+  | grep -E '(AWAITING-APPROVAL/|grants-(before|after)-[0-9]+\.json|/revoke-.*\.sql$|PAYMENT-CREDENTIAL)' || true)"
+if [ -z "$OPS" ]; then
+  ok "no operator-only file is tracked by git"
+else
+  bad "operator-only material is tracked in a public repository"
+  printf '%s\n' "$OPS" | sed 's/^/     /'
+fi
+# And the ignore rule that is meant to prevent it must still be in place.
+if (cd "$ROOT" && git check-ignore -q supabase/AWAITING-APPROVAL/probe.sql 2>/dev/null); then
+  ok "supabase/AWAITING-APPROVAL/ is ignored, so a stray file there is not staged"
+else
+  bad "supabase/AWAITING-APPROVAL/ is NOT ignored — operator files there would be committed"
+fi
+
 hdr "Unit tests"
 for t in test-tuning.sh test-capacity.sh test-bootstrap-local.sh; do
   if "$HERE/$t" >/tmp/.vt.$$ 2>&1; then ok "$t ($(grep -c 'ok\x1b\[0m' /tmp/.vt.$$ || true) checks)"
