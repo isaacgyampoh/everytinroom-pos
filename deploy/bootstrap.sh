@@ -268,6 +268,8 @@ else
   cp -a "$HERE/compose/app.compose.yml"      "$ROOT_DIR/compose/"
   cp -a "$HERE/compose/Caddyfile.tmpl"       "$ROOT_DIR/compose/"
   cp -a "$HERE/compose/caddy-site.template"  "$ROOT_DIR/compose/"
+  install -d -m 0750 "$ROOT_DIR/compose/functions-main"
+  cp -a "$HERE/compose/functions-main/." "$ROOT_DIR/compose/functions-main/"
   install -d -m 0750 "$ROOT_DIR/compose/postgres"
   cp -a "$HERE/compose/postgres/90-central.conf.tmpl" "$ROOT_DIR/compose/postgres/"
   install -d -m 0750 "$ROOT_DIR/sql"

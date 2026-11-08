@@ -326,6 +326,21 @@ if [ "$WANT_FN" = "0" ]; then
 else
   run install -d -m 0750 "$APP_DIR/functions"
   if [ "$DRY" = "0" ]; then
+    # The runtime is started with --main-service .../functions/main. That
+    # router is NOT part of the image -- it is what receives each request,
+    # works out which function the path names, and spawns a worker. Without
+    # it the container starts and serves nothing. Vendored from upstream in
+    # compose/functions-main; see its README.
+    if [ -d "$ROOT_DIR/compose/functions-main" ]; then
+      install -d -m 0750 "$APP_DIR/functions/main"
+      cp -a "$ROOT_DIR/compose/functions-main/index.ts" \
+            "$ROOT_DIR/compose/functions-main/memory-pressure.ts" \
+            "$APP_DIR/functions/main/"
+      ok "installed the edge-runtime main router"
+    else
+      warn "compose/functions-main is missing, so the functions runtime has no router."
+      warn "Re-run bootstrap.sh to copy it into $ROOT_DIR/compose."
+    fi
     # Secrets for the functions live in their own file so the compose env and
     # the payment credentials are not the same blast radius.
     if [ ! -e "$APP_DIR/functions.env" ]; then
@@ -348,9 +363,12 @@ EOT
     else
       ok "functions.env already exists — left alone"
     fi
-    if [ -z "$(ls -A "$APP_DIR/functions" 2>/dev/null)" ]; then
-      warn "$APP_DIR/functions is empty, so the runtime has nothing to serve."
-      warn "Copy the function directories there, each with its own index.ts."
+    # "Empty" means no FUNCTIONS, not no files: main/ is the router.
+    if [ -z "$(ls -A "$APP_DIR/functions" 2>/dev/null | grep -v '^main$')" ]; then
+      warn "$APP_DIR/functions holds only the router, so there are no functions to serve."
+      warn "Copy each function's directory there, each with its own index.ts."
+      warn "Download them from the old project with:"
+      warn "  supabase functions download <slug> --project-ref <ref>"
     fi
   fi
   PROFILES="${PROFILES:+$PROFILES,}functions"
