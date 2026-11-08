@@ -46,3 +46,5 @@ deploy/inventory*.json
 deploy/inventory*.md
 migration-plans/
 deploy/migration-plans/
+# Everything left in this directory is local operator material.
+supabase/AWAITING-APPROVAL/
