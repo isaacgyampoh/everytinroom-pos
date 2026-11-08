@@ -387,6 +387,41 @@ else
   fi
   ok "compose configuration is valid"
 
+  # The import glob must match something. A .caddy file holding only comments
+  # is valid configuration and removes any doubt about an empty glob.
+  if [ -z "$(ls -A "$ROOT_DIR/compose/caddy-sites"/*.caddy 2>/dev/null)" ]; then
+    printf '# Placeholder so "import /etc/caddy/sites/*.caddy" always matches.\n# provision-app.sh writes the real site files beside this one.\n' \
+      > "$ROOT_DIR/compose/caddy-sites/00-placeholder.caddy"
+    dim "wrote a placeholder site file so the import glob matches"
+  fi
+
+  # Validate the Caddyfile BEFORE starting anything.
+  #
+  # Learned the hard way: the first staging run used `trusted_proxies
+  # cloudflare`, which needs a module the official image does not ship. Caddy
+  # exited, the container restarted forever, and the only symptom this script
+  # reported was "central-caddy is 'restarting'" -- true, but it did not say
+  # why, and the reason was only in the container's own log. Validating here
+  # puts Caddy's actual complaint in front of whoever ran the script.
+  CADDY_IMG="$(awk '/image: caddy:/{print $2; exit}' docker-compose.yml)"
+  if [ -n "$CADDY_IMG" ]; then
+    if ! VOUT="$(docker run --rm \
+          -e ACME_EMAIL="$(get_env_var "$ENV_FILE" ACME_EMAIL 2>/dev/null || echo '')" \
+          -v "$ROOT_DIR/compose/Caddyfile:/etc/caddy/Caddyfile:ro" \
+          -v "$ROOT_DIR/compose/caddy-sites:/etc/caddy/sites:ro" \
+          "$CADDY_IMG" caddy validate --config /etc/caddy/Caddyfile 2>&1)"; then
+      die "The Caddy configuration is not valid, so nothing was started.
+
+Caddy said:
+$(printf '%s' "$VOUT" | sed 's/^/  /' | tail -20)" \
+        "Fix $ROOT_DIR/compose/Caddyfile and run this again." \
+        "A message naming an unrecognized directive or module usually means the" \
+        "config uses something that needs a plugin the official image does not" \
+        "carry. Only directives in the standard build can be used here."
+    fi
+    ok "Caddy configuration is valid"
+  fi
+
   run docker compose --env-file "$ENV_FILE" -f docker-compose.yml up -d \
     || die "Starting the shared stack failed." \
            "See what happened:  docker compose -f $ROOT_DIR/compose/docker-compose.yml logs --tail=80" \
@@ -415,10 +450,17 @@ else
   for c in central-caddy; do
     st="$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo missing)"
     if [ "$st" = "running" ]; then ok "$c is running"
-    else die "$c is '$st' rather than running." \
-      "Caddy almost always fails on its configuration file." \
-      "  docker logs $c --tail=40" \
-      "Validate it with: docker exec $c caddy validate --config /etc/caddy/Caddyfile"
+    else
+      # Include the container's own log in the failure. Without it the report
+      # says only "restarting", and the reason is one `docker logs` away that
+      # nobody thinks to run -- which is how the first staging run produced
+      # twenty-three downstream failures and no stated cause.
+      die "$c is '$st' rather than running.
+
+Its last log lines:
+$(docker logs "$c" --tail=25 2>&1 | sed 's/^/  /')" \
+        "Caddy almost always fails on its configuration file." \
+        "Validate it:  docker run --rm -v $ROOT_DIR/compose/Caddyfile:/etc/caddy/Caddyfile:ro caddy:2.11.9-alpine caddy validate --config /etc/caddy/Caddyfile"
     fi
   done
 

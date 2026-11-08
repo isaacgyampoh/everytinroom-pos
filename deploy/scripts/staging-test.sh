@@ -353,18 +353,34 @@ section "7. Object storage: upload, download, delete"
 # storage-api talks to either way, so this tests OUR configuration -- the
 # backend selection, the bucket wiring, the signing and the proxy route. It
 # does NOT test R2 itself. That difference is stated in the report.
-if docker run -d --name staging-minio --network central_edge \
-     -e MINIO_ROOT_USER=stagingkey -e MINIO_ROOT_PASSWORD=stagingsecret123 \
-     quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z server /data >/dev/null 2>&1; then
-  sleep 8
-  docker exec staging-minio mc alias set local http://127.0.0.1:9000 stagingkey stagingsecret123 >/dev/null 2>&1 || true
-  docker exec staging-minio mc mb local/staging-images >/dev/null 2>&1 || true
-  pass "an S3-compatible endpoint is running (MinIO, standing in for R2)"
+# adobe/s3mock rather than MinIO. MinIO is no longer published to Docker Hub
+# and its server image carries no `mc` client, so the first run skipped this
+# whole section with "could not start MinIO". s3mock is built for exactly this
+# job: it creates buckets from an environment variable, needs no client, and
+# keeps objects as plain files that can be checked with `find`.
+# Generated, not written down: a literal credential in a repository is a bad
+# habit even when the value is a throwaway, and the repository's own secret
+# scan correctly refuses it.
+S3_KEY="stg$(openssl rand -hex 6)"
+S3_SECRET="$(openssl rand -hex 16)"
+if docker run -d --name staging-s3 --network central_edge \
+     -e initialBuckets=staging-images \
+     -e root=/s3data \
+     adobe/s3mock:5.2.3 >/dev/null 2>&1; then
+  # Wait for it to answer rather than guessing at a sleep.
+  s3_up=0
+  for _ in $(seq 1 20); do
+    if docker run --rm --network central_edge curlimages/curl:8.11.1 \
+         -s -o /dev/null --max-time 4 "http://staging-s3:9090/" 2>/dev/null; then s3_up=1; break; fi
+    sleep 3
+  done
+  [ "$s3_up" = "1" ] && pass "an S3-compatible endpoint is running (adobe/s3mock, standing in for R2)" \
+                     || { fail "the S3 endpoint never answered"; docker logs staging-s3 --tail=15 2>&1 | sed 's/^/       /'; }
 
   sed -i 's|^R2_BUCKET=.*|R2_BUCKET=staging-images|' "$ENV"
-  sed -i 's|^R2_ENDPOINT=.*|R2_ENDPOINT=http://staging-minio:9000|' "$ENV"
-  sed -i 's|^R2_ACCESS_KEY_ID=.*|R2_ACCESS_KEY_ID=stagingkey|' "$ENV"
-  sed -i 's|^R2_SECRET_ACCESS_KEY=.*|R2_SECRET_ACCESS_KEY=stagingsecret123|' "$ENV"
+  sed -i 's|^R2_ENDPOINT=.*|R2_ENDPOINT=http://staging-s3:9090|' "$ENV"
+  sed -i "s|^R2_ACCESS_KEY_ID=.*|R2_ACCESS_KEY_ID=$S3_KEY|" "$ENV"
+  sed -i "s|^R2_SECRET_ACCESS_KEY=.*|R2_SECRET_ACCESS_KEY=$S3_SECRET|" "$ENV"
   cd "$ROOT_DIR/apps/$APP" && ./compose.sh up -d >/tmp/st-up.log 2>&1
   ok=0
   for _ in $(seq 1 24); do
@@ -394,18 +410,21 @@ if docker run -d --name staging-minio --network central_edge \
       fail "download returned HTTP $c and $( [ -s /tmp/dl.txt ] && echo 'unexpected content' || echo 'nothing' )"
     fi
 
-    # Confirm the object really landed in the object store, not on a local disk.
-    if docker exec staging-minio mc ls --recursive local/staging-images 2>/dev/null | grep -q probe.txt; then
+    # Confirm the object really landed in the object store rather than on
+    # storage-api's own disk. s3mock keeps objects as files, so this is a
+    # direct check on the S3 server's contents with no client involved.
+    if docker exec staging-s3 find /s3data -name '*probe*' 2>/dev/null | grep -q .; then
       pass "the object is physically in the S3 bucket, so the backend is really S3"
     else
       fail "the object is not in the S3 bucket — storage may have fallen back to local files"
+      docker exec staging-s3 find /s3data -maxdepth 3 2>/dev/null | head -8 | sed 's/^/       /'
     fi
 
     c=$(curl -s -o /tmp/rm.json -w '%{http_code}' -X DELETE "$B/object/product-images/test/probe.txt" \
       -H "Authorization: Bearer $SVC")
     case "$c" in 200|204) pass "DELETE removed the object (HTTP $c)" ;;
       *) fail "delete returned HTTP $c: $(head -c 150 /tmp/rm.json)" ;; esac
-    docker exec staging-minio mc ls --recursive local/staging-images 2>/dev/null | grep -q probe.txt \
+    docker exec staging-s3 find /s3data -name '*probe*' 2>/dev/null | grep -q . \
       && fail "the object is still in the bucket after the delete" \
       || pass "the object is gone from the bucket"
   else
@@ -414,7 +433,7 @@ if docker run -d --name staging-minio --network central_edge \
   fi
   cd "$ROOT_DIR"
 else
-  skip "could not start MinIO, so storage was not tested"
+  skip "could not start the S3 endpoint, so storage was not tested"
 fi
 
 # ===========================================================================
@@ -556,6 +575,26 @@ P2="$(sed -n 's/^APP_DB_PASSWORD=//p' "$ROOT_DIR/apps/alpha_shop/.env" | tail -1
 "$ROOT_DIR/scripts/test-provision-sql.sh" >/tmp/iso.log 2>&1 \
   && pass "the standalone isolation test also passes here ($(grep -c PASS /tmp/iso.log) checks)" \
   || note "standalone isolation test: $(grep -c FAIL /tmp/iso.log) failure(s)"
+
+# ===========================================================================
+section "Logs from anything that is not healthy"
+# ===========================================================================
+# The first run reported "central-caddy is 'restarting'" and nothing about
+# why, because the reason lived in the container's log and the report did not
+# carry it. It does now.
+any_bad=0
+for c in $(docker ps -a --format '{{.Names}}' 2>/dev/null); do
+  st=$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null)
+  h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$c" 2>/dev/null)
+  if [ "$st" != "running" ] || { [ "$h" != "healthy" ] && [ "$h" != "none" ]; }; then
+    any_bad=1
+    note "----- $c ($st/$h) -----"
+    while IFS= read -r line; do note "$line"; done <<EOL
+$(docker logs "$c" --tail=25 2>&1 | tail -25)
+EOL
+  fi
+done
+[ "$any_bad" = "0" ] && note "every container is running and healthy"
 
 # ===========================================================================
 printf '\n%s===== Result =====%s\n' "$C_B" "$C_0"
