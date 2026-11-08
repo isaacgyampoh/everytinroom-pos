@@ -185,6 +185,19 @@ HITS="$(grep -rIlE 'eyJ[A-Za-z0-9_-]{20,}\.|BEGIN [A-Z ]*PRIVATE KEY|(PASSWORD|S
 [ -z "$HITS" ] && ok "nothing that looks like a live credential" \
                || bad "possible secrets in: $HITS"
 
+hdr "Every file the scripts reach for actually exists"
+# A path like "$ROOT_DIR/scripts/post-start.sh" or "$DEPLOY/sql/24-storage-grants.sql"
+# resolves on the server only because bootstrap.sh copied that file there. A
+# missing one fails at the moment it is needed, on the server, rather than
+# here. Both roots map onto this directory, so it can be checked here instead.
+XREF="$(DEPLOY="$DEPLOY" python3 "$DEPLOY/scripts/check-paths.py" 2>&1 || true)"
+if printf '%s' "$XREF" | grep -q '^MISSING '; then
+  bad "a script reaches for a file that does not exist"
+  printf '%s\n' "$XREF" | grep '^MISSING ' | sed 's/^MISSING /     /'
+else
+  ok "every \$ROOT_DIR/ and \$DEPLOY/ path resolves ($(printf '%s' "$XREF" | sed -n 's/^CHECKED //p') reference(s))"
+fi
+
 hdr "No operator-only material is tracked"
 # This repository is public. A `git add -A` once committed five files of local
 # operator material to it: two privilege snapshots of the live database, the
