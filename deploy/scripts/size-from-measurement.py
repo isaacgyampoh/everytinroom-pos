@@ -72,25 +72,52 @@ def parse_mem(tok):
 
 
 def parse_stats(path):
-    """Pull the `docker stats` block out of the staging report."""
+    """Pull the `docker stats` block out of the staging report.
+
+    ONLY from inside a fenced block. This used to scan the whole file, which
+    was safe while the report was a list of verdicts and is not safe now that
+    it carries container logs: a log line reading "cache 12MiB" would be taken
+    for a container called "cache" and sized as one.
+
+    A container reporting 0B is recorded as UNMEASURED rather than as zero. A
+    service whose container never started reads as free, and a server sized
+    on that is a server too small for the service to start on.
+    """
     text = open(path).read()
-    found = {}
+    found, zero = {}, set()
+    inside = False
     for line in text.split("\n"):
+        if line.strip().startswith("```"):
+            inside = not inside
+            continue
+        if not inside:
+            continue
         # "name  123.4MiB / 512MiB  0.15%"  (the report prints name mem cpu)
-        m = re.match(r"\s*([a-z0-9][a-z0-9_.-]*)\s+([0-9.]+\s*[KMG]i?B)", line, re.I)
+        m = re.match(r"\s*([a-z0-9][a-z0-9_.-]*)\s+([0-9.]+\s*[KMGT]?i?B)", line, re.I)
         if not m:
             continue
-        name, mem = m.group(1), parse_mem(m.group(2))
-        if mem is None:
+        name = m.group(1)
+        mem = parse_mem(m.group(2))
+        if mem is None or mem == 0:
+            zero.add(name)
             continue
         found[name] = max(found.get(name, 0), mem)
+    for n in zero - set(found):
+        found[n] = None          # present in the stats, but no usable figure
     return found
 
 
 def classify(stats):
-    """Map measured container names onto services and the shared stack."""
-    per_app, shared = {}, {}
+    """Map measured container names onto services and the shared stack.
+
+    Containers with no usable figure are returned separately rather than
+    counted as nothing.
+    """
+    per_app, shared, unmeasured = {}, {}, []
     for name, mem in stats.items():
+        if mem is None:
+            unmeasured.append(name)
+            continue
         if name.startswith("central-postgres"):
             shared["postgres"] = mem
         elif name.startswith("central-caddy"):
@@ -108,7 +135,7 @@ def classify(stats):
                     # is nothing here to de-duplicate.
                     per_app[svc] = per_app.get(svc, 0) + mem
                     break
-    return per_app, shared
+    return per_app, shared, unmeasured
 
 
 def main():
@@ -121,7 +148,7 @@ def main():
     if not stats:
         sys.exit(f"no container memory figures found in {args.stats}.\n"
                  "The staging run must have reached its resource section.")
-    per_app, shared = classify(stats)
+    per_app, shared, unmeasured = classify(stats)
     if not per_app:
         sys.exit("measured the shared stack but no per-application service; "
                  "the run did not get far enough to size applications.")
@@ -130,14 +157,21 @@ def main():
 
     print("\nMEASURED, from the staging run")
     print(f"  {'container':<26} {'MB':>8}")
-    for n, m in sorted(stats.items(), key=lambda x: -x[1]):
-        print(f"  {n:<26} {m:>8.0f}")
+    for n, m in sorted(stats.items(), key=lambda x: -(x[1] or 0)):
+        print(f"  {n:<26} {'  no figure' if m is None else f'{m:>8.0f}'}")
     print()
     print("  Mapped to services:")
     for svc, mb in sorted(per_app.items(), key=lambda x: -x[1]):
         print(f"    {svc:<12} {mb:>7.0f} MB")
     for k, v in sorted(shared.items()):
         print(f"    {k:<12} {v:>7.0f} MB   (shared)")
+    if unmeasured:
+        print()
+        print(f"  NO USABLE FIGURE: {', '.join(sorted(unmeasured))}")
+        print("  Those containers appear in the stats at 0B, which means they were")
+        print("  not running when the sample was taken. They are NOT counted as")
+        print("  zero: a service that never started reads as free, and a server")
+        print("  sized on that is one the service cannot start on.")
     missing = {s for p in projects for s in p.get("needs", [])} - set(per_app) - {"cron"}
     if missing:
         print(f"\n  NOT MEASURED: {', '.join(sorted(missing))}")
