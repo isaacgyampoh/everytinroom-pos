@@ -42,6 +42,17 @@ for f in "$DEPLOY"/compose/*.yml; do
   fi
 done
 
+hdr "Every compose variable is set or defaulted"
+# `docker compose up` reports an unset variable only when it runs, and an
+# EMPTY one does not error at all -- it interpolates to nothing and the
+# container starts misconfigured. That is how the Caddy ACME address broke.
+if "$PY" "$HERE/check-compose-vars.py" >/tmp/.cv.$$ 2>&1; then
+  ok "$(tail -1 /tmp/.cv.$$ | sed 's/^ *//')"
+else
+  bad "a compose variable is neither defaulted nor written"; sed 's/^/     /' /tmp/.cv.$$ | tail -8
+fi
+rm -f /tmp/.cv.$$
+
 hdr "Image tags exist on Docker Hub"
 if command -v curl >/dev/null 2>&1; then
   grep -ho 'image: [^ ]*' "$DEPLOY"/compose/*.yml | sed 's/image: //' | sort -u | while read -r img; do
