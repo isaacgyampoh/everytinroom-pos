@@ -388,6 +388,50 @@ def main():
         A("")
 
     # ----- security and isolation -----------------------------------------
+    # ----- scheduled jobs, placed by what they do ------------------------
+    if projects:
+        jobs = [(p["name"], j) for p in projects if p.get("reachable")
+                for j in (p.get("cron_jobs") or [])]
+        if jobs:
+            http = [x for x in jobs if x[1].get("calls_http")]
+            sql = [x for x in jobs if not x[1].get("calls_http")]
+            urls = [x for x in jobs if x[1].get("hardcodes_project_url")]
+            A("## Scheduled jobs, and where each one has to live")
+            A("")
+            A(f"**{len(jobs)} job(s) across {len({n for n, _ in jobs})} project(s).** "
+              f"{len(http)} make an HTTP call and {len(sql)} run SQL only. "
+              f"{len(urls)} have the old project URL written into the job body "
+              f"and keep calling the old backend after cutover unless they are "
+              f"edited -- without erroring.")
+            A("")
+            A("pg_net's worker serves exactly one database, so a job that makes")
+            A("an HTTP call has to be registered in `postgres`, and a job that")
+            A("only runs SQL belongs in its application's own database. That is")
+            A("not a preference: a `net.http_post()` from an application")
+            A("database queues a row and is never served.")
+            A("")
+            A("| Project | Job | Schedule | Calls out | Registered in | Old URL inside |")
+            A("|---|---|---|---|---|---|")
+            for n, j in sorted(jobs, key=lambda x: (x[0], x[1].get("name") or "")):
+                where = "`postgres`" if j.get("calls_http") else "the application's own"
+                A(f"| {n} | `{j.get('name')}` | `{j.get('schedule')}` | "
+                  f"{'yes' if j.get('calls_http') else 'no'} | {where} | "
+                  f"{'**yes**' if j.get('hardcodes_project_url') else 'no'} |")
+            A("")
+            A("`migrate-from-supabase.sh` reads these out of the live `cron.job`")
+            A("table at migration time and writes the re-registration SQL with")
+            A("each job already placed, flagging any that both read data and")
+            A("call out -- those cannot run from either database as written and")
+            A("have to be split. The live table is the source of truth, not the")
+            A("repository's migrations, which have drifted from it.")
+            A("")
+            A("One consequence worth stating: every project's HTTP jobs end up")
+            A("registered in the same `postgres` database, so `cron.job` there")
+            A("lists jobs belonging to several applications. Only the server's")
+            A("administrator can read it, and no application can see another's")
+            A("data through it, but it is shared state and worth knowing about.")
+            A("")
+
     A("## Security and isolation")
     A("")
     A("What the staging run proves, and by which check, is in the table above.")
