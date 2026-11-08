@@ -146,6 +146,32 @@ def inspect(project, token):
     else:
         p["cron_jobs"] = []
 
+    # --- a dormant-looking feature that may not be dormant ---
+    #
+    # Everytinroom had a WhatsApp AI agent with empty conversation tables and
+    # its master switch set to false, so it was safe to remove. Another
+    # project on the same account has the SAME empty tables with the switch
+    # set to TRUE, and a cleanup function that empties them -- so "0 rows"
+    # says nothing there. Reporting the switch alongside the row counts is
+    # the difference between removing dead code and removing a live feature.
+    p["agent"] = None
+    if one(ref, token,
+           "select count(*) from information_schema.tables "
+           "where table_schema='public' and table_name='wa_agent_settings'", 0):
+        enabled = one(ref, token,
+            "select count(*) from public.wa_agent_settings "
+            "where lower(trim(both '\"' from value::text)) <> 'false'", 0)
+        p["agent"] = {
+            "settings_rows": one(ref, token, "select count(*) from public.wa_agent_settings", 0),
+            "conversations": one(ref, token, "select count(*) from public.wa_conversations", 0),
+            "messages": one(ref, token, "select count(*) from public.wa_messages", 0),
+            "enabled_settings": enabled,
+            "has_cleanup_function": bool(one(ref, token,
+                "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace "
+                "where n.nspname='public' and (p.prosrc like '%wa_conversations%' "
+                "or p.prosrc like '%wa_messages%') and p.proname like '%cleanup%'", 0)),
+        }
+
     # --- storage ---
     p["buckets"] = [
         {"name": r.get("bucket"), "objects": r.get("objects"), "mb": r.get("mb")}
@@ -203,6 +229,19 @@ def inspect(project, token):
         flags.append("no supabase_migrations schema: the live database is the only source of truth")
     if p["storage_mb"] > 10240:
         flags.append(f"storage is {p['storage_mb']} MB, above R2's 10 GB free tier")
+    ag = p.get("agent")
+    if ag:
+        if ag["enabled_settings"]:
+            flags.append(
+                "a WhatsApp agent is present and its master switch is NOT false -- "
+                "do NOT remove it on the assumption that empty conversation tables "
+                "mean unused" + (", especially as a cleanup function empties them"
+                                 if ag["has_cleanup_function"] else ""))
+        elif ag["conversations"] or ag["messages"]:
+            flags.append("a WhatsApp agent is present and holds conversation history")
+        else:
+            flags.append("a WhatsApp agent is present, switched off and holding no "
+                         "history -- a candidate for removal, behind the guarded drop")
     p["flags"] = flags
     return p
 
@@ -256,6 +295,12 @@ def markdown(projects):
         A(f"- Auth: {p['auth_users']} GoTrue users"
           + (f"; custom auth tables: {', '.join(p['custom_auth_tables'])}" if p['custom_auth_tables'] else ""))
         A(f"- Realtime tables: {', '.join(p['realtime_tables']) or 'none'}")
+        if p.get("agent"):
+            a = p["agent"]
+            A(f"- WhatsApp agent: {a['settings_rows']} settings "
+              f"({a['enabled_settings']} not false), {a['conversations']} conversations, "
+              f"{a['messages']} messages"
+              + (", cleanup function present" if a["has_cleanup_function"] else ""))
         if p["buckets"]:
             A("- Storage:")
             for b in p["buckets"]:
