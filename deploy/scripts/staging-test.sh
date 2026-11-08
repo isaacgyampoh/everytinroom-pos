@@ -411,6 +411,34 @@ APP=alpha_shop
 # Container names and hostnames use the hyphenated form; the database and
 # role names keep the underscore. provision-app.sh derives this the same way.
 APP_DNS="$(printf '%s' "$APP" | tr '_' '-')"
+
+# ---------------------------------------------------------------------------
+# Before any client: replay Realtime's OWN tenant migrations against this
+# server, as a role shaped like the one it connects with.
+#
+# Realtime builds realtime.list_changes() with ninety-one tenant migrations
+# and does not stop when one fails -- it accepts subscriptions and delivers
+# nothing. Five runs were spent narrowing that down twenty-five minutes at a
+# time. This answers it in seconds, here, against the real image, whose
+# `postgres` is not a superuser either; and it checks BOTH directions, so if
+# the grant in 21-realtime.sql ever stops being necessary the run says so
+# instead of carrying it forever.
+if [ -d /tmp/realtime-src/lib/realtime/tenants/repo/migrations ] \
+   || "$DEPLOY/scripts/fetch-realtime-migrations.sh" /tmp/realtime-src >/tmp/rtfetch.log 2>&1; then
+  if python3 "$DEPLOY/scripts/test-realtime-migrations.py" \
+       --migrations /tmp/realtime-src/lib/realtime/tenants/repo/migrations \
+       --via-docker central-postgres > /tmp/rtmig.log 2>&1; then
+    pass "Realtime's own tenant migrations replay cleanly here, and list_changes() is created"
+    detail bash -c "grep -E 'PASS' /tmp/rtmig.log | head -10"
+  else
+    fail "Realtime's tenant migrations do not replay on this server under its own privileges"
+    detail bash -c "grep -E 'PASS|FAIL|ERROR|stops at' /tmp/rtmig.log | head -12"
+  fi
+else
+  skip "could not fetch Realtime's migration sources, so they were not replayed"
+  detail tail -5 /tmp/rtfetch.log
+fi
+
 ENV="$ROOT_DIR/apps/$APP/.env"
 
 # Serve this site over plain HTTP for the test: the hostname does not resolve
@@ -490,28 +518,56 @@ if command -v node >/dev/null 2>&1; then
   mkdir -p /tmp/rt && cd /tmp/rt
   npm init -y >/dev/null 2>&1
   if npm install @supabase/supabase-js@2.47.10 >/tmp/npm.log 2>&1; then
+    # A real supabase-js client. Parameterised, because one subscription on
+    # one tenant is not enough: delivery is checked on two independent
+    # tenants, a change in one must NOT appear on the other's channel, and
+    # the whole thing is checked again after the service is restarted.
+    #
+    #   RT_EXPECT=event     a change must arrive
+    #   RT_EXPECT=no-event  a change must NOT arrive (cross-tenant isolation)
     cat > rt.mjs <<'JS'
 import { createClient } from '@supabase/supabase-js'
-const url = process.env.RT_URL, key = process.env.RT_KEY
+const url = process.env.RT_URL
+const key = process.env.RT_KEY
+const table = process.env.RT_TABLE || 'tick'
+const label = process.env.RT_LABEL || 'realtime-probe'
+const expect = process.env.RT_EXPECT || 'event'
+// Where the INSERT goes. For the cross-tenant check it is a DIFFERENT
+// application from the one being listened to, which is the whole point.
+const insertUrl = process.env.RT_INSERT_URL || url
+const insertKey = process.env.RT_INSERT_KEY || key
+
 const sb = createClient(url, key, { realtime: { params: { eventsPerSecond: 10 } } })
 let got = null
-const ch = sb.channel('probe')
-  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tick' },
-      p => { got = p.new })
+const ch = sb.channel('probe-' + Math.random().toString(36).slice(2))
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table },
+      p => { if (!got) got = p.new })
 const sub = await new Promise(res => {
   ch.subscribe(s => { if (s === 'SUBSCRIBED' || s === 'CHANNEL_ERROR' || s === 'TIMED_OUT') res(s) })
   setTimeout(() => res('NO_STATUS'), 25000)
 })
 if (sub !== 'SUBSCRIBED') { console.log('SUBSCRIBE_FAILED:' + sub); process.exit(3) }
 console.log('SUBSCRIBED')
+
 // Insert through the REST API, so the whole path is the real one.
-const r = await fetch(`${url}/rest/v1/tick`, {
+const r = await fetch(`${insertUrl}/rest/v1/${table}`, {
   method: 'POST',
-  headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-  body: JSON.stringify({ label: 'realtime-probe' })
+  headers: { apikey: insertKey, Authorization: `Bearer ${insertKey}`,
+             'Content-Type': 'application/json', Prefer: 'return=representation' },
+  body: JSON.stringify({ label })
 })
 if (!r.ok) { console.log('INSERT_FAILED:' + r.status + ':' + (await r.text()).slice(0,200)); process.exit(4) }
+console.log('INSERTED')
+
+// 20s for an event that should come; the same 20s of silence is what proves
+// one that should not. A shorter wait for the negative case would make the
+// isolation check pass simply by not waiting long enough.
 for (let i = 0; i < 100 && !got; i++) await new Promise(r => setTimeout(r, 200))
+
+if (expect === 'no-event') {
+  if (got) { console.log('LEAKED:' + JSON.stringify(got)); process.exit(6) }
+  console.log('NO_EVENT_AS_EXPECTED'); process.exit(0)
+}
 if (got) { console.log('EVENT_RECEIVED:' + JSON.stringify(got)); process.exit(0) }
 console.log('NO_EVENT'); process.exit(5)
 JS
@@ -530,10 +586,19 @@ JS
     # the first set succeeding and the second stopping after two tables, and
     # the 20-line cap hid where. So: the tenant set specifically, and enough
     # lines to contain the failure.
+    # Realtime.Repo.Migrations build _realtime; Realtime.Tenants.Migrations
+    # build `realtime`. Run 21 matched both and spent all sixty lines on the
+    # first set, truncating before the one in question. The repo set is
+    # excluded here.
     note "----- Realtime's TENANT migrations, and anything that stopped them -----"
-    DETAIL_LINES=60 detail bash -c "docker logs '${APP_DNS}.realtime' 2>&1 | grep -iE 'Tenants\.Migrations|MigrationsFailed|tenant_db_dump|dump_not_found|== Migrated 2|== Running 2|\[error\]|permission denied|must be owner|already exists|relation .* does not exist' | grep -v PoolingReplicationError | head -60"
+    DETAIL_LINES=60 detail bash -c "docker logs '${APP_DNS}.realtime' 2>&1 | grep -vE 'Realtime[.]Repo[.]Migrations' | grep -iE 'Tenants[.]Migrations|MigrationsFailed|migrations_failed|tenant_db_dump|dump_not_found|== Migrated|== Running|\[error\]|permission denied|must be owner|already exists|does not exist|syntax error' | grep -v PoolingReplicationError | head -60"
+    # A count and a boundary, not a list. The list is 91 rows long and a
+    # truncated list answers nothing: what matters is how far it got and
+    # whether the one that creates list_changes is among them.
     note "----- how far its own migration history got -----"
-    DETAIL_LINES=90 detail pgq "select version from realtime.schema_migrations order by version" "$APP"
+    detail pgq "select 'tenant migrations applied: ' || count(*) || ' of 91, highest ' || coalesce(max(version)::text,'none') from realtime.schema_migrations" "$APP"
+    detail pgq "select 'the migration creating list_changes (20230328144023) applied: ' || count(*) from realtime.schema_migrations where version = 20230328144023" "$APP"
+    detail pgq "select 'realtime functions: ' || coalesce(string_agg(p.proname, ', ' order by p.proname), '(none)') from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'realtime'" "$APP"
     # Which roles this image refuses to let anything modify. Four failures so
     # far have been a non-superuser trying to act as another role, and one of
     # Realtime's own migrations creates a role and moves ownership to it. When
@@ -564,6 +629,110 @@ EOL
       fail "no Realtime event arrived: $(echo "$OUT" | tail -2 | tr '\n' ' ')"
       detail docker logs "${APP_DNS}.realtime" --tail=25
     fi
+
+    # -------------------------------------------------------------------
+    # A SECOND, INDEPENDENT TENANT.
+    #
+    # One tenant delivering proves Realtime works. It does not prove the
+    # tenants are separate, and Realtime reads its tenant from the first
+    # label of the Host header -- a mistake there would have every
+    # application reading one tenant's changes without anything looking
+    # wrong. beta_shop deliberately has no Realtime (section 5 proves the
+    # platform runs none for an application that does not ask), so the
+    # second Realtime tenant is its own application.
+    # -------------------------------------------------------------------
+    G_APP=gamma_rt
+    G_DNS="$(printf '%s' "$G_APP" | tr '_' '-')"
+    G_ENV="$ROOT_DIR/apps/$G_APP/.env"
+    if "$ROOT_DIR/provision-app.sh" --name "$G_APP" --domain "$G_DNS.staging.test" \
+         --realtime > /tmp/prov-gamma-rt.log 2>&1; then
+      pass "a second Realtime application was provisioned and started"
+    else
+      fail "provisioning the second Realtime application failed"
+      detail tail -20 /tmp/prov-gamma-rt.log
+    fi
+    grep -q "$G_DNS.staging.test" /etc/hosts || echo "127.0.0.1 $G_DNS.staging.test" >> /etc/hosts
+    # The site files are written for https; staging has no ACME.
+    for f in "$ROOT_DIR/compose/caddy-sites/"*.caddy; do
+      [ -f "$f" ] && sed -i 's|^https://|http://|' "$f"
+    done
+    docker exec central-caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 || true
+
+    if [ -f "$G_ENV" ]; then
+      G_ANON="$(sed -n 's/^ANON_KEY=//p' "$G_ENV" | tail -1)"
+      pgq "create table if not exists public.tick (id serial primary key, label text, at timestamptz default now())" "$G_APP" >/dev/null
+      pgq "grant select, insert on public.tick to anon, authenticated, service_role" "$G_APP" >/dev/null
+      pgq "grant usage, select on all sequences in schema public to anon, authenticated, service_role" "$G_APP" >/dev/null
+      pgq "alter table public.tick replica identity full" "$G_APP" >/dev/null
+      pgq "do \$\$ begin if not exists (select 1 from pg_publication where pubname='supabase_realtime')
+           then create publication supabase_realtime; end if; end \$\$" "$G_APP" >/dev/null
+      pgq "alter publication supabase_realtime add table public.tick" "$G_APP" >/dev/null 2>&1
+      pgq "notify pgrst, 'reload schema'" "$G_APP" >/dev/null
+      # Realtime reads its published tables at boot, so it is restarted after
+      # the publication changes -- the same reason alpha's is.
+      docker restart "$G_DNS.realtime" >/dev/null 2>&1 || true
+      gok=0
+      for _ in $(seq 1 24); do
+        st="$(docker inspect -f '{{.State.Status}}' "$G_DNS.realtime" 2>/dev/null || echo absent)"
+        [ "$st" = "running" ] && { gok=1; break; }
+        sleep 5
+      done
+      [ "$gok" = "1" ] || note "$G_DNS.realtime is not running; the check below will show what that means"
+      sleep 10
+
+      OUT2=$(RT_URL="http://$G_DNS.staging.test" RT_KEY="$G_ANON" RT_LABEL="gamma-probe" \
+             timeout 90 node rt.mjs 2>&1)
+      if echo "$OUT2" | grep -q 'EVENT_RECEIVED'; then
+        pass "the SECOND tenant also delivers a database change end to end"
+      else
+        fail "the second tenant delivered nothing: $(echo "$OUT2" | tail -2 | tr '\n' ' ')"
+        detail docker logs "$G_DNS.realtime" --tail=20
+      fi
+
+      # -----------------------------------------------------------------
+      # CROSS-TENANT: listen on gamma, write to alpha. Nothing may arrive.
+      # A leak here would mean one shop seeing another's sales in real
+      # time, and it would look like everything was working.
+      # -----------------------------------------------------------------
+      OUT3=$(RT_URL="http://$G_DNS.staging.test" RT_KEY="$G_ANON" \
+             RT_INSERT_URL="http://$APP_DNS.staging.test" RT_INSERT_KEY="$ANON" \
+             RT_LABEL="cross-tenant-probe" RT_EXPECT=no-event \
+             timeout 90 node rt.mjs 2>&1)
+      if echo "$OUT3" | grep -q 'NO_EVENT_AS_EXPECTED'; then
+        pass "a change in alpha_shop did NOT reach $G_APP's channel — the tenants are separate"
+      elif echo "$OUT3" | grep -q 'LEAKED'; then
+        fail "a change in alpha_shop WAS delivered to $G_APP — one application can see another's data"
+        note "$(echo "$OUT3" | grep LEAKED | cut -c1-140)"
+      else
+        fail "the cross-tenant check did not complete: $(echo "$OUT3" | tail -2 | tr '\n' ' ')"
+      fi
+    else
+      fail "$G_APP has no environment file, so the second tenant was not tested"
+    fi
+
+    # -------------------------------------------------------------------
+    # RECONNECTION. A restarted Realtime has to pick its tenant up again and
+    # resume delivering, with nobody touching anything. A platform that
+    # needs a human after every restart is not one to run a shop on.
+    # -------------------------------------------------------------------
+    docker restart "${APP_DNS}.realtime" >/dev/null 2>&1
+    rok=0
+    for _ in $(seq 1 24); do
+      st="$(docker inspect -f '{{.State.Status}}' "${APP_DNS}.realtime" 2>/dev/null || echo absent)"
+      [ "$st" = "running" ] && { rok=1; break; }
+      sleep 5
+    done
+    [ "$rok" = "1" ] && pass "${APP_DNS}.realtime came back up after a restart" \
+                     || fail "${APP_DNS}.realtime did not come back after a restart"
+    sleep 10
+    OUT4=$(RT_URL="http://$APP_DNS.staging.test" RT_KEY="$ANON" RT_LABEL="after-restart" \
+           timeout 90 node rt.mjs 2>&1)
+    if echo "$OUT4" | grep -q 'EVENT_RECEIVED'; then
+      pass "delivery resumed after the Realtime service was restarted, unattended"
+    else
+      fail "nothing was delivered after the restart: $(echo "$OUT4" | tail -2 | tr '\n' ' ')"
+      detail docker logs "${APP_DNS}.realtime" --tail=25
+    fi
   else
     skip "could not install @supabase/supabase-js, so Realtime was not tested end to end"
   fi
@@ -581,68 +750,74 @@ section "7. Object storage: upload, download, delete"
 # storage-api talks to either way, so this tests OUR configuration -- the
 # backend selection, the bucket wiring, the signing and the proxy route. It
 # does NOT test R2 itself. That difference is stated in the report.
-# WHICH S3 SERVER STANDS IN FOR R2, AND WHY IT CHANGED TWICE
+# WHICH S3 SERVER STANDS IN FOR R2, AND WHY IT HAS CHANGED THREE TIMES
 #
-# MinIO first, which is what storage-api is developed against -- but MinIO is
-# no longer published to Docker Hub and its server image carries no `mc`
-# client, so the first run skipped this section entirely.
+# MinIO first, which is what storage-api is developed against. It is no longer
+# published to Docker Hub and its server image carries no client, so the first
+# run skipped this section entirely.
 #
-# Then adobe/s3mock, which creates buckets from an environment variable and
-# keeps objects as plain files. It got further and then stopped being useful:
-# storage-api issues a multi-object delete when it writes, s3mock's response
-# does not satisfy the AWS SDK, and every upload failed with
+# Then adobe/s3mock. It got further and then stopped being useful: storage-api
+# issues a multi-object delete while writing, s3mock's response does not
+# satisfy the AWS SDK, and every upload failed with
 #   HTTP 500 "Backend did not confirm deletion of 2 of 2 keys"
-# Its on-disk layout is also documented as an implementation detail that may
-# change, and the old "is the object really there" check poked at /s3data
-# directly -- which had already stopped existing.
 #
-# Now LocalStack, whose S3 is a full implementation rather than a mock. It
-# ships `awslocal`, so the "did the object really reach the object store"
-# question is answered through the S3 API itself. That check is now backend-
-# agnostic: the same question, asked the same way, works against R2.
+# Then LocalStack, whose S3 is a full implementation -- and which now refuses
+# to start without a licence token:
+#   License activation failed! No credentials were found in the environment.
+#   Localstack returning with exit code 55.
+# A paid service for a staging double is not something to take on.
 #
-# LocalStack accepts any credentials; these are still generated rather than
-# written down, because a literal credential in a repository is a bad habit
-# even when the value is a throwaway and the repository's own secret scan
-# correctly refuses it.
+# Now SeaweedFS, which implements the S3 API including DeleteObjects, is
+# published with version tags, and needs no licence. Unconfigured it accepts
+# anonymous requests, which is what makes the verification below possible
+# without putting a client inside the fixture.
+#
+# AND THE CHECKS NO LONGER DEPEND ON THE FIXTURE. "Did the object really reach
+# the object store" is asked through the S3 API with an ordinary HTTP client,
+# not by looking for files on the server's disk (s3mock) or by running a tool
+# that happens to be installed in it (LocalStack's awslocal). The same
+# question, asked the same way, works against Cloudflare R2.
+#
+# Credentials are generated rather than written down: a literal credential in
+# a repository is a bad habit even when the value is a throwaway, and the
+# repository's own secret scan correctly refuses one.
 S3_KEY="stg$(openssl rand -hex 6)"
 S3_SECRET="$(openssl rand -hex 16)"
 S3_BUCKET=staging-images
+S3_HOST="http://staging-s3:8333"
+# One place that makes an HTTP request inside the platform's network, so the
+# fixture needs no client of its own.
+s3curl() { docker run --rm --network central_edge curlimages/curl:8.11.1 "$@" 2>/dev/null; }
+
 if docker run -d --name staging-s3 --network central_edge \
-     -e SERVICES=s3 -e DEBUG=0 -e EAGER_SERVICE_LOADING=1 \
-     -e AWS_DEFAULT_REGION=us-east-1 \
-     localstack/localstack:2026.10.2 >/dev/null 2>&1; then
-  # Wait for S3 to report available, rather than for the container to exist.
+     chrislusf/seaweedfs:4.52 \
+     server -s3 -dir=/data -ip.bind=0.0.0.0 -master.volumeSizeLimitMB=64 \
+     >/dev/null 2>&1; then
   s3_up=0
   for _ in $(seq 1 40); do
-    if docker exec staging-s3 curl -sf --max-time 4 \
-         http://127.0.0.1:4566/_localstack/health 2>/dev/null | grep -q '"s3": *"\(available\|running\)"'; then
-      s3_up=1; break
-    fi
+    code="$(s3curl -s -o /dev/null -w '%{http_code}' --max-time 4 "$S3_HOST/" || echo 000)"
+    case "$code" in 200|403|404) s3_up=1; break ;; esac
     sleep 3
   done
   if [ "$s3_up" = "1" ]; then
-    pass "an S3-compatible endpoint is running (LocalStack S3, standing in for R2)"
+    pass "an S3-compatible endpoint is running (SeaweedFS, standing in for R2)"
   else
-    fail "the S3 endpoint never reported S3 as available"
-    detail docker logs staging-s3 --tail=20
+    fail "the S3 endpoint never answered on $S3_HOST"
+    detail docker logs staging-s3 --tail=25
   fi
 
   # The bucket, created through the S3 API.
-  if docker exec staging-s3 awslocal s3 mb "s3://$S3_BUCKET" >/tmp/mb.log 2>&1 \
-     || grep -qi "already exists\|BucketAlreadyOwnedByYou" /tmp/mb.log; then
-    pass "the S3 bucket exists"
-  else
-    fail "could not create the S3 bucket"
-    detail cat /tmp/mb.log
-  fi
+  code="$(s3curl -s -o /dev/null -w '%{http_code}' --max-time 15 -X PUT "$S3_HOST/$S3_BUCKET" || echo 000)"
+  case "$code" in
+    200|201|204|409) pass "the S3 bucket exists (HTTP $code)" ;;
+    *) fail "creating the S3 bucket returned HTTP $code"; detail docker logs staging-s3 --tail=20 ;;
+  esac
 
   sed -i "s|^R2_BUCKET=.*|R2_BUCKET=$S3_BUCKET|" "$ENV"
-  sed -i 's|^R2_ENDPOINT=.*|R2_ENDPOINT=http://staging-s3:4566|' "$ENV"
+  sed -i "s|^R2_ENDPOINT=.*|R2_ENDPOINT=$S3_HOST|" "$ENV"
   sed -i "s|^R2_ACCESS_KEY_ID=.*|R2_ACCESS_KEY_ID=$S3_KEY|" "$ENV"
   sed -i "s|^R2_SECRET_ACCESS_KEY=.*|R2_SECRET_ACCESS_KEY=$S3_SECRET|" "$ENV"
-  # LocalStack rejects R2's 'auto'. Set explicitly for staging; production
-  # keeps 'auto' because that is what R2 wants.
+  # R2's region is 'auto'; other S3 servers reject it. Production keeps 'auto'.
   grep -q '^R2_REGION=' "$ENV" && sed -i 's|^R2_REGION=.*|R2_REGION=us-east-1|' "$ENV" \
                                || printf 'R2_REGION=us-east-1\n' >> "$ENV"
   cd "$ROOT_DIR/apps/$APP" && ./compose.sh up -d >/tmp/st-up.log 2>&1
@@ -662,47 +837,130 @@ if docker run -d --name staging-s3 --network central_edge \
       fail "post-start did not complete, so storage requests will be refused"
     fi
     detail bash -c "grep -E 'storage|realtime|table|grant|MISSING|list_changes' /tmp/poststart.log | head -14"
+    # ---------------------------------------------------------------------
+    # EFFECTIVE PRIVILEGES, not "the grant statement ran".
+    #
+    # post-start.sh applies the grants and reports success. That is not proof:
+    # a GRANT by a role that does not own the object only WARNS and grants
+    # nothing, and psql still exits 0 -- which is exactly how this was broken
+    # for two runs. So the privileges are read back out of the catalogue, for
+    # each role and each table storage-api actually created.
+    # ---------------------------------------------------------------------
+    ST_TABLES="$(pgq "select string_agg(c.relname, ' ' order by c.relname) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='storage' and c.relkind in ('r','p')" "$APP")"
+    note "storage tables storage-api created: ${ST_TABLES:-none}"
+    if [ -z "$ST_TABLES" ]; then
+      fail "storage-api created no tables, so there is nothing to grant and nothing to check"
+    else
+      missing=""
+      for r in anon authenticated service_role; do
+        for t in $ST_TABLES; do
+          got="$(pgq "select has_table_privilege('$r','storage.$t','SELECT')::text" "$APP")"
+          [ "$got" = "true" ] || missing="$missing $r:$t"
+        done
+      done
+      if [ -z "$missing" ]; then
+        pass "every storage table is readable by anon, authenticated and service_role — checked as effective privileges"
+      else
+        fail "effective privileges are MISSING on:$missing"
+      fi
+      # service_role has to write, not just read.
+      w=""
+      for t in $ST_TABLES; do
+        got="$(pgq "select has_table_privilege('service_role','storage.$t','INSERT')::text" "$APP")"
+        [ "$got" = "true" ] || w="$w $t"
+      done
+      [ -z "$w" ] && pass "service_role can INSERT into every storage table" \
+                  || fail "service_role cannot INSERT into:$w"
+      # And the functions its migrations created, which is where the
+      # owner-only rule bit: granting these as the provisioning role warned
+      # and did nothing.
+      nf="$(pgq "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='storage'" "$APP")"
+      ng="$(pgq "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='storage' and has_function_privilege('service_role', p.oid, 'EXECUTE')" "$APP")"
+      if [ "${nf:-0}" -gt 0 ] && [ "${nf:-0}" = "${ng:-0}" ]; then
+        pass "service_role may EXECUTE all $nf storage function(s)"
+      else
+        fail "service_role may execute only ${ng:-0} of ${nf:-0} storage functions"
+      fi
+    fi
+
     SVC="$(sed -n 's/^SERVICE_ROLE_KEY=//p' "$ENV" | tail -1)"
     B="http://$APP_DNS.staging.test/storage/v1"
+    # One place that asks the S3 server what it holds, through its own API.
+    s3list() { s3curl -s --max-time 20 "$S3_HOST/$S3_BUCKET?list-type=2&max-keys=200"; }
+
     c=$(curl -s -o /tmp/mk.json -w '%{http_code}' -X POST "$B/bucket" \
       -H "Authorization: Bearer $SVC" -H "Content-Type: application/json" \
       -d '{"id":"product-images","name":"product-images","public":true}')
     case "$c" in 200|201|409) pass "created the product-images bucket through the proxy (HTTP $c)" ;;
       *) fail "creating the bucket returned HTTP $c: $(head -c 150 /tmp/mk.json)" ;; esac
 
-    echo "staging test image bytes" > /tmp/up.txt
-    c=$(curl -s -o /tmp/up.json -w '%{http_code}' -X POST "$B/object/product-images/test/probe.txt" \
-      -H "Authorization: Bearer $SVC" -H "Content-Type: text/plain" --data-binary @/tmp/up.txt)
+    # A payload with a known checksum, so "the same bytes came back" is a
+    # comparison rather than a substring match.
+    head -c 4096 /dev/urandom > /tmp/up.bin
+    UP_SHA="$(sha256sum /tmp/up.bin | cut -d' ' -f1)"
+    c=$(curl -s -o /tmp/up.json -w '%{http_code}' -X POST "$B/object/product-images/test/probe.bin" \
+      -H "Authorization: Bearer $SVC" -H "Content-Type: application/octet-stream" \
+      --data-binary @/tmp/up.bin)
     case "$c" in 200|201) pass "UPLOAD through storage-api to the S3 backend (HTTP $c)" ;;
       *) fail "upload returned HTTP $c: $(head -c 200 /tmp/up.json)" ;; esac
 
-    c=$(curl -s -o /tmp/dl.txt -w '%{http_code}' "$B/object/public/product-images/test/probe.txt")
-    if [ "$c" = "200" ] && grep -q "staging test image bytes" /tmp/dl.txt; then
-      pass "DOWNLOAD returned the same bytes that were uploaded"
+    c=$(curl -s -o /tmp/dl.bin -w '%{http_code}' "$B/object/public/product-images/test/probe.bin")
+    DL_SHA="$(sha256sum /tmp/dl.bin 2>/dev/null | cut -d' ' -f1)"
+    if [ "$c" = "200" ] && [ -n "$DL_SHA" ] && [ "$DL_SHA" = "$UP_SHA" ]; then
+      pass "DOWNLOAD returned byte-identical content ($(wc -c </tmp/dl.bin | tr -d ' ') bytes, sha256 matches)"
     else
-      fail "download returned HTTP $c and $( [ -s /tmp/dl.txt ] && echo 'unexpected content' || echo 'nothing' )"
+      fail "download returned HTTP $c and the bytes differ (uploaded ${UP_SHA:0:12}…, got ${DL_SHA:0:12}…)"
     fi
 
     # Confirm the object really landed in the object store rather than on
-    # storage-api's own disk -- asked through the S3 API, not by looking for
-    # files. The old version poked at s3mock's /s3data, which is an
-    # implementation detail and had already stopped existing; a question asked
-    # this way is the same question R2 can be asked.
-    if docker exec staging-s3 awslocal s3 ls "s3://$S3_BUCKET" --recursive \
-         >/tmp/s3ls.txt 2>&1 && grep -q 'probe' /tmp/s3ls.txt; then
+    # storage-api's own disk -- asked through the S3 API with an ordinary HTTP
+    # client. Earlier versions poked at s3mock's files and then ran
+    # LocalStack's awslocal; both tied the check to the fixture. This is the
+    # same question R2 can be asked.
+    s3list > /tmp/s3ls.xml 2>&1
+    if grep -q 'probe.bin' /tmp/s3ls.xml; then
       pass "the object is physically in the S3 bucket, so the backend is really S3"
-      detail bash -c "grep probe /tmp/s3ls.txt | head -3"
+      detail bash -c "grep -o '<Key>[^<]*</Key>' /tmp/s3ls.xml | head -4"
     else
       fail "the object is not in the S3 bucket — storage may have fallen back to local files"
-      detail bash -c "head -10 /tmp/s3ls.txt"
+      detail bash -c "head -c 600 /tmp/s3ls.xml"
     fi
 
-    c=$(curl -s -o /tmp/rm.json -w '%{http_code}' -X DELETE "$B/object/product-images/test/probe.txt" \
+    # MULTI-DELETE, explicitly. storage-api issues a DeleteObjects for more
+    # than one key, and a backend whose response does not satisfy the AWS SDK
+    # fails the whole write with HTTP 500 -- which is what retired the
+    # previous stand-in. Two objects are uploaded and removed in one call so
+    # that path is exercised on purpose rather than incidentally.
+    for n in 1 2; do
+      curl -s -o /dev/null -X POST "$B/object/product-images/test/multi-$n.bin" \
+        -H "Authorization: Bearer $SVC" -H "Content-Type: application/octet-stream" \
+        --data-binary @/tmp/up.bin
+    done
+    s3list > /tmp/s3ls2.xml 2>&1
+    MN="$(grep -c 'multi-' /tmp/s3ls2.xml || true)"
+    [ "${MN:-0}" -ge 1 ] && pass "two more objects were written for the multi-delete test" \
+                         || { fail "the multi-delete fixtures were not written"; detail bash -c "head -c 400 /tmp/s3ls2.xml"; }
+    c=$(curl -s -o /tmp/rmm.json -w '%{http_code}' -X DELETE "$B/objects/product-images" \
+      -H "Authorization: Bearer $SVC" -H "Content-Type: application/json" \
+      -d '{"prefixes":["test/multi-1.bin","test/multi-2.bin"]}')
+    case "$c" in
+      200|204) pass "MULTI-DELETE of two objects accepted (HTTP $c)" ;;
+      *) fail "multi-delete returned HTTP $c: $(head -c 200 /tmp/rmm.json)" ;;
+    esac
+    s3list > /tmp/s3ls3.xml 2>&1
+    if grep -q 'multi-' /tmp/s3ls3.xml; then
+      fail "the multi-deleted objects are still in the bucket"
+      detail bash -c "grep -o '<Key>[^<]*</Key>' /tmp/s3ls3.xml | head -4"
+    else
+      pass "both objects are gone from the bucket after the multi-delete"
+    fi
+
+    c=$(curl -s -o /tmp/rm.json -w '%{http_code}' -X DELETE "$B/object/product-images/test/probe.bin" \
       -H "Authorization: Bearer $SVC")
     case "$c" in 200|204) pass "DELETE removed the object (HTTP $c)" ;;
       *) fail "delete returned HTTP $c: $(head -c 150 /tmp/rm.json)" ;; esac
-    if docker exec staging-s3 awslocal s3 ls "s3://$S3_BUCKET" --recursive 2>/dev/null \
-         | grep -q 'probe'; then
+    s3list > /tmp/s3ls4.xml 2>&1
+    if grep -q 'probe.bin' /tmp/s3ls4.xml; then
       fail "the object is still in the bucket after the delete"
     else
       pass "the object is gone from the bucket, confirmed through the S3 API"

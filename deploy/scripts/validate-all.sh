@@ -228,6 +228,62 @@ for t in test-tuning.sh test-capacity.sh test-bootstrap-local.sh; do
   rm -f /tmp/.vt.$$
 done
 
+hdr "Realtime's own tenant migrations, replayed as a non-superuser"
+# The failure this covers is the one that looked most like success: Realtime
+# accepted subscriptions and delivered nothing for five runs, because its
+# migration 20230328144023 could not create realtime.list_changes().
+#
+# Needs Realtime's migration sources. They are not vendored here -- they
+# belong to Realtime and would drift -- so this runs when they are present
+# and says plainly when they are not. The staging workflow fetches them.
+RT_MIG="${REALTIME_MIGRATIONS:-}"
+if [ -z "$RT_MIG" ]; then
+  for c in "$DEPLOY/../.realtime-src/lib/realtime/tenants/repo/migrations" \
+           "/tmp/realtime-src/lib/realtime/tenants/repo/migrations"; do
+    [ -d "$c" ] && { RT_MIG="$c"; break; }
+  done
+fi
+if [ -z "$RT_MIG" ] || [ ! -d "$RT_MIG" ]; then
+  printf '  skipped: no Realtime migration sources.\n'
+  printf '           deploy/scripts/fetch-realtime-migrations.sh puts them in place,\n'
+  printf '           or set REALTIME_MIGRATIONS to a checkout.\n'
+elif ! command -v psql >/dev/null 2>&1; then
+  printf '  skipped: psql is not on PATH\n'
+elif ! psql -tAqX -c 'select 1' >/dev/null 2>&1; then
+  printf '  skipped: no reachable PostgreSQL\n'
+else
+  if python3 "$DEPLOY/scripts/test-realtime-migrations.py" --migrations "$RT_MIG" \
+       > /tmp/rtmig.log 2>&1; then
+    ok "every migration up to and including the one creating list_changes replays cleanly"
+    grep -E 'PASS|applied' /tmp/rtmig.log | sed 's/^/     /' | head -8
+  else
+    bad "Realtime's tenant migrations do not replay under this platform's privileges"
+    grep -E 'FAIL|ERROR|first failure' /tmp/rtmig.log | sed 's/^/     /' | head -8
+  fi
+fi
+
+hdr "Every scheduled job is re-registered where it can actually run"
+# pg_net serves one database. An HTTP-calling job registered against an
+# application's own database queues a request and is never served: no error,
+# no response, no request. migrate-from-supabase.sh used to do exactly that
+# to every job, so each one is checked rather than sampled.
+INV="${INVENTORY:-/tmp/inventory.json}"
+if [ ! -f "$INV" ]; then
+  printf '  skipped: no project inventory at %s\n' "$INV"
+  printf '           inspect-supabase.py --json writes one; set INVENTORY to point here.\n'
+elif ! psql -tAqX -c 'select 1' >/dev/null 2>&1; then
+  printf '  skipped: no reachable PostgreSQL\n'
+else
+  if python3 "$DEPLOY/scripts/test-cron-placement.py" --inventory "$INV" \
+       > /tmp/cronplace.log 2>&1; then
+    ok "$(grep -c 'PASS' /tmp/cronplace.log) check(s): every job placed, schedules and commands preserved"
+    grep -E 'HTTP-calling job|SQL-only job' /tmp/cronplace.log | sed 's/^ *PASS */     /' | head -4
+  else
+    bad "at least one scheduled job would be registered where it cannot run"
+    grep -E 'FAIL' /tmp/cronplace.log | sed 's/^/     /' | head -8
+  fi
+fi
+
 hdr "Provisioning against a real PostgreSQL"
 if command -v psql >/dev/null 2>&1 && psql -tAqX -c 'select 1' >/dev/null 2>&1; then
   if "$HERE/test-provision-sql.sh" >/tmp/.vp.$$ 2>&1; then

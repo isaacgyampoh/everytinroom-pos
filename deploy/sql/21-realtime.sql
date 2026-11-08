@@ -100,6 +100,73 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO :"rt_user";
 GRANT CONNECT ON DATABASE :"dbname" TO :"rt_user";
 GRANT CREATE  ON DATABASE :"dbname" TO :"rt_user";
 
+-- ---------------------------------------------------------------------------
+-- THE PERMISSION REALTIME'S OWN MIGRATIONS NEED, AND WHY
+--
+-- Realtime builds the `realtime` schema with ninety-one tenant migrations.
+-- Number thirty creates realtime.list_changes(), which is the function its
+-- write-ahead-log poller calls on every cycle, and the function is declared
+--
+--     create or replace function realtime.list_changes(...)
+--       returns setof realtime.wal_rls
+--       language sql
+--       set log_min_messages to 'fatal'
+--
+-- log_min_messages is a superuser-only parameter, so a role that may not set
+-- it may not create a function that carries that SET clause:
+--
+--     ERROR:  permission denied to set parameter "log_min_messages"
+--
+-- Ecto stops at the first failure, so migrations thirty onwards never run.
+-- Realtime then starts anyway, accepts websocket subscriptions, reports
+-- SUBSCRIBED to the client, and delivers nothing at all -- the poller fails
+-- every cycle with "function realtime.list_changes(...) does not exist". That
+-- is the failure that looks most like success, and it cost five staging runs.
+--
+-- On Supabase's own servers this never shows up, because Realtime connects
+-- there as a superuser. Here it connects as a role scoped to one database.
+--
+-- PostgreSQL 15 added privileges on configuration parameters, which is
+-- exactly the narrow grant needed. It permits this role to quiet its own
+-- logging and nothing else: no data access, no other parameter, and nothing
+-- outside this cluster's log verbosity.
+--
+-- deploy/scripts/test-realtime-migrations.py replays the migrations against a
+-- throwaway database as a non-superuser and proves both halves of this:
+-- without the grant it stops at migration thirty, with it it goes past.
+DO $$
+DECLARE u text := current_setting('provision.rt_user');
+BEGIN
+  EXECUTE format('GRANT SET ON PARAMETER log_min_messages TO %I', u);
+EXCEPTION
+  WHEN insufficient_privilege THEN
+    RAISE WARNING 'Could not grant SET ON PARAMETER log_min_messages to % (%).', u, SQLERRM;
+  WHEN OTHERS THEN
+    RAISE WARNING 'Granting SET ON PARAMETER log_min_messages to % failed: % (%)', u, SQLERRM, SQLSTATE;
+END $$;
+
+-- And then CHECK it, rather than trusting that the statement above ran. A
+-- GRANT by a role without the privilege raises; a GRANT on an object the role
+-- does not own only WARNS and grants nothing. Neither is detectable from the
+-- statement's own success, so the privilege itself is read back.
+DO $$
+DECLARE u text := current_setting('provision.rt_user');
+BEGIN
+  IF has_parameter_privilege(u, 'log_min_messages', 'SET') THEN
+    RAISE NOTICE 'Realtime''s role may set log_min_messages, so its migrations can create list_changes().';
+  ELSE
+    RAISE WARNING E'% CANNOT set log_min_messages.\n'
+      '  Realtime''s migration 20230328144023 will fail, realtime.list_changes() will not\n'
+      '  exist, and Realtime will accept subscriptions and deliver NOTHING -- with no error\n'
+      '  that a client can see. This is reported here rather than left to be discovered.\n'
+      '  Provisioning continues, because a database can still be restored and the rest of\n'
+      '  the application still works; but anything that depends on live updates will not.\n'
+      '  To fix it, as a role that holds the privilege WITH GRANT OPTION (a superuser on a\n'
+      '  stock server, supabase_admin on this image):\n'
+      '    GRANT SET ON PARAMETER log_min_messages TO %I;', u, u;
+  END IF;
+END $$;
+
 -- Best effort: these need superuser on some servers, and provisioning must
 -- not die over a logging preference. The point is to keep the password that
 -- follows out of the server log; where that is not permitted, the statement

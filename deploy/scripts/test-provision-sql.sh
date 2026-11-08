@@ -39,11 +39,18 @@ fail() { printf '  \033[31mFAIL\033[0m %s\n' "$*"; FAILED=$((FAILED+1)); }
 q()    { psql -tAqX -d "${2:-postgres}" -c "$1"; }
 
 # --- refuse to run anywhere that might be real ----------------------------
-if [ -n "${PGHOST:-}" ] && [ "${PGHOST}" != "localhost" ] && [ "${PGHOST}" != "127.0.0.1" ]; then
-  echo "REFUSING: PGHOST is '$PGHOST'. This test creates and drops databases;" >&2
-  echo "run it only against a local development server." >&2
-  exit 2
-fi
+# A unix socket path is necessarily on this machine, so it is allowed: that is
+# the safest way to point this at a throwaway cluster, and the guard used to
+# reject it, which pushed the test onto whatever server the default connection
+# happened to find. Anything that looks like a hostname is still refused.
+case "${PGHOST:-}" in
+  ""|localhost|127.0.0.1|/*) : ;;
+  *)
+    echo "REFUSING: PGHOST is '$PGHOST'. This test creates and drops databases;" >&2
+    echo "run it only against a local development server, or give a unix socket" >&2
+    echo "directory (an absolute path) for a throwaway cluster." >&2
+    exit 2 ;;
+esac
 psql -tAqX -c 'select 1' >/dev/null 2>&1 || {
   echo "Cannot reach a PostgreSQL server. Start one, or set PGHOST/PGPORT/PGUSER." >&2
   exit 2
@@ -69,6 +76,13 @@ cleanup() {
     psql -qX -d postgres -c "DROP DATABASE IF EXISTS \"$db\" WITH (FORCE)" >/dev/null 2>&1
   done
   for r in "$A_AUTHN" "$B_AUTHN" "${PFX}_a_realtime" "${PFX}_a_storage"; do
+    # A privilege on a configuration parameter is a SHARED dependency, so the
+    # role cannot be dropped while it holds one -- and DROP ROLE then fails
+    # with "some objects depend on it", which names nothing. 21-realtime.sql
+    # grants SET ON PARAMETER log_min_messages to the realtime role, so every
+    # run left that role behind and the NEXT run died on "role already
+    # exists". Revoked first, for every role, since it costs nothing.
+    psql -qX -d postgres -c "REVOKE ALL ON PARAMETER log_min_messages FROM \"$r\"" >/dev/null 2>&1
     psql -qX -d postgres -c "DROP ROLE IF EXISTS \"$r\"" >/dev/null 2>&1
   done
   # Only if THIS run created it. If it was already there it belongs to
@@ -265,6 +279,7 @@ echo "Optional services (realtime + storage)"
 # These two files pass values into DO blocks through session settings, because
 # psql does not interpolate :variables inside a dollar-quoted string. That is
 # easy to get wrong and silent until it runs, so it runs here.
+IS_SUPER_EARLY="$(q "select rolsuper::text from pg_roles where rolname = current_user")"
 RT_USER="${PFX}_a_realtime"; RT_PW="$(openssl rand -hex 16)"
 ST_USER="${PFX}_a_storage";  ST_PW="$(openssl rand -hex 16)"
 psql -qX -d postgres -c "CREATE ROLE \"$RT_USER\" LOGIN REPLICATION" >/dev/null
@@ -283,6 +298,27 @@ if psql -qX -v ON_ERROR_STOP=1 -d "$A_DB" \
   [ "$(q "select count(*) from pg_namespace where nspname='realtime'" "$A_DB")" = "1" ] \
     && pass "realtime schema exists — Realtime's migrations have somewhere to go" \
     || fail "realtime schema missing; realtime.list_changes could never be created"
+  # The privilege Realtime's own migration thirty needs. Without it that
+  # migration fails, list_changes() is never created, and Realtime accepts
+  # subscriptions and delivers nothing. Checked as a PRIVILEGE, not as "the
+  # GRANT statement did not error".
+  if [ "$(q "select has_parameter_privilege('$RT_USER','log_min_messages','SET')::text")" = "true" ]; then
+    pass "the realtime role may SET log_min_messages, so list_changes() can be created"
+  else
+    if [ "$IS_SUPER_EARLY" = "true" ]; then
+      fail "the realtime role may NOT set log_min_messages even though this run can grant it"
+    else
+      skipped "the log_min_messages grant (this server's role cannot grant parameter privileges)"
+    fi
+  fi
+  # And a function carrying that SET clause must actually be creatable by it,
+  # which is the thing the migration does.
+  if PGPASSWORD="$RT_PW" psql -qX -h "${PGHOST:-localhost}" -U "$RT_USER" -d "$A_DB" \
+       -c "create or replace function realtime.probe_set_clause() returns int language sql set log_min_messages to 'fatal' as \$\$ select 1 \$\$" >/dev/null 2>&1; then
+    pass "it can create a function with 'set log_min_messages', as migration 20230328144023 does"
+  else
+    fail "it cannot create a function with 'set log_min_messages' — Realtime's migration 30 would fail here"
+  fi
   # The role that runs those migrations must be able to create in it.
   [ "$(q "select has_schema_privilege('$RT_USER','realtime','CREATE')::text" "$A_DB")" = "true" ] \
     && pass "the realtime role may CREATE in the realtime schema" \
