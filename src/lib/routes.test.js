@@ -59,9 +59,27 @@ describe('canOpenPage', () => {
   // cashier who typed the hash got straight in.
   it('closes the admin-only pages to a cashier', () => {
     for (const id of ['dash', 'customers', 'bundles', 'promos', 'invoices',
-                      'expenses', 'performance', 'wachats', 'wasettings', 'staff']) {
+                      'expenses', 'performance', 'staff']) {
       expect(canOpenPage(id, nobody)).toBe(false)
     }
+  })
+
+  // The WhatsApp *agent* screens were removed (the bot was never switched on:
+  // wa_conversations and wa_messages were empty and wa_agent_settings held
+  // 'false'). A deep link to a page that no longer exists must be refused
+  // rather than fall through to a default — and `whatsapp`, the order-packing
+  // page that 900+ real orders flow through, must keep working.
+  it('refuses deep links to the removed agent screens', () => {
+    for (const id of ['wachats', 'wasettings']) {
+      expect(PAGES_BY_ID.has(id)).toBe(false)
+      expect(canOpenPage(id, admin)).toBe(false)
+      expect(canOpenPage(id, nobody)).toBe(false)
+    }
+  })
+
+  it('keeps the order-packing page, which is not part of the agent', () => {
+    expect(PAGES_BY_ID.has('whatsapp')).toBe(true)
+    expect(canOpenPage('whatsapp', nobody)).toBe(true)
   })
 
   it('enforces each named permission rather than just hiding the page', () => {

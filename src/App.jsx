@@ -21,9 +21,7 @@ import toast from 'react-hot-toast'
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const POS = lazy(() => import('./pages/POS'))
 const WhatsAppOrders = lazy(() => import('./pages/WhatsAppOrders'))
-const WhatsAppChats = lazy(() => import('./pages/WhatsAppChats'))
 const ReceivingPage = lazy(() => import('./pages/ReceivingPage'))
-const WhatsAppSettings = lazy(() => import('./pages/WhatsAppSettings'))
 const Receipts = lazy(() => import('./pages/Receipts'))
 const Products = lazy(() => import('./pages/Products'))
 const CostPricesPage = lazy(() => import('./pages/CostPricesPage'))
@@ -328,7 +326,10 @@ export default function App() {
     if (!user) return
     if (canOpenPage(page, { isAdmin, can })) return
     setPage('pos')
-    toast.error('You do not have access to this page')
+    // A page that no longer exists is not a permission problem — telling a
+    // cashier they lack access to a screen that was deleted sends them to ask
+    // an admin for a permission nobody can grant.
+    if (PAGES_BY_ID.has(page)) toast.error('You do not have access to this page')
   }, [page, user, isAdmin, can, setPage])
 
   const playSaleSound = () => {
@@ -423,9 +424,7 @@ export default function App() {
     dash: <Dashboard />,
     pos: <POS />,
     whatsapp: <WhatsAppOrders />,
-    wachats: <WhatsAppChats />,
     receiving: <ReceivingPage />,
-    wasettings: <WhatsAppSettings />,
     receipts: <Receipts onPrintReceipt={(s) => setReceipt({ receiptNo: s.receiptNo, date: s.date, customer: s.customer, cashier: s.cashier, payment: s.payment, type: s.type, items: s.items, total: s.total, discount: s.discount })} />,
     products: <Products />,
     costs: <CostPricesPage />,
