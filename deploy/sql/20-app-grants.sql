@@ -116,6 +116,25 @@ END $$;
 -- also removes USAGE, so nothing reaches the schema except the roles named
 -- below -- and then puts the application's own roles back.
 -- ---------------------------------------------------------------------------
+-- The `extensions` schema.
+--
+-- PostgREST is started with db-extra-search-path = "public, extensions", which
+-- is what Supabase's hosted platform uses: extensions live in their own schema
+-- there. A freshly created database has no such schema, and PostgREST then
+-- refuses to build its schema cache at all:
+--
+--   Failed to load the schema cache using db-schemas=public and
+--   db-extra-search-path=public,extensions
+--   {"code":"3F000","message":"schema \"extensions\" does not exist"}
+--
+-- It retried every 32 seconds forever and never served a request, which
+-- surfaced as "never became healthy" and a 503 through the proxy.
+--
+-- Creating it also matches the layout a restored Supabase dump expects, so a
+-- function qualified as extensions.something still resolves.
+CREATE SCHEMA IF NOT EXISTS extensions;
+GRANT USAGE ON SCHEMA extensions TO anon, authenticated, service_role;
+
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 
 -- No ALTER SCHEMA ... OWNER TO here. The schema stays owned by the role that

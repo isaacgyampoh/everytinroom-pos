@@ -49,7 +49,7 @@ install -d -m 0700 "$OUT"
 STAMP="$(date -u '+%Y%m%d-%H%M%S')"
 FAILED=0
 
-pgq() { docker exec central-postgres psql -tAqX -U postgres -d postgres -c "$1" 2>/dev/null; }
+pgq() { docker exec central-postgres psql -tAqX -U postgres -d "${2:-postgres}" -c "$1" 2>/dev/null; }
 
 # --- cluster globals ------------------------------------------------------
 # Roles and their (hashed) passwords, plus database-level grants. Without this
@@ -81,13 +81,33 @@ for db in $DBS; do
   if docker exec central-postgres pg_dump -U postgres --format=plain --clean --if-exists \
        --quote-all-identifiers "$db" 2>/dev/null | gzip -9 > "$F"; then
     SZ="$(stat -c %s "$F" 2>/dev/null || echo 0)"
-    if [ "$SZ" -lt 1024 ]; then
-      printf 'FAILED (only %s bytes)\n' "$SZ"
-      warn "the dump for $db is too small to be real; it has been kept for inspection as $(basename "$F")"
+    # Completeness is checked against the DATABASE, not against a byte count.
+    #
+    # This used to reject any dump under 1 KB as "too small to be real". An
+    # EMPTY database legitimately produces a dump of a few hundred bytes, so a
+    # correct backup of an application that has no tables yet was reported as a
+    # failure -- and the whole run was marked not-backed-up because of it.
+    #
+    # The real question is whether the dump contains the tables the database
+    # has, so that is what is asked.
+    WANT_TABLES="$(pgq "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE'" "$db")"
+    GOT_TABLES="$(gzip -dc "$F" 2>/dev/null | grep -c '^CREATE TABLE' || true)"
+    if [ "$SZ" -lt 100 ]; then
+      printf 'FAILED (only %s bytes — not even a header)\n' "$SZ"
+      warn "the dump for $db is truncated; kept for inspection as $(basename "$F")"
+      FAILED=$((FAILED+1))
+    elif [ "${WANT_TABLES:-0}" -gt 0 ] && [ "${GOT_TABLES:-0}" -lt "${WANT_TABLES:-0}" ]; then
+      printf 'FAILED (%s of %s tables)\n' "${GOT_TABLES:-0}" "${WANT_TABLES:-0}"
+      warn "the dump for $db has ${GOT_TABLES:-0} CREATE TABLE statements but the database has ${WANT_TABLES:-0} tables"
+      warn "kept for inspection as $(basename "$F")"
       FAILED=$((FAILED+1))
     else
       chmod 600 "$F"
-      printf '%s\n' "$(du -h "$F" | awk '{print $1}')"
+      if [ "${WANT_TABLES:-0}" = "0" ]; then
+        printf '%s  (no tables yet — a small dump is correct)\n' "$(du -h "$F" | awk '{print $1}')"
+      else
+        printf '%s  (%s/%s tables)\n' "$(du -h "$F" | awk '{print $1}')" "${GOT_TABLES:-0}" "${WANT_TABLES:-0}"
+      fi
       if [ "$VERIFY" = "1" ]; then
         # Reading the whole file back through gzip is the only way to know the
         # archive is not truncated. It does not prove the SQL restores, but it

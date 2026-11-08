@@ -117,6 +117,12 @@ services:
       DB_ENC_KEY: ${REALTIME_ENC_KEY:?REALTIME_ENC_KEY is not set}
       API_JWT_SECRET: ${JWT_SECRET}
       SECRET_KEY_BASE: ${REALTIME_SECRET_KEY_BASE:?REALTIME_SECRET_KEY_BASE is not set}
+      # Required, not optional. Realtime's runtime.exs calls fetch_env! on it,
+      # so a missing value is not a warning -- the release terminates during
+      # boot with a crash dump and the container restarts forever:
+      #   (System.EnvError) could not fetch environment variable
+      #   "METRICS_JWT_SECRET" because it is not set
+      METRICS_JWT_SECRET: ${REALTIME_METRICS_JWT_SECRET:?REALTIME_METRICS_JWT_SECRET is not set}
       # The seed names the tenant after the application, so two applications
       # on this server never share one.
       SELF_HOST_TENANT_NAME: ${APP_DNS}
@@ -128,7 +134,7 @@ services:
       RLIMIT_NOFILE: "10000"
       DISABLE_HEALTHCHECK_LOGGING: "true"
     healthcheck:
-      test: ["CMD-SHELL", "curl -sSfL --head -o /dev/null -H \"Authorization: Bearer ${ANON_KEY}\" http://localhost:4000/api/tenants/${APP_DNS}/health"]
+      test: ["CMD-SHELL", "curl -sSfL --head -o /dev/null -H \"Authorization: Bearer ${ANON_KEY}\" http://127.0.0.1:4000/api/tenants/${APP_DNS}/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -194,7 +200,7 @@ services:
       GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-}
       GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:-${APP_NAME}}
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:9999/health"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -250,7 +256,10 @@ services:
       ENABLE_IMAGE_TRANSFORMATION: "true"
       IMGPROXY_URL: http://${APP_DNS}-imgproxy:5001
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/status"]
+      # 127.0.0.1, not localhost. storage-api binds IPv4, and `localhost`
+      # inside the container can resolve to ::1 first, so the probe failed
+      # against a service whose own log said "Started Successfully".
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:5000/status"]
       interval: 15s
       timeout: 5s
       retries: 3

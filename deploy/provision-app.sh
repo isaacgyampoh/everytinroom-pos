@@ -262,6 +262,10 @@ else
       || set_env_var "$APP_ENV" REALTIME_ENC_KEY "$(openssl rand -hex 8)"
     [ -n "$(get_env_var "$APP_ENV" REALTIME_SECRET_KEY_BASE 2>/dev/null || true)" ] \
       || set_env_var "$APP_ENV" REALTIME_SECRET_KEY_BASE "$(openssl rand -hex 32)"
+    # Realtime calls fetch_env! on this one, so an absent value terminates the
+    # release during boot rather than degrading.
+    [ -n "$(get_env_var "$APP_ENV" REALTIME_METRICS_JWT_SECRET 2>/dev/null || true)" ] \
+      || set_env_var "$APP_ENV" REALTIME_METRICS_JWT_SECRET "$(gen_secret 32)"
     ok "Realtime role, schema and keys ready (tenant: $NAME)"
   fi
   PROFILES="realtime"
