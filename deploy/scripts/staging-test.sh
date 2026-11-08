@@ -20,10 +20,11 @@
 #    5  two independent applications, and that neither can read the other
 #    6  Realtime, end to end, through the proxy
 #    7  object storage through storage-api: upload, download, delete
-#    8  backup and restore rehearsal, reconciled by row count
-#    9  scheduled jobs, in another database, calling a new URL
-#   10  resource use UNDER LOAD, capacity, provisioning again from clean
-#   11  the whole deployment re-run, and recovery from a full stop
+#    8  Supabase Auth, for the application that actually uses it
+#    9  backup and restore rehearsal, reconciled by row count
+#   10  scheduled jobs, in another database, calling a new URL
+#   11  resource use UNDER LOAD, capacity, provisioning again from clean
+#   12  the whole deployment re-run, and recovery from a full stop
 #
 # Exit code 0 only if every check passed.
 # ===========================================================================
@@ -717,7 +718,129 @@ fi
 
 # ===========================================================================
 gate_section 8
-section "8. Backup and restore rehearsal"
+section "8. Supabase Auth, for the application that actually uses it"
+# ===========================================================================
+# Everytinroom does NOT use Supabase Auth -- it checks a PIN against its own
+# staff_sessions table -- and the platform is built so that an application
+# which does not use it runs no GoTrue at all. That is tested in section 5.
+#
+# But three of the inventoried projects DO need it, and until now nothing
+# started GoTrue or made a single request to it. The run proved beta_shop had
+# an `auth` schema and the right compose profile, which are both static facts
+# about a database and a file. A broken GoTrue would have passed every check.
+#
+# This starts beta_shop and exercises the thing that matters: sign a user up,
+# sign them in, and use the token. It runs here, before the resource and
+# recovery sections, so GoTrue is measured under load with everything else and
+# has to come back from the restart like everything else.
+B_APP=beta_shop
+B_DNS="$(printf '%s' "$B_APP" | tr '_' '-')"
+B_ENV="$ROOT_DIR/apps/$B_APP/.env"
+if [ -f "$B_ENV" ]; then
+  ( cd "$ROOT_DIR/apps/$B_APP" && ./compose.sh up -d >/tmp/beta-up.log 2>&1 ) || true
+  bok=0
+  for _ in $(seq 1 24); do
+    st="$(docker inspect -f '{{.State.Status}}' "${B_DNS}-auth" 2>/dev/null || echo absent)"
+    h="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${B_DNS}-auth" 2>/dev/null)"
+    [ "$st" = "running" ] && { [ "$h" = "healthy" ] || [ "$h" = "none" ]; } && { bok=1; break; }
+    sleep 5
+  done
+  if [ "$bok" = "1" ]; then
+    pass "GoTrue is running for the application that asked for auth"
+  else
+    fail "GoTrue never became healthy for $B_APP"
+    detail docker logs "${B_DNS}-auth" --tail=25
+  fi
+
+  B_ANON="$(sed -n 's/^ANON_KEY=//p' "$B_ENV" | tail -1)"
+  AUTH_URL="http://$B_DNS.staging.test/auth/v1"
+  grep -q "$B_DNS.staging.test" /etc/hosts || echo "127.0.0.1 $B_DNS.staging.test" >> /etc/hosts
+
+  CODE="$(curl -s -o /tmp/gt-health.json -w '%{http_code}' --max-time 15 \
+    -H "apikey: $B_ANON" "$AUTH_URL/health" 2>/dev/null || echo 000)"
+  [ "$CODE" = "200" ] && pass "GoTrue answers /auth/v1/health through the proxy (HTTP 200)" \
+                      || { fail "GoTrue health returned HTTP $CODE through the proxy"; detail head -c 200 /tmp/gt-health.json; }
+
+  # Created through the ADMIN endpoint with the service role key, not through
+  # /signup. provision-app.sh sets GOTRUE_DISABLE_SIGNUP=true by default --
+  # open self-registration on a shop's backend is not a default worth having
+  # -- so /signup correctly refuses. Weakening that to make a test pass would
+  # be testing a configuration nobody runs. The admin path is also what an
+  # application that creates its own users actually uses, and it proves the
+  # service role key works against GoTrue.
+  B_SVC="$(sed -n 's/^SERVICE_ROLE_KEY=//p' "$B_ENV" | tail -1)"
+  B_EMAIL="probe-$(openssl rand -hex 4)@staging.invalid"
+  B_PASS="$(openssl rand -hex 16)"
+  CODE="$(curl -s -o /tmp/gt-signup.json -w '%{http_code}' --max-time 20 \
+    -X POST "$AUTH_URL/admin/users" -H "apikey: $B_SVC" \
+    -H "Authorization: Bearer $B_SVC" -H "Content-Type: application/json" \
+    -d "{\"email\":\"$B_EMAIL\",\"password\":\"$B_PASS\",\"email_confirm\":true}" \
+    2>/dev/null || echo 000)"
+  if [ "$CODE" = "200" ] || [ "$CODE" = "201" ]; then
+    pass "a user was created through GoTrue's admin API with the service role key (HTTP $CODE)"
+  else
+    fail "admin user creation returned HTTP $CODE"
+    # The body can carry a token, so it goes through the redacting path.
+    detail head -c 300 /tmp/gt-signup.json
+  fi
+
+  # And open self-registration really is refused, which is the other half of
+  # that default being correct.
+  CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 \
+    -X POST "$AUTH_URL/signup" -H "apikey: $B_ANON" -H "Content-Type: application/json" \
+    -d "{\"email\":\"open-$(openssl rand -hex 3)@staging.invalid\",\"password\":\"$B_PASS\"}" \
+    2>/dev/null || echo 000)"
+  case "$CODE" in
+    403|422|400) pass "open self-registration is refused (HTTP $CODE), as the default intends" ;;
+    200|201) fail "anyone can register on this application — GOTRUE_DISABLE_SIGNUP is not in effect" ;;
+    *) note "self-registration returned HTTP $CODE; expected a refusal" ;;
+  esac
+
+  # And the row really exists in that application's database, not somewhere else.
+  NUSERS="$(psqlq_db "$B_APP" "select count(*) from auth.users where email='$B_EMAIL'" 2>/dev/null | tr -d ' ')"
+  [ "${NUSERS:-0}" = "1" ] && pass "the user is in ${B_APP}'s own auth.users table" \
+                           || fail "the user is not in ${B_APP}'s auth.users (found ${NUSERS:-0})"
+  # And NOT in the other application's database, which has no auth schema at all.
+  OTHER="$(psqlq_db "$APP" "select count(*) from pg_namespace where nspname='auth'" 2>/dev/null | tr -d ' ')"
+  [ "${OTHER:-0}" = "0" ] && pass "$APP still has no auth schema, so the two do not share users" \
+                          || fail "$APP has an auth schema it never asked for"
+
+  # Sign in, and check the token is usable.
+  CODE="$(curl -s -o /tmp/gt-login.json -w '%{http_code}' --max-time 20 \
+    -X POST "$AUTH_URL/token?grant_type=password" -H "apikey: $B_ANON" \
+    -H "Content-Type: application/json" \
+    -d "{\"email\":\"$B_EMAIL\",\"password\":\"$B_PASS\"}" 2>/dev/null || echo 000)"
+  if [ "$CODE" = "200" ] && grep -q access_token /tmp/gt-login.json; then
+    pass "sign-in returned an access token"
+    B_TOKEN="$(sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p' /tmp/gt-login.json | head -1)"
+    UCODE="$(curl -s -o /tmp/gt-user.json -w '%{http_code}' --max-time 15 \
+      "$AUTH_URL/user" -H "apikey: $B_ANON" -H "Authorization: Bearer $B_TOKEN" 2>/dev/null || echo 000)"
+    if [ "$UCODE" = "200" ] && grep -q "$B_EMAIL" /tmp/gt-user.json; then
+      pass "the token identifies that user to GoTrue, so the whole path works"
+    else
+      fail "/auth/v1/user returned HTTP $UCODE and did not identify the user"
+    fi
+    # The token must be useless against the OTHER application: a separate JWT
+    # secret per application is what makes that true, and it is worth proving
+    # with a real token rather than by comparing two secrets.
+    XCODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
+      -H "apikey: $B_ANON" -H "Authorization: Bearer $B_TOKEN" \
+      "http://$APP_DNS.staging.test/rest/v1/tick?select=id&limit=1" 2>/dev/null || echo 000)"
+    case "$XCODE" in
+      401|403) pass "beta_shop's token is REJECTED by alpha_shop's API (HTTP $XCODE)" ;;
+      *) fail "beta_shop's token got HTTP $XCODE from alpha_shop's API — the JWT secrets are not separating them" ;;
+    esac
+  else
+    fail "sign-in returned HTTP $CODE with no access token"
+    detail head -c 200 /tmp/gt-login.json
+  fi
+else
+  fail "$B_APP is not provisioned, so Supabase Auth was not tested at all"
+fi
+
+# ===========================================================================
+gate_section 9
+section "9. Backup and restore rehearsal"
 # ===========================================================================
 pgq "create table if not exists public.money (id serial primary key, total numeric)" "$APP" >/dev/null
 pgq "insert into public.money (total) select (random()*100)::numeric(10,2) from generate_series(1,500)" "$APP" >/dev/null
@@ -757,8 +880,8 @@ if [ -n "$BK" ]; then
 fi
 
 # ===========================================================================
-gate_section 9
-section "9. Scheduled jobs in another database, calling a new URL"
+gate_section 10
+section "10. Scheduled jobs in another database, calling a new URL"
 # ===========================================================================
 # The architectural claim: pg_cron's scheduler lives in one database, so each
 # application's jobs are registered with cron.schedule_in_database(). If that
@@ -867,8 +990,8 @@ pgq "select cron.unschedule('staging-proof')" >/dev/null 2>&1
 pgq "select cron.unschedule('staging-http')" >/dev/null 2>&1
 
 # ===========================================================================
-gate_section 10
-section "10. Resource usage, capacity, and provisioning from clean"
+gate_section 11
+section "11. Resource usage, capacity, and provisioning from clean"
 # ===========================================================================
 RUNNING="$(docker ps --format '{{.Names}}' | wc -l | tr -d ' ')"
 note "containers running: $RUNNING"
@@ -990,11 +1113,8 @@ P2="$(sed -n 's/^APP_DB_PASSWORD=//p' "$ROOT_DIR/apps/alpha_shop/.env" | tail -1
   && pass "the standalone isolation test also passes here ($(grep -c PASS /tmp/iso.log) checks)" \
   || note "standalone isolation test: $(grep -c FAIL /tmp/iso.log) failure(s)"
 
-# ===========================================================================
-section "Logs from anything that is not healthy"
-# ===========================================================================
-gate_section 11
-section "11. Running the whole deployment again, and surviving a reboot"
+gate_section 12
+section "12. Running the whole deployment again, and surviving a reboot"
 # ===========================================================================
 # Two things an operator does that nothing above tests.
 #
@@ -1113,6 +1233,9 @@ CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
 [ "$CODE" = "200" ] && pass "the API answers again after the restart, unattended (HTTP 200)" \
                     || fail "the API returned HTTP $CODE after the restart"
 
+# ===========================================================================
+section "Logs from anything that is not healthy"
+# ===========================================================================
 # ===========================================================================
 # The first run reported "central-caddy is 'restarting'" and nothing about
 # why, because the reason lived in the container's log and the report did not

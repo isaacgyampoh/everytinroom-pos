@@ -72,7 +72,11 @@ while read -r name domain; do
     *) printf '  %sFAIL%s   PostgREST returned HTTP %s\n' "$C_RED" "$C_RESET" "$code"; BAD=$((BAD+1)) ;;
   esac
 
-  for svc in realtime storage functions imgproxy; do
+  # auth was missing from this list. beta_shop in the staging run has auth and
+  # nothing else, so its only real service was never checked and a broken
+  # GoTrue would have been reported healthy. An application that uses auth has
+  # auth as the thing that matters most: without it nobody can sign in.
+  for svc in realtime storage functions imgproxy auth; do
     cn="${dns}-${svc}"; [ "$svc" = "realtime" ] && cn="${dns}.realtime"
     st="$(docker inspect -f '{{.State.Status}}' "$cn" 2>/dev/null || echo absent)"
     [ "$st" = "absent" ] && continue
