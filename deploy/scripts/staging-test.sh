@@ -22,7 +22,8 @@
 #    7  object storage through storage-api: upload, download, delete
 #    8  backup and restore rehearsal, reconciled by row count
 #    9  scheduled jobs, in another database, calling a new URL
-#   10  provisioning again from clean, and capacity reporting
+#   10  resource use UNDER LOAD, capacity, provisioning again from clean
+#   11  the whole deployment re-run, and recovery from a full stop
 #
 # Exit code 0 only if every check passed.
 # ===========================================================================
@@ -913,6 +914,110 @@ P2="$(sed -n 's/^APP_DB_PASSWORD=//p' "$ROOT_DIR/apps/alpha_shop/.env" | tail -1
 
 # ===========================================================================
 section "Logs from anything that is not healthy"
+# ===========================================================================
+gate_section 11
+section "11. Running the whole deployment again, and surviving a reboot"
+# ===========================================================================
+# Two things an operator does that nothing above tests.
+#
+# FIRST: run bootstrap.sh a second time on a machine that is already set up.
+# That happens on every upgrade and after every interrupted run, and the way
+# it goes wrong is not an error -- it is a regenerated POSTGRES_PASSWORD. The
+# old password lives inside the existing data volume, so a new one locks the
+# server out of its own database, silently, until the next restart. The unit
+# tests cover the helper that writes it; this covers the real script on a real
+# machine with a real volume.
+PW_BEFORE="$(sed -n 's/^POSTGRES_PASSWORD=//p' "$ROOT_DIR/.env" | tail -1)"
+APPS_BEFORE="$(pgq "select count(*) from central.applications")"
+ROWS_BEFORE="$(pgq 'select count(*) from public.load_sales' "$APP" 2>/dev/null || echo 0)"
+
+if "$DEPLOY/bootstrap.sh" --acme-email staging@example.invalid --yes --no-firewall \
+     > /tmp/bootstrap2.log 2>&1; then
+  pass "bootstrap.sh ran a second time on an already-configured machine"
+else
+  fail "re-running bootstrap.sh failed on a machine it had already set up"
+  detail tail -20 /tmp/bootstrap2.log
+fi
+
+PW_AFTER="$(sed -n 's/^POSTGRES_PASSWORD=//p' "$ROOT_DIR/.env" | tail -1)"
+if [ -n "$PW_BEFORE" ] && [ "$PW_BEFORE" = "$PW_AFTER" ]; then
+  pass "the database password was NOT regenerated, so the server keeps access to its volume"
+else
+  fail "the database password CHANGED on re-run; a real server would be locked out of its own data"
+fi
+
+# The database must still answer, and still hold what it held.
+if [ "$(pgq 'select 1')" = "1" ]; then
+  pass "PostgreSQL still answers after the second bootstrap"
+else
+  fail "PostgreSQL does not answer after re-running bootstrap"
+fi
+APPS_AFTER="$(pgq "select count(*) from central.applications")"
+[ -n "$APPS_BEFORE" ] && [ "$APPS_BEFORE" = "$APPS_AFTER" ] \
+  && pass "the application registry is unchanged ($APPS_AFTER application(s))" \
+  || fail "the registry changed across a re-run: $APPS_BEFORE -> $APPS_AFTER"
+
+# SECOND: a reboot. Everything is stopped and started the way a restart policy
+# would, and every container must come back on its own with the data intact.
+# Section 4 restarts one container; this restarts the machine's whole stack.
+note "stopping every container, then starting the stack again — a reboot, in effect"
+RESTART_LIST="$(docker ps --format '{{.Names}}' | sort | tr '\n' ' ')"
+note "containers before: $RESTART_LIST"
+docker stop $(docker ps -q) >/dev/null 2>&1 || true
+sleep 3
+STOPPED="$(docker ps -q | wc -l | tr -d ' ')"
+[ "${STOPPED:-1}" = "0" ] && pass "every container stopped cleanly" \
+                          || note "$STOPPED container(s) were still running after stop"
+
+# --env-file, exactly as bootstrap.sh starts it. Without it the shared stack's
+# variables are unset and compose refuses, which would have looked like a
+# failure to recover rather than a mistake in this test.
+( cd "$ROOT_DIR/compose" \
+  && docker compose --env-file "$ROOT_DIR/.env" -f docker-compose.yml up -d \
+       >/tmp/restack.log 2>&1 ) || true
+for a in $(pgq "select name from central.applications order by name"); do
+  [ -x "$ROOT_DIR/apps/$a/compose.sh" ] || continue
+  ( cd "$ROOT_DIR/apps/$a" && ./compose.sh up -d >>/tmp/restack.log 2>&1 ) || true
+done
+
+# Wait for health rather than assuming it.
+back=0
+for _ in $(seq 1 36); do
+  bad=0
+  for c in $(docker ps -a --format '{{.Names}}'); do
+    st="$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null)"
+    h="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$c" 2>/dev/null)"
+    [ "$st" = "running" ] || { bad=$((bad+1)); continue; }
+    [ "$h" = "healthy" ] || [ "$h" = "none" ] || bad=$((bad+1))
+  done
+  [ "$bad" = "0" ] && { back=1; break; }
+  sleep 5
+done
+if [ "$back" = "1" ]; then
+  pass "every container came back running and healthy after the whole stack was stopped"
+else
+  fail "$bad container(s) did not come back healthy after a full stop and start"
+  detail bash -c "docker ps -a --format '{{.Names}} {{.Status}}'"
+fi
+
+# And the data is still there. A stack that comes back empty is worse than one
+# that does not come back.
+ROWS_AFTER="$(pgq 'select count(*) from public.load_sales' "$APP" 2>/dev/null || echo 0)"
+if [ "${ROWS_BEFORE:-0}" -gt 0 ] && [ "$ROWS_BEFORE" = "$ROWS_AFTER" ]; then
+  pass "the application's data survived the restart ($ROWS_AFTER rows, unchanged)"
+elif [ "${ROWS_BEFORE:-0}" = "0" ]; then
+  fail "there were no rows to check, so data survival was not proven"
+else
+  fail "row count changed across the restart: $ROWS_BEFORE -> $ROWS_AFTER"
+fi
+
+# Requests must work again without anyone touching anything.
+CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
+  -H "apikey: $ANON" -H "Authorization: Bearer $ANON" \
+  "http://$APP_DNS.staging.test/rest/v1/load_sales?select=id&limit=1" 2>/dev/null || echo 000)"
+[ "$CODE" = "200" ] && pass "the API answers again after the restart, unattended (HTTP 200)" \
+                    || fail "the API returned HTTP $CODE after the restart"
+
 # ===========================================================================
 # The first run reported "central-caddy is 'restarting'" and nothing about
 # why, because the reason lived in the container's log and the report did not

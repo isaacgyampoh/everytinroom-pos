@@ -48,7 +48,8 @@ TESTS = [
     ("Restart recovery, unattended", True,
      [r"returned to healthy after a restart", r"restart policy is unless-stopped"]),
     ("Two applications provisioned with different services", True,
-     [r"provisioned alpha_shop", r"provisioned beta_shop"]),
+     [r"provisioned alpha_shop", r"provisioned beta_shop"],
+     [r"provisioning \w+ failed"]),
     ("Only requested services provisioned", True,
      [r"has NO auth schema", r"profiles are 'auth'"]),
     ("Database isolation: credentials refused across applications", True,
@@ -60,46 +61,78 @@ TESTS = [
     ("Provisioning is idempotent", True,
      [r"re-provisioning .* changed nothing", r"re-provisioning kept the existing password"]),
     ("PostgREST answers through the proxy", True,
-     [r"PostgREST answers through the proxy", r"PostgREST answers \(HTTP"]),
-    ("Realtime subscription accepted", True, [r"subscription was accepted"]),
+     [r"PostgREST answers through the proxy", r"PostgREST answers \(HTTP"],
+     [r"PostgREST through the proxy returned HTTP", r"-rest never became healthy"]),
+    ("Realtime subscription accepted", True, [r"subscription was accepted"],
+     [r"subscription was not accepted", r"\.realtime is not running"]),
     ("Realtime's own schema and WAL reader exist", True,
      [r"list_changes present: 1", r"realtime\.list_changes\(\) exists"]),
     ("Realtime delivers a database change end to end", True,
-     [r"INSERT produced a Realtime event"]),
+     [r"INSERT produced a Realtime event"],
+     [r"no Realtime event arrived"]),
     ("Storage grants applied after the service's own migrations", True,
-     [r"post-start granted the storage schema"]),
-    ("Object storage upload", True, [r"UPLOAD through storage-api"]),
+     [r"post-start granted the storage schema"],
+     [r"post-start did not complete", r"storage-api never became healthy"]),
+    ("Object storage upload", True, [r"UPLOAD through storage-api"],
+     [r"upload returned HTTP", r"storage-api never became healthy"]),
     ("Object storage download returns identical bytes", True,
-     [r"DOWNLOAD returned the same bytes"]),
+     [r"DOWNLOAD returned the same bytes"],
+     [r"download returned HTTP", r"storage-api never became healthy"]),
     ("Object really lands in the object store", True,
      [r"physically in the S3 bucket"]),
-    ("Object storage delete", True, [r"DELETE removed the object", r"gone from the bucket"]),
+    ("Object storage delete", True, [r"DELETE removed the object", r"gone from the bucket"],
+     [r"delete returned HTTP", r"still in the bucket after"]),
     ("Backup produces a dump and cluster globals", True,
-     [r"a dump was produced", r"cluster globals were dumped"]),
+     [r"a dump was produced", r"cluster globals were dumped"],
+     [r"backup\.sh exited non-zero"]),
     ("Restore into a SEPARATE database", True,
-     [r"restored into a separate database"]),
+     [r"restored into a separate database"],
+     [r"restore\.sh exited non-zero"]),
     ("Restore verified by row count and a money total", True,
-     [r"restored row count matches", r"restored money total matches"]),
+     [r"restored row count matches", r"restored money total matches"],
+     [r"restored row count is", r"restored total is"]),
     ("Live database untouched by the restore rehearsal", True,
      [r"live database was left alone"]),
     ("Scheduled job registered in another database", True,
      [r"job was registered for alpha_shop"]),
-    ("Scheduled job actually executed", True, [r"actually executed in the other database"]),
-    ("Scheduled job reached a new API URL", True, [r"reached the new API URL"]),
+    ("Scheduled job actually executed", True, [r"actually executed in the other database"],
+     [r"the job never ran"]),
+    ("Scheduled job reached a new API URL", True, [r"reached the new API URL"],
+     [r"did not reach PostgREST through pg_net"]),
     ("pg_net is pinned to the one database its worker serves", True,
      [r"pg_net\.database_name is 'postgres'"]),
     ("pg_net's one-database limit measured, not assumed", True,
      [r"pg_net from an application's own database queues",
       r"pg_net behaviour from an application database recorded"]),
     ("Sustained load served without errors", True,
-     [r"served a sustained load with no non-2xx"]),
-    ("Throughput and latency measured", True, [r"measured throughput:"]),
+     [r"served a sustained load with no non-2xx"],
+     [r"returned errors under load"]),
+    ("Throughput and latency measured", True, [r"measured throughput:"],
+     [r"produced no throughput figure"]),
     ("Resource usage measured UNDER LOAD, not at rest", True,
-     [r"resource usage captured under load"]),
+     [r"resource usage captured under load"],
+     [r"no peak resource figures"]),
     ("Capacity report with headroom estimate", True, [r"headroom estimate"]),
-    ("Service health check across applications", True, [r"health\.sh reported every service healthy"]),
+    ("Service health check across applications", True,
+     [r"health\.sh reported every service healthy"],
+     [r"health\.sh reported problems"]),
     ("Provisioning from an already-configured machine", True,
      [r"third application provisioned"]),
+    ("The whole deployment re-run on a configured machine", True,
+     [r"bootstrap\.sh ran a second time"],
+     [r"re-running bootstrap\.sh failed"]),
+    ("Re-running the deployment does not regenerate the DB password", True,
+     [r"password was NOT regenerated, so the server keeps access"],
+     [r"password CHANGED on re-run"]),
+    ("Registry unchanged by a re-run", True, [r"application registry is unchanged"]),
+    ("Whole stack recovers from a full stop, unattended", True,
+     [r"came back running and healthy after the whole stack"],
+     [r"did not come back healthy after a full stop"]),
+    ("Data survives a full restart", True, [r"data survived the restart"],
+     [r"row count changed across the restart", r"no rows to check"]),
+    ("API answers again after a restart with no intervention", True,
+     [r"API answers again after the restart"],
+     [r"API returned HTTP .* after the restart"]),
     # Cannot be done from here: needs the owner's Cloudflare credentials.
     ("Cloudflare R2: real upload, download, integrity, delete", True, [r"__never_matches__"]),
 ]
@@ -147,18 +180,34 @@ def load(path):
     return open(path, encoding="utf-8", errors="replace").read()
 
 
-def state_of(patterns, texts):
-    """PASSED if a PASS line matches; FAILED if a FAIL line does; else NOT VERIFIED."""
+def state_of(patterns, texts, fail_patterns=()):
+    """PASSED if a PASS line matches; FAILED if a FAIL line does; else NOT VERIFIED.
+
+    A check's failure often does not read like its success -- the run prints
+    "no Realtime event arrived", not "an INSERT produced a Realtime event".
+    Matching only the success wording filed those as NOT VERIFIED, which reads
+    as "nobody looked" when in fact the test ran and failed. Both still block
+    a ready verdict, but they are not the same statement, so failures are
+    matched on their own wording.
+    """
+    # A failure is looked for FIRST: a run can print a PASS for one half of a
+    # check and a FAIL for the other, and the failure is the finding.
     for text in texts:
         for line in text.split("\n"):
-            if not line.strip().startswith("- "):
+            st = line.strip()
+            if "**FAIL**" not in st:
+                continue
+            for p in tuple(fail_patterns) + tuple(patterns):
+                if re.search(p, st, re.I):
+                    return "FAILED", st[:160]
+    for text in texts:
+        for line in text.split("\n"):
+            st = line.strip()
+            if not st.startswith("- PASS"):
                 continue
             for p in patterns:
-                if re.search(p, line, re.I):
-                    if "**FAIL**" in line:
-                        return "FAILED", line.strip()[:160]
-                    if line.strip().startswith("- PASS"):
-                        return "PASSED", line.strip()[:160]
+                if re.search(p, st, re.I):
+                    return "PASSED", st[:160]
     return "NOT VERIFIED", ""
 
 
@@ -179,8 +228,10 @@ def main():
                  "report proves, so with no report there is nothing to say.")
 
     results = []
-    for name, required, pats in TESTS:
-        st, ev = state_of(pats, texts)
+    for t in TESTS:
+        name, required, pats = t[0], t[1], t[2]
+        fails = t[3] if len(t) > 3 else ()
+        st, ev = state_of(pats, texts, fails)
         results.append((name, required, st, ev))
 
     passed = [r for r in results if r[2] == "PASSED"]

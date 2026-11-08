@@ -152,6 +152,27 @@ jobs:
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Verdict, computed from the report
+        if: always()
+        continue-on-error: true
+        # readiness-package.py with no inventory and no sizing: the acceptance
+        # table and the verdict, which is all that can be computed here.
+        #
+        # The project inventory and the VPS sizing are NOT produced in CI, on
+        # purpose. The inventory names the owner's other projects and their
+        # sizes, and this repository is public, so it stays off it entirely --
+        # the complete package is generated on the owner's own machine from
+        # this report plus the local inventory.
+        run: |
+          sudo chmod 0644 /tmp/staging-report.md 2>/dev/null || true
+          python3 deploy/scripts/readiness-package.py \
+            --full /tmp/staging-report.md \
+            --repo . \
+            --run-id "${{ github.run_id }}" \
+            --out /tmp/VERDICT.md || true
+          echo "## Verdict, computed from the evidence" >> "$GITHUB_STEP_SUMMARY"
+          sed -n '/## Verdict/,/## Acceptance/p' /tmp/VERDICT.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+
       - name: Publish the report to the results branch
         if: always()
         # Published to a DEDICATED branch, force-pushed.
@@ -165,6 +186,7 @@ jobs:
           mkdir -p deploy/staging-results
           sudo cp /tmp/staging-report.md  deploy/staging-results/report.md 2>/dev/null || true
           sudo cp /tmp/staging-console.log deploy/staging-results/console.log 2>/dev/null || true
+          cp /tmp/VERDICT.md deploy/staging-results/VERDICT.md 2>/dev/null || true
           sudo chown "$(id -u):$(id -g)" deploy/staging-results/* 2>/dev/null || true
           # Trim the console log: the point is the verdicts, not every apt line.
           if [ -f deploy/staging-results/console.log ]; then
