@@ -49,10 +49,23 @@ psql -tAqX -c 'select 1' >/dev/null 2>&1 || {
   exit 2
 }
 [ "$(q "select current_setting('is_superuser')")" = "on" ] || {
-  echo "Must be superuser to create databases and roles." >&2; exit 2; }
+  echo "Must be superuser to SET UP this test (it creates the non-superuser" >&2
+  echo "role that then does the provisioning)." >&2; exit 2; }
+
+# A role shaped like the one this will really run as.
+#
+# Supabase's `postgres` has CREATEDB and CREATEROLE and is NOT a superuser.
+# That difference is not cosmetic: when a non-superuser creates a role,
+# PostgreSQL 16+ gives the creator admin_option but NOT set_option, so
+# `CREATE DATABASE ... OWNER <role>` fails with "must be able to SET ROLE".
+# Provisioning as a superuser hides that completely, which is how it reached a
+# staging run. The superuser here is used only to set this up and tear it down.
+MGD="${PFX}_provisioner"
+MGD_PW="$(openssl rand -hex 16)"
 
 cleanup() {
   set +e
+  psql -qX -d postgres -c "DROP ROLE IF EXISTS \"$MGD\"" >/dev/null 2>&1
   for db in "$A_DB" "$B_DB"; do
     psql -qX -d postgres -c "DROP DATABASE IF EXISTS \"$db\" WITH (FORCE)" >/dev/null 2>&1
   done
@@ -97,23 +110,46 @@ fi
 # pg_net and pg_cron are in the supabase image but not usually on a laptop.
 # The test runs the grants file with whatever is unavailable commented out,
 # and says which lines it skipped rather than pretending it checked them.
+# The SQL itself distinguishes "not available in this installation" from "not
+# permitted". On a laptop pg_net is simply absent, so the file is run with
+# require_extensions=off and it says which ones it therefore skipped. The file
+# is NOT edited -- an earlier version rewrote it with sed, which meant the
+# test exercised a different file from the one that ships.
 SKIPPED=""
-GRANTS_SQL="$(mktemp)"; trap 'rm -f "$GRANTS_SQL"' RETURN 2>/dev/null || true
-cp "$SQL_DIR/20-app-grants.sql" "$GRANTS_SQL"
 for ext in pg_net pg_cron; do
-  if [ "$(q "select count(*) from pg_available_extensions where name='$ext'")" = "0" ]; then
-    SKIPPED="$SKIPPED $ext"
-    sed -i.bak "s/^CREATE EXTENSION IF NOT EXISTS $ext;/-- skipped on this server: $ext/" "$GRANTS_SQL"
-  fi
+  [ "$(q "select count(*) from pg_available_extensions where name='$ext'")" = "0" ] \
+    && SKIPPED="$SKIPPED $ext"
 done
-[ -n "$SKIPPED" ] && say "not available here, so not exercised:$SKIPPED"
+GRANTS_SQL="$SQL_DIR/20-app-grants.sql"
+REQ_EXT=on
+if [ -n "$SKIPPED" ]; then
+  REQ_EXT=off
+  say "not available on this server, so not exercised:$SKIPPED"
+  say "(the shipped file is run unmodified, with require_extensions=off)"
+fi
+
+psql -qX -c "DROP ROLE IF EXISTS \"$MGD\"" >/dev/null 2>&1
+psql -qX -c "CREATE ROLE \"$MGD\" LOGIN CREATEDB CREATEROLE PASSWORD '$MGD_PW'" >/dev/null
+# On the real server the provisioning role holds ADMIN OPTION on these,
+# because it is the role that created them. Mirrored here so the test exercises
+# the same conditions rather than an accidentally weaker set.
+for r in anon authenticated service_role; do
+  psql -qX -c "GRANT \"$r\" TO \"$MGD\" WITH ADMIN OPTION" >/dev/null 2>&1
+done
+[ "$(q "select rolsuper::text from pg_roles where rolname='$MGD'")" = "false" ] \
+  && say "provisioning as $MGD (CREATEDB, CREATEROLE, NOT superuser -- as on a managed server)" \
+  || fail "the provisioning role came out as a superuser, so this test proves less than it should"
+
+# Everything the provisioning SQL does runs through the non-superuser.
+mgd() { PGPASSWORD="$MGD_PW" psql -qX -v ON_ERROR_STOP=1 -h "${PGHOST:-localhost}" -U "$MGD" "$@"; }
 
 provision() { # db owner authn password
-  psql -qX -v ON_ERROR_STOP=1 -d postgres \
+  mgd -d postgres \
     -v app="$1" -v dbname="$1" -v owner="$2" -v authn="$3" \
     -f "$SQL_DIR/10-create-app-db.sql" >/dev/null
-  psql -qX -v ON_ERROR_STOP=1 -d "$1" \
+  mgd -d "$1" \
     -v dbname="$1" -v owner="$2" -v authn="$3" -v authn_password="$4" \
+    -v require_extensions="$REQ_EXT" \
     -f "$GRANTS_SQL" >/dev/null
 }
 

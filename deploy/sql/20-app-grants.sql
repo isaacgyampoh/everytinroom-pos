@@ -22,14 +22,92 @@
 \set ON_ERROR_STOP on
 -- 'already exists' notices are expected on a re-run and drown out real ones.
 SET client_min_messages = warning;
+SELECT set_config('provision.authn', :'authn', false);
 
--- Extensions Everytinroom's schema depends on, as captured from production.
--- pg_cron is deliberately NOT here: its scheduler runs in the 'postgres'
+-- ---------------------------------------------------------------------------
+-- Extensions
+--
+-- Separated into what the application CANNOT RUN WITHOUT and what is merely
+-- useful, because they are not equally important and provisioning should not
+-- die on the useful ones.
+--
+-- Creating an extension generally needs superuser. On a managed PostgreSQL
+-- the provisioning role is not one -- Supabase's `postgres` is not -- and its
+-- supautils extension permits a whitelist instead. So each is attempted and
+-- the outcome is reported: a REQUIRED one that cannot be created aborts with
+-- an explanation, an OPTIONAL one only warns.
+--
+-- pg_cron is deliberately absent: its scheduler runs in the 'postgres'
 -- database and jobs are registered with cron.schedule_in_database().
-CREATE EXTENSION IF NOT EXISTS pgcrypto;      -- PIN hashing (migration 018)
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS pg_net;        -- cron jobs call edge functions
-CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+-- ---------------------------------------------------------------------------
+-- A caller may set this to 'off' to downgrade a MISSING extension from an
+-- error to a warning. It exists for one case: a developer laptop where
+-- pg_net is not installed at all. It is 'on' everywhere that matters, and the
+-- test that sets it says out loud which extensions it therefore did not
+-- exercise.
+\if :{?require_extensions}
+\else
+  \set require_extensions on
+\endif
+SELECT set_config('provision.require_ext', :'require_extensions', false);
+
+DO $$
+DECLARE
+  ext      text;
+  ok_list  text := '';
+  missing  text := '';
+  unavail  text := '';
+  strict_mode boolean := current_setting('provision.require_ext') <> 'off';
+BEGIN
+  -- Required. pgcrypto hashes staff PINs (migration 018); uuid-ossp and
+  -- pg_net are called by the schema and by the scheduled jobs.
+  FOREACH ext IN ARRAY ARRAY['pgcrypto', 'uuid-ossp', 'pg_net'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = ext) THEN
+      ok_list := ok_list || ' ' || ext || '(already)';
+      CONTINUE;
+    END IF;
+    -- Distinguish "this installation does not have it" from "I am not
+    -- allowed to create it". They need different answers.
+    IF NOT EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = ext) THEN
+      unavail := unavail || ' ' || ext;
+      CONTINUE;
+    END IF;
+    BEGIN
+      EXECUTE format('CREATE EXTENSION IF NOT EXISTS %I', ext);
+      ok_list := ok_list || ' ' || ext;
+    EXCEPTION WHEN insufficient_privilege OR feature_not_supported THEN
+      missing := missing || ' ' || ext;
+    END;
+  END LOOP;
+
+  IF missing <> '' THEN
+    RAISE EXCEPTION
+      'Not permitted to create required extension(s):%. The application needs them -- pgcrypto hashes staff PINs, pg_net is how the scheduled jobs make HTTP calls. Create them once as a superuser and run this again: CREATE EXTENSION IF NOT EXISTS <name>;', missing;
+  END IF;
+
+  IF unavail <> '' THEN
+    IF strict_mode THEN
+      RAISE EXCEPTION
+        'Required extension(s) are not available in this PostgreSQL installation:%. The supabase/postgres image ships them; a plain postgres image does not. Check the image tag in docker-compose.yml.', unavail;
+    ELSE
+      RAISE WARNING
+        'Extension(s) not available here and NOT exercised:%  (require_extensions=off)', unavail;
+    END IF;
+  END IF;
+
+  -- Optional: statement statistics, for the capacity report. Useful, and
+  -- nothing in the application calls it.
+  IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements') THEN
+    BEGIN
+      CREATE EXTENSION pg_stat_statements;
+      ok_list := ok_list || ' pg_stat_statements';
+    EXCEPTION WHEN insufficient_privilege OR feature_not_supported THEN
+      RAISE WARNING 'pg_stat_statements could not be created (needs superuser). Query statistics will be missing from the capacity report; nothing in the application depends on it.';
+    END;
+  END IF;
+
+  RAISE NOTICE 'extensions ready:%', ok_list;
+END $$;
 
 -- ---------------------------------------------------------------------------
 -- The public schema
@@ -51,7 +129,24 @@ GRANT CREATE, USAGE ON SCHEMA public TO :"owner";
 -- anonymous request or service_role for a trusted one. It is NOINHERIT, so
 -- the switch is the only way it gains anything.
 -- ---------------------------------------------------------------------------
-GRANT anon, authenticated, service_role TO :"authn";
+-- Granting these needs ADMIN OPTION on them. On the supabase/postgres image
+-- the `postgres` role created them and therefore has it. A provisioning role
+-- that did not create them does not, and the error PostgreSQL gives
+-- ("Only roles with the ADMIN option ... may grant this role") does not say
+-- what to do about it, so this does.
+DO $$
+DECLARE r text;
+BEGIN
+  FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
+    BEGIN
+      EXECUTE format('GRANT %I TO %I', r, current_setting('provision.authn'));
+    EXCEPTION WHEN insufficient_privilege THEN
+      RAISE EXCEPTION
+        'Cannot grant % to %. PostgREST becomes that role by SET ROLE, so without this the API rejects every request. Run this once as a superuser: GRANT anon, authenticated, service_role TO %I WITH ADMIN OPTION; -- where %I is the role that runs provisioning. Then run this again.',
+        r, current_setting('provision.authn'), current_user, current_user;
+    END;
+  END LOOP;
+END $$;
 
 -- A belt-and-braces check on the roles PostgREST switches into: if any of
 -- them could log in, the anon key would be a database password.
@@ -89,10 +184,23 @@ ALTER ROLE :"authn" IN DATABASE :"dbname" SET search_path = public, extensions;
 -- ALTER ROLE could be written into the server log in clear text by
 -- log_min_duration_statement, and the log is not a secret store.
 -- ---------------------------------------------------------------------------
-SET log_min_duration_statement = -1;
-SET log_statement = 'none';
+-- Best effort: these need superuser on some servers, and provisioning must
+-- not die over a logging preference. The point is to keep the password that
+-- follows out of the server log; where that is not permitted, the statement
+-- is fast enough that log_min_duration_statement will not catch it anyway.
+DO $$
+BEGIN
+  SET log_min_duration_statement = -1;
+  SET log_statement = 'none';
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE WARNING 'Could not silence statement logging (needs superuser). The password statement below may appear in the server log if slow-statement logging is aggressive.';
+END $$;
 ALTER ROLE :"authn" PASSWORD :'authn_password';
-RESET log_statement;
-RESET log_min_duration_statement;
+DO $$
+BEGIN
+  RESET log_statement;
+  RESET log_min_duration_statement;
+EXCEPTION WHEN insufficient_privilege THEN NULL;
+END $$;
 
 \echo '  database internals configured (no table grants added, by design)'

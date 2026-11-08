@@ -48,10 +48,23 @@ BEGIN
   END IF;
 END $$;
 
-SET log_min_duration_statement = -1;
-SET log_statement = 'none';
+-- Best effort: these need superuser on some servers, and provisioning must
+-- not die over a logging preference. The point is to keep the password that
+-- follows out of the server log; where that is not permitted, the statement
+-- is fast enough that log_min_duration_statement will not catch it anyway.
+DO $$
+BEGIN
+  SET log_min_duration_statement = -1;
+  SET log_statement = 'none';
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE WARNING 'Could not silence statement logging (needs superuser). The password statement below may appear in the server log if slow-statement logging is aggressive.';
+END $$;
 ALTER ROLE :"st_user" PASSWORD :'st_password';
-RESET log_statement;
-RESET log_min_duration_statement;
+DO $$
+BEGIN
+  RESET log_statement;
+  RESET log_min_duration_statement;
+EXCEPTION WHEN insufficient_privilege THEN NULL;
+END $$;
 
 \echo '  storage role ready'

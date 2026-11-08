@@ -17,6 +17,27 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 
+-- ADMIN OPTION on the three roles PostgREST switches into.
+--
+-- Provisioning has to run `GRANT anon TO <app>_authenticator`, which needs
+-- admin on anon. On the supabase/postgres image the `postgres` role created
+-- these and already has it; this makes that explicit so provisioning does not
+-- fail later with an error that does not explain itself. Best effort: if the
+-- current role cannot grant admin on them, provisioning will say what to run.
+DO $$
+DECLARE r text;
+BEGIN
+  FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+      BEGIN
+        EXECUTE format('GRANT %I TO CURRENT_USER WITH ADMIN OPTION', r);
+      EXCEPTION WHEN insufficient_privilege OR duplicate_object THEN
+        RAISE WARNING 'Could not take ADMIN OPTION on %. If provisioning later fails to grant it, run that GRANT once as a superuser.', r;
+      END;
+    END IF;
+  END LOOP;
+END $$;
+
 -- A read-only role for the capacity monitor (deploy/capacity.sh). It can see
 -- sizes, connection counts and statement statistics, and no application data.
 -- pg_monitor is a built-in role that grants exactly that.
