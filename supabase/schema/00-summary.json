@@ -1,0 +1,17 @@
+{
+ "project_ref": "noiiuwkovoojkcwzupye",
+ "captured_counts": {
+  "01-extensions": 7,
+  "02-tables": 247,
+  "03-constraints": 88,
+  "04-indexes": 65,
+  "05-functions": 42,
+  "06-triggers": 3,
+  "07-policies": 45,
+  "08-grants": 77,
+  "09-sequences": 2,
+  "10-views": 2,
+  "11-cron": 6,
+  "12-rls": 27
+ }
+}

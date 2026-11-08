@@ -1,0 +1,530 @@
+[
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_75982_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "app_releases"
+ },
+ {
+  "check_clause": "platform IS NOT NULL",
+  "constraint_name": "2200_75982_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "app_releases"
+ },
+ {
+  "check_clause": "version IS NOT NULL",
+  "constraint_name": "2200_75982_3_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "app_releases"
+ },
+ {
+  "check_clause": "object_path IS NOT NULL",
+  "constraint_name": "2200_75982_4_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "app_releases"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "app_releases_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "app_releases"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_21894_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "bundles"
+ },
+ {
+  "check_clause": "name IS NOT NULL",
+  "constraint_name": "2200_21894_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "bundles"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "bundles_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "bundles"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_21932_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "customers"
+ },
+ {
+  "check_clause": "phone IS NOT NULL",
+  "constraint_name": "2200_21932_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "customers"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "customers_phone_key",
+  "constraint_type": "UNIQUE",
+  "table_name": "customers"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "customers_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "customers"
+ },
+ {
+  "check_clause": "key IS NOT NULL",
+  "constraint_name": "2200_75442_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "doc_counters"
+ },
+ {
+  "check_clause": "value IS NOT NULL",
+  "constraint_name": "2200_75442_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "doc_counters"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "doc_counters_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "doc_counters"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_75508_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "drawer_sessions"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "drawer_sessions_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "drawer_sessions"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_21956_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "expenses"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "expenses_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "expenses"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_75549_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "image_rollback_20260831"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "image_rollback_20260831_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "image_rollback_20260831"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_22008_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "invoices"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "invoices_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "invoices"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_75425_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "pin_attempts"
+ },
+ {
+  "check_clause": "at IS NOT NULL",
+  "constraint_name": "2200_75425_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "pin_attempts"
+ },
+ {
+  "check_clause": "succeeded IS NOT NULL",
+  "constraint_name": "2200_75425_3_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "pin_attempts"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "pin_attempts_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "pin_attempts"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_21878_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "products"
+ },
+ {
+  "check_clause": "name IS NOT NULL",
+  "constraint_name": "2200_21878_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "products"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "products_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "products"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_21997_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "promos"
+ },
+ {
+  "check_clause": "name IS NOT NULL",
+  "constraint_name": "2200_21997_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "promos"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "promos_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "promos"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_74770_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "receivings"
+ },
+ {
+  "check_clause": "ref_no IS NOT NULL",
+  "constraint_name": "2200_74770_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "receivings"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "receivings_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "receivings"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "receivings_ref_no_key",
+  "constraint_type": "UNIQUE",
+  "table_name": "receivings"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "receivings_supplier_id_fkey",
+  "constraint_type": "FOREIGN KEY",
+  "table_name": "receivings"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_22049_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "refunds"
+ },
+ {
+  "check_clause": "refund_no IS NOT NULL",
+  "constraint_name": "2200_22049_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "refunds"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "refunds_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "refunds"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_21906_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "sales"
+ },
+ {
+  "check_clause": "receipt_no IS NOT NULL",
+  "constraint_name": "2200_21906_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "sales"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "sales_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "sales"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "sales_receipt_no_key",
+  "constraint_type": "UNIQUE",
+  "table_name": "sales"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_21945_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "staff"
+ },
+ {
+  "check_clause": "name IS NOT NULL",
+  "constraint_name": "2200_21945_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "staff"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "staff_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "staff"
+ },
+ {
+  "check_clause": "token IS NOT NULL",
+  "constraint_name": "2200_75414_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "staff_sessions"
+ },
+ {
+  "check_clause": "staff_id IS NOT NULL",
+  "constraint_name": "2200_75414_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "staff_sessions"
+ },
+ {
+  "check_clause": "created_at IS NOT NULL",
+  "constraint_name": "2200_75414_3_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "staff_sessions"
+ },
+ {
+  "check_clause": "expires_at IS NOT NULL",
+  "constraint_name": "2200_75414_4_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "staff_sessions"
+ },
+ {
+  "check_clause": "last_seen IS NOT NULL",
+  "constraint_name": "2200_75414_5_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "staff_sessions"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "staff_sessions_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "staff_sessions"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_21982_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "stock_adjustments"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "stock_adjustments_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "stock_adjustments"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_74874_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "stock_ledger"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "stock_ledger_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "stock_ledger"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_21969_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "stock_takes"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "stock_takes_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "stock_takes"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_73202_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "store_settings"
+ },
+ {
+  "check_clause": "shop_open IS NOT NULL",
+  "constraint_name": "2200_73202_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "store_settings"
+ },
+ {
+  "check_clause": "closed_message IS NOT NULL",
+  "constraint_name": "2200_73202_3_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "store_settings"
+ },
+ {
+  "check_clause": "updated_at IS NOT NULL",
+  "constraint_name": "2200_73202_4_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "store_settings"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "store_settings_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "store_settings"
+ },
+ {
+  "check_clause": "(id = 1)",
+  "constraint_name": "store_settings_singleton",
+  "constraint_type": "CHECK",
+  "table_name": "store_settings"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_74758_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "suppliers"
+ },
+ {
+  "check_clause": "name IS NOT NULL",
+  "constraint_name": "2200_74758_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "suppliers"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "suppliers_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "suppliers"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_75491_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "terminals"
+ },
+ {
+  "check_clause": "name IS NOT NULL",
+  "constraint_name": "2200_75491_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "terminals"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "terminals_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "terminals"
+ },
+ {
+  "check_clause": "session_id IS NOT NULL",
+  "constraint_name": "2200_60935_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "ussd_sessions"
+ },
+ {
+  "check_clause": "order_code IS NOT NULL",
+  "constraint_name": "2200_60935_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "ussd_sessions"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "ussd_sessions_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "ussd_sessions"
+ },
+ {
+  "check_clause": "key IS NOT NULL",
+  "constraint_name": "2200_74442_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "wa_agent_settings"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "wa_agent_settings_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "wa_agent_settings"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_74406_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "wa_conversations"
+ },
+ {
+  "check_clause": "phone IS NOT NULL",
+  "constraint_name": "2200_74406_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "wa_conversations"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "wa_conversations_phone_key",
+  "constraint_type": "UNIQUE",
+  "table_name": "wa_conversations"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "wa_conversations_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "wa_conversations"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_74428_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "wa_messages"
+ },
+ {
+  "check_clause": "phone IS NOT NULL",
+  "constraint_name": "2200_74428_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "wa_messages"
+ },
+ {
+  "check_clause": "role IS NOT NULL",
+  "constraint_name": "2200_74428_3_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "wa_messages"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "wa_messages_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "wa_messages"
+ },
+ {
+  "check_clause": "id IS NOT NULL",
+  "constraint_name": "2200_22026_1_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "check_clause": "order_no IS NOT NULL",
+  "constraint_name": "2200_22026_2_not_null",
+  "constraint_type": "CHECK",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "check_clause": "",
+  "constraint_name": "whatsapp_orders_pkey",
+  "constraint_type": "PRIMARY KEY",
+  "table_name": "whatsapp_orders"
+ }
+]

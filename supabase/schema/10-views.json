@@ -1,0 +1,10 @@
+[
+ {
+  "table_name": "products_sale",
+  "view_definition": " SELECT id,\n    name,\n    category,\n    price,\n    wholesale_price,\n    wholesale_min_qty,\n    quantity,\n    image,\n    group_tag,\n    barcode\n   FROM products;"
+ },
+ {
+  "table_name": "staff_safe",
+  "view_definition": " SELECT id,\n    name,\n    role,\n    active,\n    COALESCE(permissions, '[]'::jsonb) AS permissions\n   FROM staff;"
+ }
+]

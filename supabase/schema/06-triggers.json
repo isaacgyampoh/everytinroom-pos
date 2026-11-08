@@ -1,0 +1,17 @@
+[
+ {
+  "definition": "CREATE TRIGGER trg_assign_ussd_code BEFORE INSERT ON public.whatsapp_orders FOR EACH ROW EXECUTE FUNCTION assign_ussd_code()",
+  "table_name": "whatsapp_orders",
+  "tgname": "trg_assign_ussd_code"
+ },
+ {
+  "definition": "CREATE TRIGGER trg_auto_tracking BEFORE UPDATE ON public.whatsapp_orders FOR EACH ROW EXECUTE FUNCTION auto_tracking_no()",
+  "table_name": "whatsapp_orders",
+  "tgname": "trg_auto_tracking"
+ },
+ {
+  "definition": "CREATE TRIGGER trg_auto_tracking_insert BEFORE INSERT ON public.whatsapp_orders FOR EACH ROW EXECUTE FUNCTION auto_tracking_no_insert()",
+  "table_name": "whatsapp_orders",
+  "tgname": "trg_auto_tracking_insert"
+ }
+]

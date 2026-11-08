@@ -1,0 +1,14 @@
+[
+ {
+  "data_type": "bigint",
+  "increment": "1",
+  "sequence_name": "pin_attempts_id_seq",
+  "start_value": "1"
+ },
+ {
+  "data_type": "bigint",
+  "increment": "1",
+  "sequence_name": "ussd_code_seq",
+  "start_value": "1"
+ }
+]
