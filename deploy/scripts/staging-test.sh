@@ -532,7 +532,14 @@ JS
     note "----- Realtime's TENANT migrations, and anything that stopped them -----"
     DETAIL_LINES=60 detail bash -c "docker logs '${APP_DNS}.realtime' 2>&1 | grep -iE 'Tenants\.Migrations|MigrationsFailed|tenant_db_dump|dump_not_found|== Migrated 2|== Running 2|\[error\]|permission denied|must be owner|already exists|relation .* does not exist' | grep -v PoolingReplicationError | head -60"
     note "----- how far its own migration history got -----"
-    detail pgq "select version from realtime.schema_migrations order by version" "$APP"
+    DETAIL_LINES=90 detail pgq "select version from realtime.schema_migrations order by version" "$APP"
+    # Which roles this image refuses to let anything modify. Four failures so
+    # far have been a non-superuser trying to act as another role, and one of
+    # Realtime's own migrations creates a role and moves ownership to it. When
+    # that is the wall, this names it instead of leaving it to be guessed at.
+    detail pgq "select 'reserved roles: ' || coalesce(current_setting('supautils.reserved_roles', true), '(not set)')"
+    detail pgq "select 'rt_user attributes: createrole=' || rolcreaterole || ' superuser=' || rolsuper || ' bypassrls=' || rolbypassrls from pg_roles where rolname = '${APP}_realtime'"
+    detail pgq "select 'supabase_realtime_admin exists: ' || count(*) from pg_roles where rolname='supabase_realtime_admin'"
     detail pgq "select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='realtime' order by 1" "$APP"
     note "----- what Realtime actually built in ${APP} -----"
     detail pgq "select coalesce((select 'realtime schema: yes' from pg_namespace where nspname='realtime'), 'realtime schema: NO')" "$APP"
