@@ -77,7 +77,12 @@ import sys, re
 src = open(sys.argv[1]).read()
 bad = []
 for m in re.finditer(r'\$(\w*)\$(.*?)\$\1\$', src, re.S):
-    for v in re.findall(r":'?\"?(\w+)'?\"?", m.group(2)):
+    body = m.group(2)
+    # `::int` is a cast and `:=` is an assignment. Neither is a psql variable
+    # reference, and both appear legitimately inside plpgsql. Blank them out
+    # before looking, or the check reports valid SQL as broken -- which it did.
+    body = body.replace('::', '  ').replace(':=', '  ')
+    for v in re.findall(r"(?<![:\w]):'?\"?(\w+)'?\"?", body):
         bad.append(v)
 sys.exit(1 if bad else 0)
 EOF

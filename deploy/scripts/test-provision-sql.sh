@@ -65,7 +65,6 @@ MGD_PW="$(openssl rand -hex 16)"
 
 cleanup() {
   set +e
-  psql -qX -d postgres -c "DROP ROLE IF EXISTS \"$MGD\"" >/dev/null 2>&1
   for db in "$A_DB" "$B_DB"; do
     psql -qX -d postgres -c "DROP DATABASE IF EXISTS \"$db\" WITH (FORCE)" >/dev/null 2>&1
   done
@@ -77,6 +76,12 @@ cleanup() {
   if [ "$MADE_MONITOR" = "1" ]; then
     psql -qX -d postgres -c "DROP ROLE IF EXISTS central_monitor" >/dev/null 2>&1
   fi
+  # The provisioning role LAST: it owns the databases and roles created above,
+  # and DROP ROLE fails while anything it owns still exists. Dropping it first
+  # left it behind on every run.
+  psql -qX -d postgres -c "REASSIGN OWNED BY \"$MGD\" TO CURRENT_USER" >/dev/null 2>&1
+  psql -qX -d postgres -c "DROP OWNED BY \"$MGD\"" >/dev/null 2>&1
+  psql -qX -d postgres -c "DROP ROLE IF EXISTS \"$MGD\"" >/dev/null 2>&1
   set -e
 }
 trap cleanup EXIT
