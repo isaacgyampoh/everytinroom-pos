@@ -129,8 +129,18 @@ GRANTS_SQL="$SQL_DIR/20-app-grants.sql"
 REQ_EXT=on
 if [ -n "$SKIPPED" ]; then
   REQ_EXT=off
-  say "not available on this server, so not exercised:$SKIPPED"
-  say "(the shipped file is run unmodified, with require_extensions=off)"
+  printf '\n  \033[33mREDUCED CONFIDENCE\033[0m\n'
+  say "These extensions are not installed on this server, so this run did NOT"
+  say "verify them:$SKIPPED"
+  say ""
+  say "On a deployment they are REQUIRED and their absence stops the install:"
+  say "  pg_cron  runs every application's scheduled jobs"
+  say "  pg_net   is how those jobs make HTTP calls"
+  say ""
+  say "The shipped files are run unmodified with require_extensions=off. A real"
+  say "deployment passes on, and bootstrap.sh and provision-app.sh pass it"
+  say "explicitly so no default can drift."
+  printf '\n'
 fi
 
 psql -qX -c "DROP ROLE IF EXISTS \"$MGD\"" >/dev/null 2>&1
@@ -290,9 +300,12 @@ printf '%s' "$cfg" | grep -q "statement_timeout=15s" \
 
 echo
 if [ "$FAILED" = "0" ]; then
-  printf '  \033[32mAll checks passed.\033[0m'
-  [ -n "$SKIPPED" ] && printf ' Not exercised here:%s' "$SKIPPED"
-  printf '\n\n'
+  printf '  \033[32mAll checks passed.\033[0m\n'
+  if [ -n "$SKIPPED" ]; then
+    printf '  \033[33mBut this run did not verify:%s — it is NOT a full pass.\033[0m\n' "$SKIPPED"
+    printf '  Only a run on a server that has them proves those paths.\n'
+  fi
+  printf '\n'
 else
   printf '  \033[31m%d check(s) failed.\033[0m\n\n' "$FAILED"
   exit 1

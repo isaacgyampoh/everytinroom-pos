@@ -483,7 +483,13 @@ else
   # streams to /dev/null, so when this step failed the report said only "could
   # not apply" and the reason -- a one-line PostgreSQL error -- was gone. A
   # failure that hides its own cause costs a whole run to diagnose.
-  if ROLES_OUT="$(docker exec -i central-postgres psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+  # require_extensions=on is passed EXPLICITLY. The file defaults to on, but a
+  # deployment must not depend on a default: a missing pg_cron or pg_net means
+  # no scheduled job will ever run, and that must stop the install rather than
+  # warn in a log nobody reads. Only the laptop test passes off, and it says
+  # loudly which extensions it therefore did not verify.
+  if ROLES_OUT="$(docker exec -i central-postgres psql -v ON_ERROR_STOP=1 \
+       -v require_extensions=on -U postgres -d postgres \
        < "$ROOT_DIR/sql/00-central-roles.sql" 2>&1)"; then
     # Set the monitor password separately, with logging off for that statement.
     docker exec -i central-postgres psql -q -U postgres -d postgres >/dev/null 2>&1 <<EOSQL

@@ -197,7 +197,11 @@ else
   set_env_var "$APP_ENV" APP_DB_USER "$APP_AUTHN"
   set_env_var "$APP_ENV" APP_DOMAIN "${DOMAIN:-localhost}"
 
+  # require_extensions=on, explicitly: an application whose database lacks
+  # pgcrypto cannot hash a staff PIN, and one without pg_net cannot run a
+  # scheduled job. Those must stop provisioning, not warn.
   psqlc -d "$APP_DB" -v dbname="$APP_DB" -v owner="$APP_OWNER" -v authn="$APP_AUTHN" \
+    -v require_extensions=on \
     -v authn_password="$APP_DB_PASSWORD" < "$ROOT_DIR/sql/20-app-grants.sql" >/dev/null \
     || die "Configuring the database internals failed." \
            "The database exists; only the grants step failed, and it is safe to re-run." \

@@ -189,7 +189,10 @@ def check(path):
         safe = {m.group(1) for m in SAFE_USE.finditer(line)}
         for m in USE.finditer(line):
             name = m.group(1)
-            if name in IGNORE or name in safe or name.startswith("C_"):
+            # C_* are the colour variables from lib/common.sh. They are NOT
+            # blanket-skipped: a script that does not source common.sh and
+            # uses one is broken, and a blanket skip hid exactly that bug.
+            if name in IGNORE or name in safe:
                 continue
             if name in external:          # assigned by a sourced file
                 continue
