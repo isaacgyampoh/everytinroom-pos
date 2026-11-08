@@ -25,6 +25,31 @@ SET client_min_messages = warning;
 -- schema; it needs to CREATE IN it, which the grant below provides.
 CREATE SCHEMA IF NOT EXISTS _realtime;
 
+-- And the `realtime` schema, which is a DIFFERENT thing and was the reason
+-- Realtime accepted subscriptions and delivered nothing for several runs.
+--
+-- `_realtime` holds Realtime's own tenants and extensions. `realtime` holds
+-- what reads the write-ahead log: realtime.subscription, realtime.apply_rls
+-- and realtime.list_changes, which is the function the WAL poller calls. With
+-- it missing the symptom is precisely the one that looks like success -- the
+-- client subscribes, the channel reports SUBSCRIBED, and no database change
+-- ever arrives. The only sign is in Realtime's own log:
+--
+--   PoolingReplicationError ... schema "realtime" does not exist
+--   query: SELECT ... FROM realtime.list_changes($1, $2, $3, $4)
+--
+-- Realtime builds the schema's CONTENTS with its own tenant migrations, run
+-- through Ecto with `prefix: "realtime"`. Ecto creates the migration table in
+-- that prefix; it does NOT create the schema. On Supabase's own servers the
+-- schema is already there, because the supabase/postgres image puts it in the
+-- `postgres` database -- but every application database here is created with
+-- TEMPLATE template0 (see 10-create-app-db.sql), which carries none of the
+-- image's schemas. That is the same reason this platform already creates
+-- `extensions`, `storage`, `auth` and `_realtime` by hand.
+--
+-- So: the schema is created here, and its contents are left to Realtime.
+CREATE SCHEMA IF NOT EXISTS realtime;
+
 -- psql does NOT interpolate :variables inside a dollar-quoted string, so a
 -- DO block cannot see them directly. They are handed over as session settings
 -- instead, which is why the next line exists.
@@ -41,6 +66,16 @@ END $$;
 GRANT ALL ON SCHEMA _realtime TO :"rt_user";
 ALTER DEFAULT PRIVILEGES IN SCHEMA _realtime GRANT ALL ON TABLES TO :"rt_user";
 ALTER DEFAULT PRIVILEGES IN SCHEMA _realtime GRANT ALL ON SEQUENCES TO :"rt_user";
+
+-- Realtime's migrations create everything in `realtime` as this role, so it
+-- needs CREATE there as well as USAGE.
+GRANT ALL ON SCHEMA realtime TO :"rt_user";
+-- USAGE only for the three API roles, and deliberately no table grants. The
+-- tables do not exist yet, and nothing is granted speculatively: if a
+-- specific object turns out to need a grant, the run will name it and that
+-- one grant gets added. Over-granting a schema that reads every change in
+-- the database is not a mistake worth making for convenience.
+GRANT USAGE ON SCHEMA realtime TO anon, authenticated, service_role;
 
 -- It must be able to read the tables it replicates, and to create the
 -- publication it manages.

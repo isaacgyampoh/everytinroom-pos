@@ -272,6 +272,23 @@ if psql -qX -v ON_ERROR_STOP=1 -d "$A_DB" \
   pass "21-realtime.sql ran"
   [ "$(q "select count(*) from pg_namespace where nspname='_realtime'" "$A_DB")" = "1" ] \
     && pass "_realtime schema exists" || fail "_realtime schema missing"
+  # A different schema, and the one whose absence made Realtime accept
+  # subscriptions and deliver nothing. Ecto creates its migration table inside
+  # this prefix but will not create the prefix, and an application database
+  # made from template0 does not have it.
+  [ "$(q "select count(*) from pg_namespace where nspname='realtime'" "$A_DB")" = "1" ] \
+    && pass "realtime schema exists — Realtime's migrations have somewhere to go" \
+    || fail "realtime schema missing; realtime.list_changes could never be created"
+  # The role that runs those migrations must be able to create in it.
+  [ "$(q "select has_schema_privilege('$RT_USER','realtime','CREATE')::text" "$A_DB")" = "true" ] \
+    && pass "the realtime role may CREATE in the realtime schema" \
+    || fail "the realtime role cannot create in the realtime schema, so its migrations would fail"
+  # And nothing was granted on its tables speculatively.
+  for r in anon authenticated service_role; do
+    [ "$(q "select has_schema_privilege('$r','realtime','USAGE')::text" "$A_DB")" = "true" ] \
+      && pass "$r has USAGE on the realtime schema" \
+      || fail "$r has no USAGE on the realtime schema"
+  done
 else
   fail "21-realtime.sql failed: $(psql -qX -v ON_ERROR_STOP=1 -d "$A_DB" -v dbname="$A_DB" -v rt_user="$RT_USER" -v rt_password="$RT_PW" -f "$SQL_DIR/21-realtime.sql" 2>&1 | head -2 | tr '\n' ' ')"
 fi

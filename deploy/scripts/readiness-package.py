@@ -62,6 +62,8 @@ TESTS = [
     ("PostgREST answers through the proxy", True,
      [r"PostgREST answers through the proxy", r"PostgREST answers \(HTTP"]),
     ("Realtime subscription accepted", True, [r"subscription was accepted"]),
+    ("Realtime's own schema and WAL reader exist", True,
+     [r"list_changes present: 1", r"realtime\.list_changes\(\) exists"]),
     ("Realtime delivers a database change end to end", True,
      [r"INSERT produced a Realtime event"]),
     ("Storage grants applied after the service's own migrations", True,
