@@ -164,6 +164,60 @@ else
 fi
 
 # ===========================================================================
+# PREREQUISITE GATE
+#
+# Everything from here needs a working stack. When bootstrap failed, the next
+# forty checks all failed for the same single reason and the report took real
+# reading to interpret -- run 4 produced 38 failures from one unbound
+# variable. If the database is not answering, say so once, print the logs, and
+# stop. A short honest report beats a long misleading one.
+# ===========================================================================
+if [ "$(pgq 'select 1')" != "1" ]; then
+  printf '\n%s===== Stopping early =====%s\n' "$C_B" "$C_0"
+  fail "PostgreSQL is not answering, so the remaining checks cannot mean anything"
+  note "Sections 4 to 10 were NOT run. They are not passing and not failing;"
+  note "they were never reached. Fix the stack and run this again."
+  RESULTS="$RESULTS\n## Sections 4-10\n- SKIPPED: the stack was not up, so these were never reached\n"
+  SKIP=$((SKIP + 7))
+
+  printf '\n%s===== Logs =====%s\n' "$C_B" "$C_0"
+  RESULTS="$RESULTS\n## Logs from anything that is not healthy\n"
+  for c in $(docker ps -a --format '{{.Names}}' 2>/dev/null); do
+    st=$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null)
+    h=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$c" 2>/dev/null)
+    if [ "$st" != "running" ] || { [ "$h" != "healthy" ] && [ "$h" != "none" ]; }; then
+      note "----- $c ($st/$h) -----"
+      while IFS= read -r line; do note "$line"; done <<EOL
+$(docker logs "$c" --tail=30 2>&1 | tail -30)
+EOL
+    fi
+  done
+  [ -s "$BOOT_LOG" ] && {
+    note "----- the last lines bootstrap.sh printed -----"
+    while IFS= read -r line; do note "$line"; done <<EOL
+$(tail -25 "$BOOT_LOG")
+EOL
+  }
+
+  printf '\n%s===== Result =====%s\n' "$C_B" "$C_0"
+  printf '  passed %s   failed %s   skipped %s\n\n' "$PASS" "$FAIL" "$SKIP"
+  {
+    echo "# Staging validation"
+    echo
+    echo "- Machine: $PRETTY_NAME, ${CPUS} processors, ${RAM_MB} MB RAM"
+    echo "- Docker: $(docker --version 2>/dev/null | cut -d, -f1)"
+    echo "- Result: **$PASS passed, $FAIL failed, $SKIP skipped — STOPPED EARLY**"
+    echo
+    echo "The stack did not come up, so the checks past section 3 were never"
+    echo "reached. They are skipped, not passed and not failed."
+    printf '%b' "$RESULTS"
+  } > "$REPORT"
+  echo "  report written to $REPORT"
+  exit 1
+fi
+ok "the stack is up, so the remaining checks can mean something"
+
+# ===========================================================================
 section "4. Startup, health, restart recovery and resource usage"
 # ===========================================================================
 # A restart must come back healthy by itself. This is what happens after a
