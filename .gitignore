@@ -37,3 +37,12 @@ deploy/**/*.local
 supabase/AWAITING-APPROVAL/grants-*.json
 supabase/AWAITING-APPROVAL/revoke-*.sql
 supabase/AWAITING-APPROVAL/rollback-*.sql
+
+# Generated inventory and migration plans. These map the infrastructure of
+# several businesses -- project refs, table counts, bucket contents, cron
+# schedules, configured secret names. The tools that produce them are
+# committed; their output is not, because this repository is public.
+deploy/inventory*.json
+deploy/inventory*.md
+migration-plans/
+deploy/migration-plans/
