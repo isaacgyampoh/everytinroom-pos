@@ -375,12 +375,17 @@ ENV="$ROOT_DIR/apps/$APP/.env"
 # publicly, so Let's Encrypt cannot issue a certificate. Everything else about
 # the routing -- handle_path, the /socket rewrite, header_up Host -- is
 # unchanged, and that is what is under test.
-SITE="$ROOT_DIR/compose/caddy-sites/$APP.caddy"
-if [ -f "$SITE" ]; then
-  sed -i "1s|^|# staging: plain HTTP, the hostname has no public DNS\n|" "$SITE"
-  sed -i "s|^$APP_DNS.staging.test {|http://$APP_DNS.staging.test {|" "$SITE"
-  grep -q "^http://" "$SITE" && note "site file switched to http:// for the test"
-fi
+# EVERY site file, not just this application's. One left on https meant Caddy
+# kept trying to reach Let's Encrypt for a hostname with no public DNS, which
+# left the proxy reporting "starting" for minutes and made unrelated checks
+# look flaky.
+for SITE in "$ROOT_DIR"/compose/caddy-sites/*.caddy; do
+  [ -f "$SITE" ] || continue
+  grep -q "^# staging:" "$SITE" && continue
+  sed -i "1s|^|# staging: plain HTTP, these hostnames have no public DNS\n|" "$SITE"
+  sed -i -E "s|^([a-z0-9-]+\\.staging\\.test) \\{|http://\\1 {|" "$SITE"
+  note "$(basename "$SITE") switched to http:// (no ACME in staging)"
+done
 grep -q "staging.test" /etc/hosts || echo "127.0.0.1 alpha-shop.staging.test beta-shop.staging.test" >> /etc/hosts
 docker restart central-caddy >/dev/null 2>&1; sleep 4
 
@@ -471,6 +476,19 @@ JS
     OUT=$(RT_URL="http://$APP_DNS.staging.test" RT_KEY="$ANON" timeout 90 node rt.mjs 2>&1)
     echo "$OUT" | grep -q '^SUBSCRIBED' && pass "a Realtime subscription was accepted through the proxy" \
                                         || fail "the subscription was not accepted: $(echo "$OUT" | head -2 | tr '\n' ' ')"
+    # Realtime's log, unconditionally. It reports healthy while delivering
+    # nothing, so a capture that only runs for unhealthy containers never
+    # shows the one thing that would explain this.
+    note "----- ${APP_DNS}.realtime log (captured regardless of health) -----"
+    while IFS= read -r line; do note "$line"; done <<EOL
+$(docker logs "${APP_DNS}.realtime" --tail=30 2>&1 | tail -30)
+EOL
+    note "----- replication slots and publication -----"
+    while IFS= read -r line; do note "$line"; done <<EOL
+$(pgq "select slot_name, plugin, active, database from pg_replication_slots" 2>&1)
+$(pgq "select pubname, tablename from pg_publication_tables order by 1,2" "$APP" 2>&1)
+$(pgq "select count(*) as realtime_subscriptions from realtime.subscription" "$APP" 2>&1)
+EOL
     if echo "$OUT" | grep -q 'EVENT_RECEIVED'; then
       pass "an INSERT produced a Realtime event end to end"
       note "$(echo "$OUT" | grep EVENT_RECEIVED | cut -c1-120)"
@@ -668,8 +686,18 @@ for _ in $(seq 1 20); do
   [ "${n:-0}" -gt 0 ] && { http_ok=1; break; }
   sleep 5
 done
-[ "$http_ok" = "1" ] && pass "a cron job reached the new API URL through pg_net and the proxy" \
-                     || fail "the cron job did not reach PostgREST through pg_net"
+if [ "$http_ok" = "1" ]; then
+  pass "a cron job reached the new API URL through pg_net and the proxy"
+else
+  # pg_net records every response. Without reading it, a failure here is just
+  # a timeout with no cause.
+  note "----- pg_net responses and cron run details -----"
+  while IFS= read -r line; do note "$line"; done <<EOL
+$(pgq "select id, status_code, left(coalesce(error_msg,''),120) as err, left(coalesce(content,''),100) as body from net._http_response order by id desc limit 5" "$APP" 2>&1)
+$(pgq "select jobname, status, left(coalesce(return_message,''),160) as msg, start_time from cron.job_run_details d join cron.job j using (jobid) where j.jobname like 'staging-%' order by start_time desc limit 5" 2>&1)
+EOL
+  fail "the cron job did not reach PostgREST through pg_net"
+fi
 pgq "select cron.unschedule('staging-proof')" >/dev/null 2>&1
 pgq "select cron.unschedule('staging-http')" >/dev/null 2>&1
 

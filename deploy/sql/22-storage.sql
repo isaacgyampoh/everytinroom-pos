@@ -40,6 +40,33 @@ GRANT CREATE ON DATABASE :"dbname" TO :"st_user";
 --   permission denied to set role "service_role"
 -- which arrives as an opaque HTTP 400 carrying a 403 inside it.
 GRANT anon, authenticated, service_role TO :"st_user";
+
+-- The storage schema, pre-created with rights for the roles storage-api
+-- switches INTO.
+--
+-- Granting the three roles above only fixes half of it: storage-api then runs
+-- AS service_role, and that role had no rights in the storage schema, so
+-- every call failed one step later with
+--   permission denied for schema storage
+-- Creating the schema here rather than leaving it to storage-api's own
+-- migrations means the grants can be attached before anything needs them, and
+-- the default privileges cover the tables those migrations go on to create.
+CREATE SCHEMA IF NOT EXISTS storage;
+GRANT ALL ON SCHEMA storage TO :"st_user";
+GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA storage TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA storage TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA storage GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA storage GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+-- And for tables storage-api creates as its own role, so the switched-to
+-- roles can still read them.
+SELECT set_config('provision.st_user_dp', :'st_user', false);
+DO $$
+DECLARE u text := current_setting('provision.st_user_dp');
+BEGIN
+  EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA storage GRANT ALL ON TABLES TO anon, authenticated, service_role', u);
+  EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA storage GRANT ALL ON SEQUENCES TO anon, authenticated, service_role', u);
+END $$;
 GRANT USAGE  ON SCHEMA public TO :"st_user";
 -- No owner-role membership: see 10-create-app-db.sql.
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO :"st_user";
