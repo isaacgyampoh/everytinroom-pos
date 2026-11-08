@@ -29,3 +29,11 @@ deploy/compose/postgres/90-central.conf
 deploy/**/.env
 deploy/**/functions.env
 deploy/**/*.local
+
+# Operator files: privilege snapshots, prepared-but-unapplied security SQL,
+# rollback scripts. These are generated against the live database and some of
+# them describe exposures. This repository is PUBLIC, so they must never be
+# swept in by `git add -A`. Keep them locally.
+supabase/AWAITING-APPROVAL/grants-*.json
+supabase/AWAITING-APPROVAL/revoke-*.sql
+supabase/AWAITING-APPROVAL/rollback-*.sql
