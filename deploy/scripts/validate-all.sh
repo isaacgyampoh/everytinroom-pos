@@ -106,7 +106,7 @@ HITS="$(grep -rIlE 'eyJ[A-Za-z0-9_-]{20,}\.|BEGIN [A-Z ]*PRIVATE KEY|(PASSWORD|S
                || bad "possible secrets in: $HITS"
 
 hdr "Unit tests"
-for t in test-tuning.sh test-capacity.sh; do
+for t in test-tuning.sh test-capacity.sh test-bootstrap-local.sh; do
   if "$HERE/$t" >/tmp/.vt.$$ 2>&1; then ok "$t ($(grep -c 'ok\x1b\[0m' /tmp/.vt.$$ || true) checks)"
   else bad "$t"; sed 's/^/      /' /tmp/.vt.$$ | tail -12; fi
   rm -f /tmp/.vt.$$
