@@ -66,32 +66,25 @@ BEGIN
   END IF;
 END $$;
 
--- ADMIN OPTION on the three roles PostgREST switches into.
+-- NO ADMIN OPTION GRANT HERE. Deliberately.
 --
--- Provisioning has to run `GRANT anon TO <app>_authenticator`, which needs
--- admin on anon. On the supabase/postgres image the `postgres` role created
--- these and already has it; this makes that explicit so provisioning does not
--- fail later with an error that does not explain itself. Best effort: if the
--- current role cannot grant admin on them, provisioning will say what to run.
-DO $$
-DECLARE r text;
-BEGIN
-  FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
-      BEGIN
-        EXECUTE format('GRANT %I TO CURRENT_USER WITH ADMIN OPTION', r);
-      EXCEPTION
-        -- Catch EVERYTHING. This is an optimisation: it saves provisioning
-        -- from failing later with an error that does not explain itself. It
-        -- is not worth failing central setup over, and narrowing the handler
-        -- to the exceptions I expected is what made it fatal on the first
-        -- server it met. If it cannot be done, provisioning says what to run.
-        WHEN OTHERS THEN
-          RAISE WARNING 'Could not take ADMIN OPTION on % (%). If provisioning later cannot grant it, run this once as a superuser: GRANT % TO <provisioning role> WITH ADMIN OPTION;', r, SQLERRM, r;
-      END;
-    END IF;
-  END LOOP;
-END $$;
+-- This file used to run, as a convenience:
+--
+--   GRANT anon TO CURRENT_USER WITH ADMIN OPTION;
+--
+-- On the supabase/postgres image that CRASHES THE SERVER. Not an error -- the
+-- backend dies and psql reports "server closed the connection unexpectedly".
+-- anon, authenticated and service_role are reserved roles there, guarded by
+-- the image's supautils extension, and granting admin on one takes a code
+-- path that terminates the process. Every downstream failure in several
+-- staging runs traced back to this single statement.
+--
+-- It was never necessary. On that image the `postgres` role already holds
+-- what provisioning needs, and where it does not,
+-- deploy/sql/20-app-grants.sql fails with the exact GRANT to run. A
+-- convenience that can kill the database is not a convenience.
+--
+-- deploy/scripts/validate-all.sh now refuses this pattern in any SQL file.
 
 -- A read-only role for the capacity monitor (deploy/capacity.sh). It can see
 -- sizes, connection counts and statement statistics, and no application data.

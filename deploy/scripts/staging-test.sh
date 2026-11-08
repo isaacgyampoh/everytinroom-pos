@@ -255,7 +255,7 @@ EOL
   finish_report "stopped early: the stack was not up"
   exit 1
 fi
-ok "the stack is up, so the remaining checks can mean something"
+pass "the stack is up, so the remaining checks can mean something"
 
 # ===========================================================================
 gate_section 4

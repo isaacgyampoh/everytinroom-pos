@@ -91,6 +91,31 @@ EOF
   fi
 done
 
+hdr "No SQL grants ADMIN OPTION on a Supabase reserved role"
+# GRANT anon|authenticated|service_role ... WITH ADMIN OPTION crashes the
+# supabase/postgres server outright -- the backend dies rather than erroring.
+# It cost several staging runs to find, so it is banned rather than remembered.
+# Only EXECUTABLE statements: a line whose code begins with GRANT, or an
+# EXECUTE format('GRANT ...'). A comment describing the mistake, or a message
+# string telling an operator something, is not the mistake itself -- and a
+# guard that cannot tell those apart gets switched off.
+# No -o: it returns only the matched text, which strips the `--` that marks a
+# comment and made the guard report its own documentation as the defect.
+# The WHOLE line is kept, then comments and message strings are filtered out.
+BADG=$(grep -rniE "grant +[^;]*(anon|authenticated|service_role)[^;]*with +admin +option" \
+  "$DEPLOY"/sql/*.sql "$DEPLOY"/*.sh "$DEPLOY"/scripts/*.sh 2>/dev/null \
+  | awk '{ line=$0; sub(/^[^:]*:[0-9]+:/, "", line);
+           if (line ~ /^[[:space:]]*--/) next;        # a SQL comment
+           if (line ~ /^[[:space:]]*#/)  next;        # a shell comment
+           if (tolower(line) ~ /raise +(exception|warning|notice)/) next;
+           print }' || true)
+if [ -z "$BADG" ]; then
+  ok "no file grants ADMIN OPTION on a reserved role"
+else
+  bad "a file grants ADMIN OPTION on a reserved role — this crashes supabase/postgres"
+  printf '%s\n' "$BADG" | sed 's/^/     /'
+fi
+
 hdr "Templates have no leftover placeholders in committed form"
 for f in "$DEPLOY"/compose/caddy-site.template "$DEPLOY"/compose/Caddyfile.tmpl "$DEPLOY"/compose/postgres/90-central.conf.tmpl; do
   n="$(grep -c '__[A-Z_]*__' "$f" 2>/dev/null || echo 0)"

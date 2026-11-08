@@ -141,9 +141,13 @@ BEGIN
     BEGIN
       EXECUTE format('GRANT %I TO %I', r, current_setting('provision.authn'));
     EXCEPTION WHEN insufficient_privilege THEN
+      -- Deliberately does NOT tell anyone to GRANT ... WITH ADMIN OPTION on
+      -- these roles. That statement crashes the supabase/postgres server --
+      -- the backend dies rather than erroring -- so recommending it would
+      -- turn a provisioning failure into an outage.
       RAISE EXCEPTION
-        'Cannot grant % to %. PostgREST becomes that role by SET ROLE, so without this the API rejects every request. Run this once as a superuser: GRANT anon, authenticated, service_role TO %I WITH ADMIN OPTION; -- where %I is the role that runs provisioning. Then run this again.',
-        r, current_setting('provision.authn'), current_user, current_user;
+        'Cannot grant % to %. PostgREST becomes that role by SET ROLE, so without this every API request is rejected. On the supabase/postgres image the role running this already has what it needs, so if you are seeing this the image or the role is not what was expected: check that this is supabase/postgres (not a plain postgres image) and that you are connected as its postgres role. Do NOT work around it by granting ADMIN OPTION on %I -- that crashes this server.',
+        r, current_setting('provision.authn'), r;
     END;
   END LOOP;
 END $$;

@@ -517,6 +517,27 @@ ALTER ROLE central_monitor PASSWORD '${MON_PW}';
 EOSQL
     printf '%s\n' "$ROLES_OUT" > "$ROOT_DIR/logs/central-roles.log" 2>/dev/null || true
     printf '%s' "$ROLES_OUT" | grep -i 'WARNING' | head -4 | while IFS= read -r w; do warn "$w"; done
+
+    # The server must still be ALIVE afterwards. A GRANT ... WITH ADMIN OPTION
+    # on a reserved role used to crash the backend here: psql answered before
+    # the file and the process was dead after it, and because the registry was
+    # half-created the symptom surfaced three sections later as something else.
+    # Checking liveness immediately after attributes a crash to its cause.
+    if ! AFTER="$(docker exec -i central-postgres psql -tAqX -U postgres -d postgres \
+         -c 'select 1' 2>&1)" || [ "$(printf '%s' "$AFTER" | tr -d '[:space:]')" != "1" ]; then
+      die "PostgreSQL stopped responding immediately AFTER applying 00-central-roles.sql.
+
+That means a statement in that file terminated the server rather than
+erroring. The probe before it succeeded, so the container was healthy.
+
+The probe afterwards returned:
+$(printf '%s' "$AFTER" | tail -10 | sed 's/^/  /')" \
+        "Read the container's own log, which records the crash:" \
+        "  docker logs central-postgres --tail=60" \
+        "And the SQL output up to the crash:  $ROOT_DIR/logs/central-roles.log" \
+        "A GRANT ... WITH ADMIN OPTION on anon, authenticated or service_role does this on this image. validate-all.sh refuses that pattern."
+    fi
+    dim "PostgreSQL is still alive after central setup"
     ok "central schema ready (central.applications, central_monitor)"
   else
     # Written to a file AND printed verbatim. The previous version grepped for
