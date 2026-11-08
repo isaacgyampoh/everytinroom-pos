@@ -135,6 +135,72 @@ services:
         aliases: ["${APP_NAME}.realtime"]
 
   # -------------------------------------------------------------------------
+  # Supabase Auth (GoTrue) — only for applications that actually use it.
+  #
+  # Everytinroom does NOT: it signs staff in with a PIN checked by
+  # verify_pin() against its own staff_sessions table, and `grep` finds not
+  # one call to supabase.auth in its source. Running GoTrue for it would
+  # spend ~256 MB serving nothing.
+  #
+  # But two other projects DO. deploy/scripts/inspect-supabase.py counts rows
+  # in auth.users for each one, and found 9 users in one and more in another,
+  # so the platform has to be able to run it. That is the whole point of
+  # profiles: the decision is per application and based on a measurement, not
+  # on what a standard Supabase install happens to include.
+  # -------------------------------------------------------------------------
+  auth:
+    image: supabase/gotrue:v2.197.0
+    container_name: ${APP_NAME}-auth
+    profiles: ["auth"]
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      <<: *app-env
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: https://${APP_DOMAIN}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://${APP_AUTH_USER}:${APP_AUTH_PASSWORD}@postgres:5432/${APP_DB}
+      GOTRUE_SITE_URL: ${AUTH_SITE_URL:-https://${APP_DOMAIN}}
+      GOTRUE_URI_ALLOW_LIST: ${AUTH_REDIRECT_URLS:-}
+      # Signup is CLOSED by default. These are back-office applications with a
+      # known set of staff; an open signup endpoint on a public URL is how
+      # strangers end up with accounts.
+      GOTRUE_DISABLE_SIGNUP: ${AUTH_DISABLE_SIGNUP:-true}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: ${AUTH_JWT_EXPIRY:-3600}
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_ISSUER: https://${APP_DOMAIN}/auth/v1
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: ${AUTH_EMAIL_ENABLED:-true}
+      GOTRUE_EXTERNAL_PHONE_ENABLED: ${AUTH_PHONE_ENABLED:-false}
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: "false"
+      # Without SMTP configured, autoconfirm is the only way a sign-in can
+      # complete. Set the SMTP_* values in the app's .env and turn this off
+      # for a real deployment that must verify an address.
+      GOTRUE_MAILER_AUTOCONFIRM: ${AUTH_MAILER_AUTOCONFIRM:-true}
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:-}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-}
+      GOTRUE_SMTP_USER: ${SMTP_USER:-}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:-${APP_NAME}}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits: { memory: 512M }
+    networks:
+      central_db:
+      central_edge:
+        aliases: ["${APP_NAME}-auth"]
+
+  # -------------------------------------------------------------------------
   # Storage — kept so that sb.storage.from(...).upload() keeps working
   # unchanged, with Cloudflare R2 underneath instead of Supabase's disks.
   # -------------------------------------------------------------------------

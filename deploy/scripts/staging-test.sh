@@ -49,6 +49,7 @@ note() { printf '       %s\n' "$*"; RESULTS="$RESULTS      $*\n"; }
 [ "$(id -u)" = "0" ] || { echo "Run with sudo: sudo $0"; exit 2; }
 
 pgq() { docker exec central-postgres psql -tAqX -U postgres -d "${2:-postgres}" -c "$1" 2>/dev/null; }
+psqlq_db() { docker exec central-postgres psql -tAqX -U postgres -d "$1" -c "$2" 2>/dev/null; }
 
 # ===========================================================================
 section "1. The machine"
@@ -187,15 +188,37 @@ POL="$(docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' central-postgres 2
 # ===========================================================================
 section "5. Two independent applications, and isolation between them"
 # ===========================================================================
-for app in alpha_shop beta_shop; do
-  if "$ROOT_DIR/provision-app.sh" --name "$app" --domain "$app.staging.test" \
-       --realtime --storage --no-start > "/tmp/prov-$app.log" 2>&1; then
-    pass "provisioned $app"
-  else
-    fail "provisioning $app failed"
-    tail -20 "/tmp/prov-$app.log" | sed 's/^/       /'
-  fi
-done
+# alpha gets realtime+storage, beta gets auth instead. Two applications with
+# DIFFERENT service sets, because "provision only what it needs" is the claim
+# under test, not just isolation.
+if "$ROOT_DIR/provision-app.sh" --name alpha_shop --domain alpha_shop.staging.test \
+     --realtime --storage --no-start > /tmp/prov-alpha_shop.log 2>&1; then
+  pass "provisioned alpha_shop (realtime + storage, no auth)"
+else
+  fail "provisioning alpha_shop failed"; tail -20 /tmp/prov-alpha_shop.log | sed 's/^/       /'
+fi
+if "$ROOT_DIR/provision-app.sh" --name beta_shop --domain beta_shop.staging.test \
+     --auth --no-start > /tmp/prov-beta_shop.log 2>&1; then
+  pass "provisioned beta_shop (auth, no realtime or storage)"
+else
+  fail "provisioning beta_shop failed"; tail -20 /tmp/prov-beta_shop.log | sed 's/^/       /'
+fi
+
+# The services each one asked for, and crucially the ones it did NOT.
+A_PROF="$(sed -n 's/^COMPOSE_PROFILES=//p' "$ROOT_DIR/apps/alpha_shop/.env" 2>/dev/null | tail -1)"
+B_PROF="$(sed -n 's/^COMPOSE_PROFILES=//p' "$ROOT_DIR/apps/beta_shop/.env" 2>/dev/null | tail -1)"
+printf '%s' "$A_PROF" | grep -q realtime && printf '%s' "$A_PROF" | grep -qv auth \
+  && pass "alpha_shop's profiles are '$A_PROF' — no auth, as measured" \
+  || fail "alpha_shop's profiles are '$A_PROF'"
+printf '%s' "$B_PROF" | grep -q auth \
+  && pass "beta_shop's profiles are '$B_PROF' — auth only" \
+  || fail "beta_shop's profiles are '$B_PROF'"
+[ -n "$(psqlq_db beta_shop "select 1 from pg_namespace where nspname='auth'" 2>/dev/null)" ] \
+  && pass "beta_shop's database has an auth schema" \
+  || fail "beta_shop has no auth schema"
+[ -z "$(psqlq_db alpha_shop "select 1 from pg_namespace where nspname='auth'" 2>/dev/null)" ] \
+  && pass "alpha_shop's database has NO auth schema — nothing provisioned that it does not use" \
+  || fail "alpha_shop has an auth schema it never asked for"
 
 # Each application's own credentials must open its own database.
 for app in alpha_shop beta_shop; do

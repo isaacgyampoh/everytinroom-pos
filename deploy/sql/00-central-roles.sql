@@ -47,9 +47,13 @@ CREATE TABLE IF NOT EXISTS central.applications (
   needs_realtime  boolean NOT NULL DEFAULT false,
   needs_storage   boolean NOT NULL DEFAULT false,
   needs_functions boolean NOT NULL DEFAULT false,
+  needs_auth      boolean NOT NULL DEFAULT false,
   created_at      timestamptz NOT NULL DEFAULT now(),
   notes           text
 );
+
+-- Added after the registry already existed on some servers.
+ALTER TABLE central.applications ADD COLUMN IF NOT EXISTS needs_auth boolean NOT NULL DEFAULT false;
 
 COMMENT ON TABLE central.applications IS
   'One row per application hosted on this server. Written by provision-app.sh. Holds no credentials -- those live in /srv/central/apps/<name>/.env, mode 600.';

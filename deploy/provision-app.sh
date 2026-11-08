@@ -15,6 +15,9 @@
 #   --name NAME        lowercase letters, digits and underscores (required)
 #   --domain HOST      the API hostname, e.g. api.everytinroom.store
 #   --realtime         run Realtime for this application
+#   --auth             run Supabase Auth (GoTrue). Only for applications that
+#                      actually use it -- check with inspect-supabase.py, which
+#                      counts rows in auth.users
 #   --storage          run Storage (Cloudflare R2 behind it) and imgproxy
 #   --functions        run the Deno edge-function runtime
 #   --migrations DIR   apply *.sql from DIR in filename order
@@ -31,11 +34,11 @@ SCRIPT_NAME="provision-app.sh"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/lib/common.sh"
 
-STEP_TOTAL=10
+STEP_TOTAL=11
 ROOT_DIR="/srv/central"
 CENTRAL_ENV="$ROOT_DIR/.env"
 
-NAME=""; DOMAIN=""; WANT_RT=0; WANT_ST=0; WANT_FN=0
+NAME=""; DOMAIN=""; WANT_RT=0; WANT_ST=0; WANT_FN=0; WANT_AUTH=0
 MIGRATIONS=""; DRY=0; DO_START=1
 
 while [ $# -gt 0 ]; do
@@ -47,6 +50,7 @@ while [ $# -gt 0 ]; do
     --migrations) MIGRATIONS="${2:-}"; shift 2 ;;
     --migrations=*) MIGRATIONS="${1#*=}"; shift ;;
     --realtime) WANT_RT=1; shift ;;
+    --auth) WANT_AUTH=1; shift ;;
     --storage) WANT_ST=1; shift ;;
     --functions) WANT_FN=1; shift ;;
     --no-start) DO_START=0; shift ;;
@@ -95,13 +99,14 @@ APP_OWNER="${NAME}_owner"
 APP_AUTHN="${NAME}_authenticator"
 APP_RT_USER="${NAME}_realtime"
 APP_ST_USER="${NAME}_storage"
+APP_AUTH_USER="${NAME}_auth"
 APP_DIR="$ROOT_DIR/apps/$NAME"
 APP_ENV="$APP_DIR/.env"
 
 info "name      : $NAME"
 info "database  : $APP_DB"
 info "domain    : ${DOMAIN:-(none yet)}"
-info "services  : rest$( [ "$WANT_RT" = 1 ] && printf ' realtime' )$( [ "$WANT_ST" = 1 ] && printf ' storage+imgproxy' )$( [ "$WANT_FN" = 1 ] && printf ' functions' )"
+info "services  : rest$( [ "$WANT_RT" = 1 ] && printf ' realtime' )$( [ "$WANT_ST" = 1 ] && printf ' storage+imgproxy' )$( [ "$WANT_FN" = 1 ] && printf ' functions' )$( [ "$WANT_AUTH" = 1 ] && printf ' auth' )"
 
 [ -s "$CENTRAL_ENV" ] || die \
   "$CENTRAL_ENV does not exist, so the server has not been bootstrapped." \
@@ -119,12 +124,13 @@ if [ "$DRY" = "0" ]; then
     "Re-run bootstrap.sh — step 9 creates it. Nothing here has been changed."
 
   run docker exec -i central-postgres psql -q -U postgres -d postgres -c \
-    "INSERT INTO central.applications (name, database_name, db_role, domain, needs_realtime, needs_storage, needs_functions)
-     VALUES ('$NAME','$APP_DB','$APP_AUTHN',$( [ -n "$DOMAIN" ] && printf "'%s'" "$DOMAIN" || printf 'NULL' ),$WANT_RT::boolean,$WANT_ST::boolean,$WANT_FN::boolean)
+    "INSERT INTO central.applications (name, database_name, db_role, domain, needs_realtime, needs_storage, needs_functions, needs_auth)
+     VALUES ('$NAME','$APP_DB','$APP_AUTHN',$( [ -n "$DOMAIN" ] && printf "'%s'" "$DOMAIN" || printf 'NULL' ),$WANT_RT::boolean,$WANT_ST::boolean,$WANT_FN::boolean,$WANT_AUTH::boolean)
      ON CONFLICT (name) DO UPDATE SET domain = EXCLUDED.domain,
        needs_realtime = EXCLUDED.needs_realtime,
        needs_storage  = EXCLUDED.needs_storage,
-       needs_functions= EXCLUDED.needs_functions" >/dev/null \
+       needs_functions= EXCLUDED.needs_functions,
+       needs_auth     = EXCLUDED.needs_auth" >/dev/null \
     || die "Could not write to central.applications." "Run bootstrap.sh again to repair the registry."
   ok "registered in central.applications"
 fi
@@ -279,6 +285,37 @@ else
     ok "Storage role ready; R2 settings are in $APP_ENV"
   fi
   PROFILES="${PROFILES:+$PROFILES,}storage"
+fi
+
+# ---------------------------------------------------------------------------
+step "Configuring Supabase Auth"
+# ---------------------------------------------------------------------------
+if [ "$WANT_AUTH" = "0" ]; then
+  dim "not requested — no GoTrue container for this application"
+  dim "that is correct for an app with its own sign-in; inspect-supabase.py"
+  dim "counts rows in auth.users to decide"
+else
+  if [ "$DRY" = "1" ]; then
+    dim "would create the $APP_AUTH_USER role and the auth schema"
+  else
+    AU_PW="$(get_env_var "$APP_ENV" APP_AUTH_PASSWORD 2>/dev/null || true)"
+    [ -n "$AU_PW" ] || AU_PW="$(gen_password)"
+    psqlq -d postgres -c "select 1 from pg_roles where rolname='$APP_AUTH_USER'" | grep -q 1 \
+      || psqlc -d postgres -c "CREATE ROLE \"$APP_AUTH_USER\" LOGIN" >/dev/null
+    psqlc -d postgres -c "GRANT CONNECT ON DATABASE \"$APP_DB\" TO \"$APP_AUTH_USER\"" >/dev/null
+    psqlc -d "$APP_DB" -v dbname="$APP_DB" -v owner="$APP_OWNER" \
+      -v auth_user="$APP_AUTH_USER" -v auth_password="$AU_PW" \
+      < "$ROOT_DIR/sql/23-auth.sql" >/dev/null \
+      || die "Preparing the database for Supabase Auth failed." "Re-running is safe."
+    set_env_var "$APP_ENV" APP_AUTH_USER "$APP_AUTH_USER"
+    set_env_var "$APP_ENV" APP_AUTH_PASSWORD "$AU_PW"
+    [ -n "$(get_env_var "$APP_ENV" AUTH_DISABLE_SIGNUP 2>/dev/null || true)" ] \
+      || set_env_var "$APP_ENV" AUTH_DISABLE_SIGNUP "true"
+    ok "Auth role and schema ready (signup disabled by default)"
+    warn "GoTrue has no SMTP configured, so AUTH_MAILER_AUTOCONFIRM defaults to true."
+    warn "Set SMTP_* in $APP_ENV before relying on email confirmation."
+  fi
+  PROFILES="${PROFILES:+$PROFILES,}auth"
 fi
 
 # ---------------------------------------------------------------------------

@@ -14,6 +14,14 @@ __DOMAIN__ {
 
 	encode zstd gzip
 
+	# --- Supabase Auth, only present if the app runs the auth profile -----
+	# Matches Supabase's own gateway: /auth/v1/ -> auth:9999/
+	# Applications that do not run GoTrue simply have nothing listening on
+	# this name, and the route returns 502 rather than silently succeeding.
+	handle_path /auth/v1/* {
+		reverse_proxy __APP__-auth:9999
+	}
+
 	# --- PostgREST: every sb.from() and sb.rpc() call ---------------------
 	# /rest/v1/products?select=*  ->  rest:3000/products?select=*
 	handle_path /rest/v1/* {

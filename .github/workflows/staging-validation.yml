@@ -92,11 +92,15 @@ jobs:
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Commit the report back to this branch
+      - name: Publish the report to the results branch
         if: always()
-        # The report is committed rather than only uploaded as an artifact so
-        # it can be read from a clone of this public repository without any
-        # credentials.
+        # Published to a DEDICATED branch, force-pushed.
+        #
+        # It used to commit onto the branch that triggered the run, which
+        # silently stopped working the moment that branch moved on: the push
+        # was rejected as non-fast-forward, the step printed "push skipped",
+        # and the run's real output was lost. A second run's results were read
+        # as if they were the first's. A separate branch cannot conflict.
         run: |
           mkdir -p deploy/staging-results
           sudo cp /tmp/staging-report.md  deploy/staging-results/report.md 2>/dev/null || true
@@ -114,9 +118,16 @@ jobs:
           } > deploy/staging-results/run-info.txt
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A deploy/staging-results
-          git diff --cached --quiet || git commit -m "Staging validation results from run ${{ github.run_id }}"
-          git push origin HEAD:${{ github.ref_name }} || echo "push skipped"
+          # An orphan branch holding only the results: no source, no history to
+          # conflict with, and nothing from the working tree can be swept in.
+          git stash -u -- deploy/staging-results >/dev/null 2>&1 || true
+          git checkout --orphan staging-results
+          git rm -rq --cached . 2>/dev/null || true
+          git stash pop >/dev/null 2>&1 || true
+          git add -A -f deploy/staging-results
+          git commit -q -m "Staging validation results from run ${{ github.run_id }}"
+          git push --force origin HEAD:staging-results
+          echo "results published to the staging-results branch"
 
       - name: Fail the job if any check failed
         if: always()
