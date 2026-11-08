@@ -479,8 +479,12 @@ else
   # would never run at all.
   info "applying central roles and the application registry"
   MON_PW="$(get_env_var "$ENV_FILE" MONITOR_PASSWORD)"
-  if docker exec -i central-postgres psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
-       < "$ROOT_DIR/sql/00-central-roles.sql" >/dev/null 2>&1; then
+  # The output is CAPTURED, not discarded. An earlier version sent both
+  # streams to /dev/null, so when this step failed the report said only "could
+  # not apply" and the reason -- a one-line PostgreSQL error -- was gone. A
+  # failure that hides its own cause costs a whole run to diagnose.
+  if ROLES_OUT="$(docker exec -i central-postgres psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+       < "$ROOT_DIR/sql/00-central-roles.sql" 2>&1)"; then
     # Set the monitor password separately, with logging off for that statement.
     docker exec -i central-postgres psql -q -U postgres -d postgres >/dev/null 2>&1 <<EOSQL
 SET log_min_duration_statement = -1;
@@ -489,8 +493,11 @@ ALTER ROLE central_monitor PASSWORD '${MON_PW}';
 EOSQL
     ok "central schema ready (central.applications, central_monitor)"
   else
-    die "Could not apply $ROOT_DIR/sql/00-central-roles.sql." \
-      "See the error:  docker exec -i central-postgres psql -U postgres -d postgres < $ROOT_DIR/sql/00-central-roles.sql" \
+    die "Could not apply $ROOT_DIR/sql/00-central-roles.sql.
+
+PostgreSQL said:
+$(printf '%s' "$ROLES_OUT" | grep -iE 'ERROR|DETAIL|HINT|CONTEXT' | head -8 | sed 's/^/  /')" \
+      "Reproduce it:  docker exec -i central-postgres psql -U postgres -d postgres < $ROOT_DIR/sql/00-central-roles.sql" \
       "The containers are running; only this step failed, and it is safe to re-run."
   fi
 fi

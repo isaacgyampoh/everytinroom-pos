@@ -13,9 +13,58 @@
 -- pg_cron's scheduler lives in this database (cron.database_name = 'postgres'
 -- in postgresql.conf). The extension must therefore exist HERE, and every
 -- application registers its jobs from here with cron.schedule_in_database().
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pg_net;
-CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+--
+-- Handled the same way as the per-application extensions: required ones
+-- abort with an explanation, the monitoring one only warns, and "not
+-- available in this installation" is reported differently from "not
+-- permitted" because the answers differ. require_extensions=off downgrades a
+-- missing one to a warning, which is how this file can be tested on a laptop
+-- that has no pg_cron.
+\if :{?require_extensions}
+\else
+  \set require_extensions on
+\endif
+SELECT set_config('central.require_ext', :'require_extensions', false);
+
+DO $$
+DECLARE
+  ext         text;
+  unavail     text := '';
+  denied      text := '';
+  strict_mode boolean := current_setting('central.require_ext') <> 'off';
+BEGIN
+  FOREACH ext IN ARRAY ARRAY['pg_cron', 'pg_net'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = ext) THEN CONTINUE; END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = ext) THEN
+      unavail := unavail || ' ' || ext; CONTINUE;
+    END IF;
+    BEGIN
+      EXECUTE format('CREATE EXTENSION IF NOT EXISTS %I', ext);
+    EXCEPTION WHEN OTHERS THEN
+      denied := denied || ' ' || ext || ' (' || SQLERRM || ')';
+    END;
+  END LOOP;
+
+  IF denied <> '' THEN
+    RAISE EXCEPTION 'Could not create:%. pg_cron runs every application''s scheduled jobs and pg_net is how they make HTTP calls, so both are required in this database.', denied;
+  END IF;
+  IF unavail <> '' THEN
+    IF strict_mode THEN
+      RAISE EXCEPTION 'Not available in this PostgreSQL installation:%. The supabase/postgres image ships them; a plain postgres image does not. Check the image tag in docker-compose.yml.', unavail;
+    ELSE
+      RAISE WARNING 'Not available here and NOT created:% (require_extensions=off)', unavail;
+    END IF;
+  END IF;
+
+  -- Monitoring only. Nothing depends on it.
+  IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements') THEN
+    BEGIN
+      CREATE EXTENSION pg_stat_statements;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'pg_stat_statements not created (%). Query statistics will be missing from the capacity report.', SQLERRM;
+    END;
+  END IF;
+END $$;
 
 -- ADMIN OPTION on the three roles PostgREST switches into.
 --
@@ -31,8 +80,14 @@ BEGIN
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
       BEGIN
         EXECUTE format('GRANT %I TO CURRENT_USER WITH ADMIN OPTION', r);
-      EXCEPTION WHEN insufficient_privilege OR duplicate_object THEN
-        RAISE WARNING 'Could not take ADMIN OPTION on %. If provisioning later fails to grant it, run that GRANT once as a superuser.', r;
+      EXCEPTION
+        -- Catch EVERYTHING. This is an optimisation: it saves provisioning
+        -- from failing later with an error that does not explain itself. It
+        -- is not worth failing central setup over, and narrowing the handler
+        -- to the exceptions I expected is what made it fatal on the first
+        -- server it met. If it cannot be done, provisioning says what to run.
+        WHEN OTHERS THEN
+          RAISE WARNING 'Could not take ADMIN OPTION on % (%). If provisioning later cannot grant it, run this once as a superuser: GRANT % TO <provisioning role> WITH ADMIN OPTION;', r, SQLERRM, r;
       END;
     END IF;
   END LOOP;

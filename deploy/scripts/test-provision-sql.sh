@@ -65,7 +65,7 @@ MGD_PW="$(openssl rand -hex 16)"
 
 cleanup() {
   set +e
-  for db in "$A_DB" "$B_DB"; do
+  for db in "$A_DB" "$B_DB" "${PFX}_central"; do
     psql -qX -d postgres -c "DROP DATABASE IF EXISTS \"$db\" WITH (FORCE)" >/dev/null 2>&1
   done
   for r in "$A_AUTHN" "$B_AUTHN" "${PFX}_a_realtime" "${PFX}_a_storage" "$A_OWNER" "$B_OWNER"; do
@@ -157,6 +157,31 @@ provision() { # db owner authn password
     -v require_extensions="$REQ_EXT" \
     -f "$GRANTS_SQL" >/dev/null
 }
+
+# ---------------------------------------------------------------------------
+# Central setup first. It was not exercised here before, and a change to it
+# broke a staging run at the step that creates the application registry --
+# which then made provisioning, isolation and everything downstream fail.
+# It is the first thing bootstrap runs, so it is the first thing tested.
+# ---------------------------------------------------------------------------
+echo
+echo "Central setup (00-central-roles.sql)"
+CENTRAL_DB="${PFX}_central"
+psql -qX -d postgres -c "CREATE DATABASE \"$CENTRAL_DB\"" >/dev/null 2>&1
+if psql -qX -v ON_ERROR_STOP=1 -v require_extensions="$REQ_EXT" -d "$CENTRAL_DB" \
+     -f "$SQL_DIR/00-central-roles.sql" >/dev/null 2>&1; then
+  pass "00-central-roles.sql ran"
+else
+  fail "00-central-roles.sql failed: $(psql -X -v ON_ERROR_STOP=1 -v require_extensions="$REQ_EXT" -d "$CENTRAL_DB" -f "$SQL_DIR/00-central-roles.sql" 2>&1 | grep -i error | head -1)"
+fi
+[ "$(psql -tAqX -d "$CENTRAL_DB" -c "select count(*) from information_schema.tables where table_schema='central' and table_name='applications'")" = "1" ] \
+  && pass "the central.applications registry exists" || fail "central.applications was not created"
+[ "$(psql -tAqX -d "$CENTRAL_DB" -c "select count(*) from information_schema.columns where table_schema='central' and table_name='applications' and column_name='needs_auth'")" = "1" ] \
+  && pass "the registry has the needs_auth column" || fail "needs_auth column missing"
+psql -qX -v ON_ERROR_STOP=1 -v require_extensions="$REQ_EXT" -d "$CENTRAL_DB" \
+  -f "$SQL_DIR/00-central-roles.sql" >/dev/null 2>&1 \
+  && pass "re-running central setup changed nothing and did not error" \
+  || fail "central setup is not idempotent"
 
 echo
 echo "Creating two applications"
