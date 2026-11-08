@@ -27,6 +27,11 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 
 STEP_TOTAL=10
 ROOT_DIR="/srv/central"
+# Assigned here, not in the step that writes it: step 6 generates the
+# Caddyfile and needs the ACME address out of it. Defining it inside step 7
+# made step 6 die on `ENV_FILE: unbound variable` under set -u, before a
+# single container started.
+ENV_FILE="$ROOT_DIR/.env"
 DRY=0; ASSUME_YES=0; DO_FIREWALL=1; DO_START=1; ACME_EMAIL=""
 
 while [ $# -gt 0 ]; do
@@ -327,8 +332,6 @@ fi
 # ---------------------------------------------------------------------------
 step "Writing the environment files"
 # ---------------------------------------------------------------------------
-ENV_FILE="$ROOT_DIR/.env"
-
 # The one irreversible mistake this script could make: generating a new
 # database password when the database already exists. The password lives
 # inside the pgdata volume, and overwriting it here would leave a database

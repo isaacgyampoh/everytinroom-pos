@@ -11,6 +11,8 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DEPLOY="$(cd "$HERE/.." && pwd)"
 FAIL=0
+PY=/usr/bin/python3
+[ -x "$PY" ] || PY=python3
 hdr() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 ok()  { printf '  \033[32mok\033[0m   %s\n' "$*"; }
 bad() { printf '  \033[31mFAIL\033[0m %s\n' "$*"; FAIL=$((FAIL+1)); }
@@ -20,9 +22,18 @@ while IFS= read -r f; do
   if bash -n "$f" 2>/dev/null; then ok "${f#$DEPLOY/}"; else bad "${f#$DEPLOY/} — $(bash -n "$f" 2>&1 | head -1)"; fi
 done < <(find "$DEPLOY" -name '*.sh' -type f | sort)
 
+hdr "No variable is read before it is assigned"
+# Every script here runs with set -u, so this is a crash and not a warning,
+# and `bash -n` cannot see it. Two staging runs were lost to exactly this.
+if "$PY" "$HERE/check-unbound.py" "$DEPLOY"/*.sh "$DEPLOY"/lib/*.sh \
+     "$DEPLOY"/scripts/*.sh "$DEPLOY"/mac/*.sh >/tmp/.ub.$$ 2>&1; then
+  ok "$(tail -1 /tmp/.ub.$$ | sed 's/^ *//')"
+else
+  bad "a variable is read before assignment"; sed 's/^/     /' /tmp/.ub.$$ | head -12
+fi
+rm -f /tmp/.ub.$$
+
 hdr "Compose files parse as YAML"
-PY=/usr/bin/python3
-[ -x "$PY" ] || PY=python3
 for f in "$DEPLOY"/compose/*.yml; do
   if "$PY" -c "import yaml,sys; yaml.safe_load(open(sys.argv[1]))" "$f" 2>/dev/null; then
     ok "$(basename "$f")"
