@@ -4,6 +4,7 @@ import {
   isEnhanced, isEligible, eligibleProducts, estimateCost,
   makeJob, addJobs, dueJobs, applyResult, queueStats,
   BATCH_SIZE, GIVE_UP_AFTER, backoffFor,
+  candidatePath, productIdFromCandidate, isUsingStudioImage, pendingReviews,
 } from './photoStudio'
 
 const prod = (o = {}) => ({ id: 'p1', name: 'Thing', category: 'Other', image: 'https://x/storage/v1/object/public/product-images/products/a.jpg', quantity: 3, ...o })
@@ -218,5 +219,48 @@ describe('the queue', () => {
     const back = JSON.parse(JSON.stringify(q))
     expect(dueJobs(back)).toHaveLength(2)
     expect(queueStats(back).total).toBe(2)
+  })
+})
+
+describe('where a candidate lives', () => {
+  it('is a convention, not a table — which is why this needs no migration', () => {
+    expect(candidatePath('abc123')).toBe('studio/abc123.webp')
+  })
+
+  it('reads the product id back out of a file name', () => {
+    expect(productIdFromCandidate('abc123.webp')).toBe('abc123')
+    expect(productIdFromCandidate('abc123.WEBP')).toBe('abc123')
+  })
+
+  it('ignores anything in the folder that is not ours', () => {
+    for (const f of ['.emptyFolderPlaceholder', 'notes.txt', 'abc.jpg', '', null]) {
+      expect(productIdFromCandidate(f)).toBeNull()
+    }
+  })
+
+  it('knows when a product is already live on its studio image', () => {
+    expect(isUsingStudioImage({ image: 'https://x/public/product-images/studio/a.webp' })).toBe(true)
+    expect(isUsingStudioImage({ image: 'https://x/public/product-images/products/a.jpg' })).toBe(false)
+    expect(isUsingStudioImage({ image: '' })).toBe(false)
+    expect(isUsingStudioImage({})).toBe(false)
+  })
+
+  it('pairs the catalogue against what the runner left for review', () => {
+    const products = [{ id: 'a', image: 'x/products/a.jpg' }, { id: 'b', image: 'x/products/b.jpg' }, { id: 'c', image: 'x/products/c.jpg' }]
+    const files = [{ name: 'a.webp' }, { name: 'c.webp' }, { name: '.emptyFolderPlaceholder' }]
+    expect(pendingReviews(products, files).map(p => p.id)).toEqual(['a', 'c'])
+  })
+
+  // Approving sets products.image to the candidate. It must then drop out of
+  // the review list rather than being offered again for ever.
+  it('drops a product that has already been approved', () => {
+    const products = [{ id: 'a', image: 'https://x/product-images/studio/a.webp' }]
+    expect(pendingReviews(products, [{ name: 'a.webp' }])).toEqual([])
+  })
+
+  it('copes with an empty folder or no products', () => {
+    expect(pendingReviews([], [{ name: 'a.webp' }])).toEqual([])
+    expect(pendingReviews([{ id: 'a', image: 'x' }], [])).toEqual([])
+    expect(pendingReviews(null, null)).toEqual([])
   })
 })

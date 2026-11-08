@@ -1,0 +1,78 @@
+# ============================================================================
+# Product Studio — background removal on free CPU.
+#
+# WHY HERE AND NOT IN THE APP
+#     The model is a 168MB ONNX file and wants a few hundred MB of RAM. A
+#     Supabase Edge Function is Deno with a short CPU budget and cannot load
+#     it. Vercel is where the shop is served from, and that account has
+#     already been paused once for exceeding Hobby fair use — putting image
+#     processing there risks taking the till offline to tidy photographs.
+#
+#     A GitHub runner is two cores, 7GB and Python, and because this
+#     repository is public those minutes are free and unmetered. No new
+#     hosting, no GPU, no recurring bill.
+#
+# WHAT IT CAN AND CANNOT TOUCH
+#     It writes candidates to product-images/studio/ and nothing else. It
+#     never writes to the products table, so a run cannot change a price, a
+#     name or a live image. Approval is a person's job, in the till.
+#
+# Run it by hand from the Actions tab. There is no schedule on purpose: this
+# should happen when somebody has decided to review the results, not quietly
+# at 3am.
+# ============================================================================
+name: Product Studio
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'How many images to process this run'
+        required: true
+        default: '25'
+      dry_run:
+        description: 'List what would be processed, change nothing'
+        type: boolean
+        default: true
+      redo:
+        description: 'Include images that have already been processed'
+        type: boolean
+        default: false
+
+# One run at a time. Two runs would fetch the same candidates and do the same
+# work twice.
+concurrency:
+  group: product-studio
+  cancel-in-progress: false
+
+jobs:
+  studio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'   # onnxruntime ships wheels for this
+
+      # The model is 168MB and identical every run. Caching it keeps a run to
+      # the processing rather than the download.
+      - name: Cache the segmentation model
+        uses: actions/cache@v4
+        with:
+          path: ~/.u2net
+          key: u2net-v1
+
+      - name: Install
+        run: pip install --quiet pillow rembg onnxruntime
+
+      - name: Process
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python tools/studio_run.py \
+            --limit "${{ inputs.limit }}" \
+            ${{ inputs.dry_run == true && '--dry-run' || '' }} \
+            ${{ inputs.redo == true && '--redo' || '' }}

@@ -181,3 +181,39 @@ export function queueStats(queue) {
     done: by('approved') + by('failed'),
   }
 }
+
+
+// ---------------------------------------------------------------------------
+// Where a candidate lives.
+//
+// Deliberately a convention rather than a table: a processed image waiting for
+// review is simply an object at studio/<product-id>.webp beside the original.
+// Its existence IS the pending state, which is why this whole feature needs no
+// database migration and cannot leave rows orphaned if a run is interrupted.
+//
+// Approving copies that URL onto products.image, which is a column the app
+// already writes. Rejecting deletes the object. Nothing else moves.
+// ---------------------------------------------------------------------------
+export const STUDIO_BUCKET = 'product-images'
+export const STUDIO_PREFIX = 'studio'
+
+export const candidatePath = (productId) => `${STUDIO_PREFIX}/${productId}.webp`
+
+// '<id>.webp' -> '<id>'. Anything else in the folder is not ours and is
+// ignored rather than guessed at.
+export function productIdFromCandidate(fileName) {
+  const m = /^(.+)\.webp$/i.exec(String(fileName || '').trim())
+  return m ? m[1] : null
+}
+
+// A product is "live on its studio image" when its image column already points
+// at the candidate. Re-approving it is a no-op, and the runner skips it.
+export const isUsingStudioImage = (p) =>
+  new RegExp(`/${STUDIO_PREFIX}/`).test(String(p?.image || ''))
+
+// Pair the catalogue against whatever the runner has left for review.
+export function pendingReviews(products, candidateFiles) {
+  const ids = new Set(
+    (candidateFiles || []).map(f => productIdFromCandidate(f?.name ?? f)).filter(Boolean))
+  return (products || []).filter(p => ids.has(p.id) && !isUsingStudioImage(p))
+}

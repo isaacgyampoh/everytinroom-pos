@@ -68,6 +68,7 @@ describe('canOpenPage', () => {
     const cases = {
       products: 'product_management',
       costs: 'product_management',
+      studio: 'product_management',
       restock: 'product_receiving',
       receiving: 'product_receiving',
       stocktakes: 'stock_taking',
