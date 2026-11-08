@@ -65,7 +65,7 @@ EOF
 done
 
 hdr "Templates have no leftover placeholders in committed form"
-for f in "$DEPLOY"/compose/caddy-site.template "$DEPLOY"/compose/postgres/90-central.conf.tmpl; do
+for f in "$DEPLOY"/compose/caddy-site.template "$DEPLOY"/compose/Caddyfile.tmpl "$DEPLOY"/compose/postgres/90-central.conf.tmpl; do
   n="$(grep -c '__[A-Z_]*__' "$f" 2>/dev/null || echo 0)"
   [ "$n" -gt 0 ] && ok "$(basename "$f") has $n placeholder(s), as a template should" \
                  || bad "$(basename "$f") has none — the substitution step would be a no-op"

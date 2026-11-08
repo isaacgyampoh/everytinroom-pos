@@ -266,7 +266,7 @@ if [ "$DRY" = "1" ]; then
 else
   cp -a "$HERE/compose/docker-compose.yml"   "$ROOT_DIR/compose/"
   cp -a "$HERE/compose/app.compose.yml"      "$ROOT_DIR/compose/"
-  cp -a "$HERE/compose/Caddyfile"            "$ROOT_DIR/compose/"
+  cp -a "$HERE/compose/Caddyfile.tmpl"       "$ROOT_DIR/compose/"
   cp -a "$HERE/compose/caddy-site.template"  "$ROOT_DIR/compose/"
   install -d -m 0750 "$ROOT_DIR/compose/postgres"
   cp -a "$HERE/compose/postgres/90-central.conf.tmpl" "$ROOT_DIR/compose/postgres/"
@@ -302,6 +302,24 @@ else
   fi
   chmod 0644 "$ROOT_DIR/compose/postgres/90-central.conf"
   ok "90-central.conf written for ${RAM_MB}MB / ${CPUS} CPUs"
+
+  # Generate the Caddyfile. The ACME email cannot be an empty directive, so
+  # the line is either present with an address or absent entirely.
+  AE="$(get_env_var "$ENV_FILE" ACME_EMAIL 2>/dev/null || true)"
+  [ -n "${AE:-}" ] || AE="$ACME_EMAIL"
+  if [ -n "${AE:-}" ]; then
+    LINE="email $AE"
+  else
+    LINE="# no ACME email set: run bootstrap.sh --acme-email you@example.com"
+  fi
+  sed -e "s|__ACME_EMAIL_LINE__|$LINE|" \
+      "$ROOT_DIR/compose/Caddyfile.tmpl" > "$ROOT_DIR/compose/Caddyfile"
+  if grep -q "__[A-Z_]*__" "$ROOT_DIR/compose/Caddyfile"; then
+    die "The Caddyfile still has unfilled placeholders: $(grep -o '__[A-Z_]*__' "$ROOT_DIR/compose/Caddyfile" | sort -u | tr '\n' ' ')" \
+      "This is a bug in bootstrap.sh. Nothing was started."
+  fi
+  chmod 0644 "$ROOT_DIR/compose/Caddyfile"
+  ok "Caddyfile written ($( [ -n "${AE:-}" ] && echo "ACME email set" || echo "no ACME email" ))"
 fi
 
 # ---------------------------------------------------------------------------
@@ -405,8 +423,11 @@ else
   # puts Caddy's actual complaint in front of whoever ran the script.
   CADDY_IMG="$(awk '/image: caddy:/{print $2; exit}' docker-compose.yml)"
   if [ -n "$CADDY_IMG" ]; then
+    # No -e here, deliberately. The previous version passed ACME_EMAIL into
+    # the validating container while the real one never received it, so
+    # validation passed and the service then failed to start. The generated
+    # file depends on no environment at all.
     if ! VOUT="$(docker run --rm \
-          -e ACME_EMAIL="$(get_env_var "$ENV_FILE" ACME_EMAIL 2>/dev/null || echo '')" \
           -v "$ROOT_DIR/compose/Caddyfile:/etc/caddy/Caddyfile:ro" \
           -v "$ROOT_DIR/compose/caddy-sites:/etc/caddy/sites:ro" \
           "$CADDY_IMG" caddy validate --config /etc/caddy/Caddyfile 2>&1)"; then
@@ -447,23 +468,6 @@ else
       "  $ROOT_DIR/compose/postgres/90-central.conf"
   fi
 
-  for c in central-caddy; do
-    st="$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo missing)"
-    if [ "$st" = "running" ]; then ok "$c is running"
-    else
-      # Include the container's own log in the failure. Without it the report
-      # says only "restarting", and the reason is one `docker logs` away that
-      # nobody thinks to run -- which is how the first staging run produced
-      # twenty-three downstream failures and no stated cause.
-      die "$c is '$st' rather than running.
-
-Its last log lines:
-$(docker logs "$c" --tail=25 2>&1 | sed 's/^/  /')" \
-        "Caddy almost always fails on its configuration file." \
-        "Validate it:  docker run --rm -v $ROOT_DIR/compose/Caddyfile:/etc/caddy/Caddyfile:ro caddy:2.11.9-alpine caddy validate --config /etc/caddy/Caddyfile"
-    fi
-  done
-
   # Apply the central roles and the application registry. Done here with psql
   # rather than as a docker-entrypoint init script, because init scripts run
   # only when the volume is first created -- so on an existing server they
@@ -485,6 +489,27 @@ EOSQL
       "The containers are running; only this step failed, and it is safe to re-run."
   fi
 fi
+
+  # Checked AFTER the database is configured, on purpose. When this failed
+  # before, bootstrap stopped here and the central schema was never created,
+  # so provisioning and every later check failed too -- twenty-odd failures
+  # from one unhappy proxy. The database does not need the proxy to be set up.
+  for c in central-caddy; do
+    st="$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo missing)"
+    if [ "$st" = "running" ]; then ok "$c is running"
+    else
+      # Include the container's own log in the failure. Without it the report
+      # says only "restarting", and the reason is one `docker logs` away that
+      # nobody thinks to run -- which is how the first staging run produced
+      # twenty-three downstream failures and no stated cause.
+      die "$c is '$st' rather than running.
+
+Its last log lines:
+$(docker logs "$c" --tail=25 2>&1 | sed 's/^/  /')" \
+        "Caddy almost always fails on its configuration file." \
+        "Validate it:  docker run --rm -v $ROOT_DIR/compose/Caddyfile:/etc/caddy/Caddyfile:ro caddy:2.11.9-alpine caddy validate --config /etc/caddy/Caddyfile"
+    fi
+  done
 
 # ---------------------------------------------------------------------------
 step "Checking what is reachable from the internet"

@@ -10,7 +10,20 @@
 {
 	# A real address: Let's Encrypt uses it for expiry warnings, and without
 	# one you find out a certificate failed to renew from a customer.
-	email {$ACME_EMAIL}
+	#
+	# This is a TEMPLATE because the directive cannot be left empty. It used
+	# to read `email {$ACME_EMAIL}`, taking the value from Caddy's own process
+	# environment -- which the container was never given, so Caddy parsed
+	# `email` with no argument and exited:
+	#
+	#   parsing caddyfile tokens for 'email': wrong argument count
+	#
+	# Worse, the pre-start validation PASSED, because that check was handed
+	# the variable explicitly while the real container was not. A validation
+	# that runs in a different environment from the thing it validates is not
+	# a validation. bootstrap.sh now substitutes this line and validates the
+	# generated file, so there is no environment to disagree about.
+	__ACME_EMAIL_LINE__
 
 	# Caddy's admin API can reconfigure the proxy over HTTP. It binds to
 	# localhost by default, which is already not public, but nothing here
