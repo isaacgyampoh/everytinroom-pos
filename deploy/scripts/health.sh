@@ -56,9 +56,14 @@ while read -r name domain; do
   [ -z "$name" ] && continue
   printf '\n  %s%s%s  (%s)\n' "$C_BLD" "$name" "$C_RESET" "$domain"
 
+  # Container names use the hyphenated form of the application name, because
+  # an underscore is not valid in a hostname and these are DNS labels. The
+  # database keeps the underscore. provision-app.sh derives it the same way.
+  dns="$(printf '%s' "$name" | tr '_' '-')"
+
   # PostgREST, from inside the network, so this works before DNS exists.
   code="$(docker run --rm --network central_edge curlimages/curl:8.11.1 \
-    -s -o /dev/null -w '%{http_code}' --max-time 5 "http://${name}-rest:3000/" 2>/dev/null || echo 000)"
+    -s -o /dev/null -w '%{http_code}' --max-time 5 "http://${dns}-rest:3000/" 2>/dev/null || echo 000)"
   # 200 means it answered; 404 also means it answered (OpenAPI is disabled on
   # purpose, so the root has nothing to show). Either proves it is serving.
   case "$code" in
@@ -68,7 +73,7 @@ while read -r name domain; do
   esac
 
   for svc in realtime storage functions imgproxy; do
-    cn="${name}-${svc}"; [ "$svc" = "realtime" ] && cn="${name}.realtime"
+    cn="${dns}-${svc}"; [ "$svc" = "realtime" ] && cn="${dns}.realtime"
     st="$(docker inspect -f '{{.State.Status}}' "$cn" 2>/dev/null || echo absent)"
     [ "$st" = "absent" ] && continue
     h="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cn" 2>/dev/null)"

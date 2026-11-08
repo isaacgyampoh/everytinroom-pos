@@ -1,5 +1,8 @@
 # ===========================================================================
-# __APP__  ->  https://__DOMAIN__
+# __APP_DNS__  ->  https://__DOMAIN__
+#
+# __APP_DNS__ is the application name with underscores turned into hyphens,
+# because an underscore is not valid in a hostname and these are DNS labels.
 #
 # Rendered by provision-app.sh. Do not edit in place: re-run provisioning, or
 # the next run will overwrite what you changed.
@@ -19,13 +22,13 @@ __DOMAIN__ {
 	# Applications that do not run GoTrue simply have nothing listening on
 	# this name, and the route returns 502 rather than silently succeeding.
 	handle_path /auth/v1/* {
-		reverse_proxy __APP__-auth:9999
+		reverse_proxy __APP_DNS__-auth:9999
 	}
 
 	# --- PostgREST: every sb.from() and sb.rpc() call ---------------------
 	# /rest/v1/products?select=*  ->  rest:3000/products?select=*
 	handle_path /rest/v1/* {
-		reverse_proxy __APP__-rest:3000
+		reverse_proxy __APP_DNS__-rest:3000
 	}
 
 	# --- Realtime --------------------------------------------------------
@@ -33,8 +36,8 @@ __DOMAIN__ {
 	# as a websocket path.
 	handle_path /realtime/v1/api/* {
 		rewrite * /api{uri}
-		reverse_proxy __APP__.realtime:4000 {
-			header_up Host __APP__.realtime
+		reverse_proxy __APP_DNS__.realtime:4000 {
+			header_up Host __APP_DNS__.realtime
 		}
 	}
 
@@ -42,18 +45,18 @@ __DOMAIN__ {
 	#
 	# `header_up Host` is load-bearing, not tidiness: Realtime reads the
 	# tenant from the first label of the Host header, so this is what tells it
-	# the connection belongs to __APP__. Send the browser's Host instead and
+	# the connection belongs to __APP_DNS__. Send the browser's Host instead and
 	# the socket opens, authenticates, and silently delivers nothing.
 	handle_path /realtime/v1/* {
 		rewrite * /socket{uri}
-		reverse_proxy __APP__.realtime:4000 {
-			header_up Host __APP__.realtime
+		reverse_proxy __APP_DNS__.realtime:4000 {
+			header_up Host __APP_DNS__.realtime
 		}
 	}
 
 	# --- Storage: sb.storage.from(...).upload() / public image URLs -------
 	handle_path /storage/v1/* {
-		reverse_proxy __APP__-storage:5000 {
+		reverse_proxy __APP_DNS__-storage:5000 {
 			# storage-api builds public URLs from the forwarded path.
 			header_up X-Forwarded-Path /storage/v1
 		}
@@ -61,7 +64,7 @@ __DOMAIN__ {
 
 	# --- Edge functions ---------------------------------------------------
 	handle_path /functions/v1/* {
-		reverse_proxy __APP__-functions:9000
+		reverse_proxy __APP_DNS__-functions:9000
 	}
 
 	# Anything else is not part of the API surface. A 404 here, rather than a
@@ -71,7 +74,7 @@ __DOMAIN__ {
 	}
 
 	log {
-		output file /var/log/caddy/__APP__.log {
+		output file /var/log/caddy/__APP_DNS__.log {
 			roll_size 10MiB
 			roll_keep 5
 		}

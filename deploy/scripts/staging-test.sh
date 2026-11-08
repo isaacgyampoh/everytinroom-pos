@@ -245,13 +245,13 @@ section "5. Two independent applications, and isolation between them"
 # alpha gets realtime+storage, beta gets auth instead. Two applications with
 # DIFFERENT service sets, because "provision only what it needs" is the claim
 # under test, not just isolation.
-if "$ROOT_DIR/provision-app.sh" --name alpha_shop --domain alpha_shop.staging.test \
+if "$ROOT_DIR/provision-app.sh" --name alpha_shop --domain alpha-shop.staging.test \
      --realtime --storage --no-start > /tmp/prov-alpha_shop.log 2>&1; then
   pass "provisioned alpha_shop (realtime + storage, no auth)"
 else
   fail "provisioning alpha_shop failed"; tail -20 /tmp/prov-alpha_shop.log | sed 's/^/       /'
 fi
-if "$ROOT_DIR/provision-app.sh" --name beta_shop --domain beta_shop.staging.test \
+if "$ROOT_DIR/provision-app.sh" --name beta_shop --domain beta-shop.staging.test \
      --auth --no-start > /tmp/prov-beta_shop.log 2>&1; then
   pass "provisioned beta_shop (auth, no realtime or storage)"
 else
@@ -323,6 +323,9 @@ section "6. Realtime, end to end"
 # right Host header, because Realtime reads the tenant from its first label.
 # Nothing short of a real subscription proves that.
 APP=alpha_shop
+# Container names and hostnames use the hyphenated form; the database and
+# role names keep the underscore. provision-app.sh derives this the same way.
+APP_DNS="$(printf '%s' "$APP" | tr '_' '-')"
 ENV="$ROOT_DIR/apps/$APP/.env"
 
 # Serve this site over plain HTTP for the test: the hostname does not resolve
@@ -332,27 +335,27 @@ ENV="$ROOT_DIR/apps/$APP/.env"
 SITE="$ROOT_DIR/compose/caddy-sites/$APP.caddy"
 if [ -f "$SITE" ]; then
   sed -i "1s|^|# staging: plain HTTP, the hostname has no public DNS\n|" "$SITE"
-  sed -i "s|^$APP.staging.test {|http://$APP.staging.test {|" "$SITE"
+  sed -i "s|^$APP_DNS.staging.test {|http://$APP_DNS.staging.test {|" "$SITE"
   grep -q "^http://" "$SITE" && note "site file switched to http:// for the test"
 fi
-grep -q "staging.test" /etc/hosts || echo "127.0.0.1 alpha_shop.staging.test beta_shop.staging.test" >> /etc/hosts
+grep -q "staging.test" /etc/hosts || echo "127.0.0.1 alpha-shop.staging.test beta-shop.staging.test" >> /etc/hosts
 docker restart central-caddy >/dev/null 2>&1; sleep 4
 
 cd "$ROOT_DIR/apps/$APP" && ./compose.sh up -d >/tmp/app-up.log 2>&1
 ok=0
 for _ in $(seq 1 24); do
-  [ "$(docker inspect -f '{{.State.Health.Status}}' "${APP}-rest" 2>/dev/null)" = "healthy" ] && { ok=1; break; }
+  [ "$(docker inspect -f '{{.State.Health.Status}}' "${APP_DNS}-rest" 2>/dev/null)" = "healthy" ] && { ok=1; break; }
   sleep 5
 done
-[ "$ok" = "1" ] && pass "${APP}-rest became healthy" || { fail "${APP}-rest never became healthy"; docker logs "${APP}-rest" --tail=20 2>&1 | sed 's/^/       /'; }
+[ "$ok" = "1" ] && pass "${APP_DNS}-rest became healthy" || { fail "${APP_DNS}-rest never became healthy"; docker logs "${APP_DNS}-rest" --tail=20 2>&1 | sed 's/^/       /'; }
 
 RT_UP=0
 for _ in $(seq 1 24); do
-  s=$(docker inspect -f '{{.State.Status}}' "${APP}.realtime" 2>/dev/null || echo missing)
+  s=$(docker inspect -f '{{.State.Status}}' "${APP_DNS}.realtime" 2>/dev/null || echo missing)
   [ "$s" = "running" ] && { RT_UP=1; break; }
   sleep 5
 done
-[ "$RT_UP" = "1" ] && pass "${APP}.realtime is running" || fail "${APP}.realtime is not running"
+[ "$RT_UP" = "1" ] && pass "${APP_DNS}.realtime is running" || fail "${APP_DNS}.realtime is not running"
 
 # PostgREST through the proxy: proves handle_path strips /rest/v1 correctly.
 ANON="$(sed -n 's/^ANON_KEY=//p' "$ENV" | tail -1)"
@@ -362,7 +365,7 @@ pgq "grant usage, select on all sequences in schema public to anon, authenticate
 pgq "notify pgrst, 'reload schema'" "$APP" >/dev/null; sleep 3
 CODE=$(curl -s -o /tmp/rest.json -w '%{http_code}' --max-time 15 \
   -H "apikey: $ANON" -H "Authorization: Bearer $ANON" \
-  "http://$APP.staging.test/rest/v1/tick?select=id&limit=1")
+  "http://$APP_DNS.staging.test/rest/v1/tick?select=id&limit=1")
 [ "$CODE" = "200" ] && pass "PostgREST answers through the proxy at /rest/v1/ (HTTP 200)" \
                     || { fail "PostgREST through the proxy returned HTTP $CODE"; head -c 200 /tmp/rest.json | sed 's/^/       /'; }
 
@@ -404,7 +407,7 @@ for (let i = 0; i < 100 && !got; i++) await new Promise(r => setTimeout(r, 200))
 if (got) { console.log('EVENT_RECEIVED:' + JSON.stringify(got)); process.exit(0) }
 console.log('NO_EVENT'); process.exit(5)
 JS
-    OUT=$(RT_URL="http://$APP.staging.test" RT_KEY="$ANON" timeout 90 node rt.mjs 2>&1)
+    OUT=$(RT_URL="http://$APP_DNS.staging.test" RT_KEY="$ANON" timeout 90 node rt.mjs 2>&1)
     echo "$OUT" | grep -q '^SUBSCRIBED' && pass "a Realtime subscription was accepted through the proxy" \
                                         || fail "the subscription was not accepted: $(echo "$OUT" | head -2 | tr '\n' ' ')"
     if echo "$OUT" | grep -q 'EVENT_RECEIVED'; then
@@ -412,7 +415,7 @@ JS
       note "$(echo "$OUT" | grep EVENT_RECEIVED | cut -c1-120)"
     else
       fail "no Realtime event arrived: $(echo "$OUT" | tail -2 | tr '\n' ' ')"
-      docker logs "${APP}.realtime" --tail=25 2>&1 | sed 's/^/       /'
+      docker logs "${APP_DNS}.realtime" --tail=25 2>&1 | sed 's/^/       /'
     fi
   else
     skip "could not install @supabase/supabase-js, so Realtime was not tested end to end"
@@ -461,13 +464,13 @@ if docker run -d --name staging-s3 --network central_edge \
   cd "$ROOT_DIR/apps/$APP" && ./compose.sh up -d >/tmp/st-up.log 2>&1
   ok=0
   for _ in $(seq 1 24); do
-    [ "$(docker inspect -f '{{.State.Health.Status}}' "${APP}-storage" 2>/dev/null)" = "healthy" ] && { ok=1; break; }
+    [ "$(docker inspect -f '{{.State.Health.Status}}' "${APP_DNS}-storage" 2>/dev/null)" = "healthy" ] && { ok=1; break; }
     sleep 5
   done
   if [ "$ok" = "1" ]; then
     pass "storage-api started against the S3 backend"
     SVC="$(sed -n 's/^SERVICE_ROLE_KEY=//p' "$ENV" | tail -1)"
-    B="http://$APP.staging.test/storage/v1"
+    B="http://$APP_DNS.staging.test/storage/v1"
     c=$(curl -s -o /tmp/mk.json -w '%{http_code}' -X POST "$B/bucket" \
       -H "Authorization: Bearer $SVC" -H "Content-Type: application/json" \
       -d '{"id":"product-images","name":"product-images","public":true}')
@@ -506,7 +509,7 @@ if docker run -d --name staging-s3 --network central_edge \
       || pass "the object is gone from the bucket"
   else
     fail "storage-api never became healthy"
-    docker logs "${APP}-storage" --tail=25 2>&1 | sed 's/^/       /'
+    docker logs "${APP_DNS}-storage" --tail=25 2>&1 | sed 's/^/       /'
   fi
   cd "$ROOT_DIR"
 else
@@ -589,7 +592,7 @@ fi
 # And a job that calls an HTTP endpoint with the NEW url, which is what the two
 # real jobs that hardcode the old project URL will have to become.
 pgq "select cron.schedule_in_database('staging-http', '* * * * *',
-       \$\$select net.http_post(url := 'http://alpha_shop.staging.test/rest/v1/tick',
+       \$\$select net.http_post(url := 'http://alpha-shop.staging.test/rest/v1/tick',
          headers := '{\"Content-Type\":\"application/json\",\"apikey\":\"$ANON\",\"Authorization\":\"Bearer $ANON\"}'::jsonb,
          body := '{\"label\":\"from-cron\"}'::jsonb)\$\$, 'alpha_shop')" >/dev/null 2>&1
 note "waiting up to 100s for the http job to reach the new URL"
@@ -644,7 +647,7 @@ else
 fi
 # Re-running must be a no-op, not a lockout: the generated password must not change.
 P1="$(sed -n 's/^APP_DB_PASSWORD=//p' "$ROOT_DIR/apps/alpha_shop/.env" | tail -1)"
-"$ROOT_DIR/provision-app.sh" --name alpha_shop --domain alpha_shop.staging.test \
+"$ROOT_DIR/provision-app.sh" --name alpha_shop --domain alpha-shop.staging.test \
   --realtime --storage --no-start >/tmp/prov-again.log 2>&1
 P2="$(sed -n 's/^APP_DB_PASSWORD=//p' "$ROOT_DIR/apps/alpha_shop/.env" | tail -1)"
 [ "$P1" = "$P2" ] && pass "re-provisioning kept the existing password instead of locking the app out" \

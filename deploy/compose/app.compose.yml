@@ -45,7 +45,7 @@ services:
   # -------------------------------------------------------------------------
   rest:
     image: postgrest/postgrest:v14.18
-    container_name: ${APP_NAME}-rest
+    container_name: ${APP_DNS}-rest
     restart: unless-stopped
     logging: *logging
     environment:
@@ -79,12 +79,19 @@ services:
     networks:
       central_db:
       central_edge:
-        aliases: ["${APP_NAME}-rest"]
+        aliases: ["${APP_DNS}-rest"]
 
   # -------------------------------------------------------------------------
   # Realtime — the WAL listener behind the three sb.channel() subscriptions
   # (products, sales, whatsapp_orders) that drive the sale confirmation, the
   # till sound and the customer display.
+  #
+  # APP_DNS, not APP_NAME. An application name may contain underscores
+  # because it becomes a PostgreSQL database and role name, and `alpha_shop`
+  # is a valid identifier. An underscore is NOT valid in a hostname, and this
+  # value ends up in a Host header, a container name and a DNS label. So
+  # provision-app.sh derives APP_DNS by turning underscores into hyphens, and
+  # the database keeps the underscore form.
   #
   # Realtime is multi-tenant even when self-hosted, and it reads the tenant
   # from the FIRST LABEL OF THE HOST HEADER. That is why this container is
@@ -94,7 +101,7 @@ services:
   # -------------------------------------------------------------------------
   realtime:
     image: supabase/realtime:v2.148.3
-    container_name: ${APP_NAME}.realtime
+    container_name: ${APP_DNS}.realtime
     profiles: ["realtime"]
     restart: unless-stopped
     logging: *logging
@@ -112,7 +119,7 @@ services:
       SECRET_KEY_BASE: ${REALTIME_SECRET_KEY_BASE:?REALTIME_SECRET_KEY_BASE is not set}
       # The seed names the tenant after the application, so two applications
       # on this server never share one.
-      SELF_HOST_TENANT_NAME: ${APP_NAME}
+      SELF_HOST_TENANT_NAME: ${APP_DNS}
       SEED_SELF_HOST: "true"
       RUN_JANITOR: "true"
       APP_NAME: realtime
@@ -121,7 +128,7 @@ services:
       RLIMIT_NOFILE: "10000"
       DISABLE_HEALTHCHECK_LOGGING: "true"
     healthcheck:
-      test: ["CMD-SHELL", "curl -sSfL --head -o /dev/null -H \"Authorization: Bearer ${ANON_KEY}\" http://localhost:4000/api/tenants/${APP_NAME}/health"]
+      test: ["CMD-SHELL", "curl -sSfL --head -o /dev/null -H \"Authorization: Bearer ${ANON_KEY}\" http://localhost:4000/api/tenants/${APP_DNS}/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -132,7 +139,7 @@ services:
     networks:
       central_db:
       central_edge:
-        aliases: ["${APP_NAME}.realtime"]
+        aliases: ["${APP_DNS}.realtime"]
 
   # -------------------------------------------------------------------------
   # Supabase Auth (GoTrue) — only for applications that actually use it.
@@ -150,7 +157,7 @@ services:
   # -------------------------------------------------------------------------
   auth:
     image: supabase/gotrue:v2.197.0
-    container_name: ${APP_NAME}-auth
+    container_name: ${APP_DNS}-auth
     profiles: ["auth"]
     restart: unless-stopped
     logging: *logging
@@ -198,7 +205,7 @@ services:
     networks:
       central_db:
       central_edge:
-        aliases: ["${APP_NAME}-auth"]
+        aliases: ["${APP_DNS}-auth"]
 
   # -------------------------------------------------------------------------
   # Storage — kept so that sb.storage.from(...).upload() keeps working
@@ -206,7 +213,7 @@ services:
   # -------------------------------------------------------------------------
   storage:
     image: supabase/storage-api:v1.89.12
-    container_name: ${APP_NAME}-storage
+    container_name: ${APP_DNS}-storage
     profiles: ["storage"]
     restart: unless-stopped
     logging: *logging
@@ -215,7 +222,7 @@ services:
       ANON_KEY: ${ANON_KEY}
       SERVICE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
-      POSTGREST_URL: http://${APP_NAME}-rest:3000
+      POSTGREST_URL: http://${APP_DNS}-rest:3000
       DATABASE_URL: postgres://${APP_STORAGE_USER}:${APP_STORAGE_PASSWORD}@postgres:5432/${APP_DB}
       DB_SUPER_USER: ${APP_STORAGE_USER}
       DB_ANON_ROLE: anon
@@ -241,7 +248,7 @@ services:
       # Thumbnails, resizing and format conversion, done by imgproxy below.
       # On Supabase this is a billed add-on; here it is CPU we already pay for.
       ENABLE_IMAGE_TRANSFORMATION: "true"
-      IMGPROXY_URL: http://${APP_NAME}-imgproxy:5001
+      IMGPROXY_URL: http://${APP_DNS}-imgproxy:5001
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/status"]
       interval: 15s
@@ -254,11 +261,11 @@ services:
     networks:
       central_db:
       central_edge:
-        aliases: ["${APP_NAME}-storage"]
+        aliases: ["${APP_DNS}-storage"]
 
   imgproxy:
     image: darthsim/imgproxy:v4.0.21
-    container_name: ${APP_NAME}-imgproxy
+    container_name: ${APP_DNS}-imgproxy
     profiles: ["storage"]
     restart: unless-stopped
     logging: *logging
@@ -281,7 +288,7 @@ services:
         limits: { memory: 512M }
     networks:
       central_edge:
-        aliases: ["${APP_NAME}-imgproxy"]
+        aliases: ["${APP_DNS}-imgproxy"]
 
   # -------------------------------------------------------------------------
   # Edge functions — the Deno runtime for charge-momo, paystack-webhook,
@@ -289,7 +296,7 @@ services:
   # -------------------------------------------------------------------------
   functions:
     image: supabase/edge-runtime:v1.77.9
-    container_name: ${APP_NAME}-functions
+    container_name: ${APP_DNS}-functions
     profiles: ["functions"]
     restart: unless-stopped
     logging: *logging
@@ -299,7 +306,7 @@ services:
     environment:
       <<: *app-env
       JWT_SECRET: ${JWT_SECRET}
-      SUPABASE_URL: http://${APP_NAME}-rest:3000
+      SUPABASE_URL: http://${APP_DNS}-rest:3000
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
       SUPABASE_DB_URL: postgres://${APP_DB_USER}:${APP_DB_PASSWORD}@postgres:5432/${APP_DB}
@@ -315,7 +322,7 @@ services:
     networks:
       central_db:
       central_edge:
-        aliases: ["${APP_NAME}-functions"]
+        aliases: ["${APP_DNS}-functions"]
 
 networks:
   # Created by the shared stack. `external` means an application never

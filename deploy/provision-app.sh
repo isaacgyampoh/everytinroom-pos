@@ -91,9 +91,19 @@ esac
 
 if [ -n "$DOMAIN" ]; then
   printf '%s' "$DOMAIN" | grep -qE '^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$' || die \
-    "'$DOMAIN' is not a valid hostname." "Example: api.everytinroom.store"
+    "'$DOMAIN' is not a valid hostname." \
+    "Lowercase letters, digits, hyphens and dots only." \
+    "$(printf '%s' "$DOMAIN" | grep -q '_' && printf 'It contains an underscore, which is not legal in a hostname. The application name may have one (it becomes a database name); the domain may not. Try: %s' "$(printf '%s' "$DOMAIN" | tr '_' '-')" || printf 'Example: api.everytinroom.store')"
 fi
 
+# A DNS-safe form of the name. The name itself may contain underscores
+# because it becomes a PostgreSQL database and role name, where `alpha_shop`
+# is perfectly valid. An underscore is NOT valid in a hostname, and this value
+# becomes a container name, a network alias, a Realtime tenant read out of a
+# Host header, and part of a domain. Keeping the two separate removes a whole
+# class of problem -- the staging run found it by failing hostname validation
+# on an application called alpha_shop.
+APP_DNS="$(printf '%s' "$NAME" | tr '_' '-')"
 APP_DB="$NAME"
 APP_OWNER="${NAME}_owner"
 APP_AUTHN="${NAME}_authenticator"
@@ -105,6 +115,7 @@ APP_ENV="$APP_DIR/.env"
 
 info "name      : $NAME"
 info "database  : $APP_DB"
+info "dns label : $APP_DNS$( [ "$APP_DNS" != "$NAME" ] && printf '  (underscores become hyphens for hostnames)' )"
 info "domain    : ${DOMAIN:-(none yet)}"
 info "services  : rest$( [ "$WANT_RT" = 1 ] && printf ' realtime' )$( [ "$WANT_ST" = 1 ] && printf ' storage+imgproxy' )$( [ "$WANT_FN" = 1 ] && printf ' functions' )$( [ "$WANT_AUTH" = 1 ] && printf ' auth' )"
 
@@ -181,6 +192,7 @@ else
   fi
 
   set_env_var "$APP_ENV" APP_NAME "$NAME"
+  set_env_var "$APP_ENV" APP_DNS "$APP_DNS"
   set_env_var "$APP_ENV" APP_DB "$APP_DB"
   set_env_var "$APP_ENV" APP_DB_USER "$APP_AUTHN"
   set_env_var "$APP_ENV" APP_DOMAIN "${DOMAIN:-localhost}"
@@ -423,9 +435,9 @@ elif [ "$DRY" = "1" ]; then
   dim "would write $ROOT_DIR/compose/caddy-sites/$NAME.caddy for $DOMAIN"
 else
   SITE="$ROOT_DIR/compose/caddy-sites/$NAME.caddy"
-  sed -e "s/__APP__/$NAME/g" -e "s/__DOMAIN__/$DOMAIN/g" \
+  sed -e "s/__APP_DNS__/$APP_DNS/g" -e "s/__DOMAIN__/$DOMAIN/g" \
     "$ROOT_DIR/compose/caddy-site.template" > "$SITE"
-  grep -q "__APP__\|__DOMAIN__" "$SITE" && die \
+  grep -q "__APP_DNS__\|__DOMAIN__" "$SITE" && die \
     "The Caddy site file still contains placeholders. This is a bug in provision-app.sh." \
     "Nothing was reloaded, so the proxy is unchanged."
   chmod 0644 "$SITE"
@@ -505,11 +517,11 @@ if [ "$DRY" = "0" ] && [ "$DO_START" = "1" ]; then
     "  cd $APP_DIR && ./compose.sh logs --tail=80"
 
   printf '\n  waiting for PostgREST\n'
-  rest_ok() { [ "$(docker inspect -f '{{.State.Health.Status}}' "${NAME}-rest" 2>/dev/null)" = "healthy" ]; }
-  if retry 18 5 rest_ok; then ok "${NAME}-rest is healthy"
+  rest_ok() { [ "$(docker inspect -f '{{.State.Health.Status}}' "${APP_DNS}-rest" 2>/dev/null)" = "healthy" ]; }
+  if retry 18 5 rest_ok; then ok "${APP_DNS}-rest is healthy"
   else
-    warn "${NAME}-rest did not report healthy within 90 seconds."
-    warn "  docker logs ${NAME}-rest --tail=40"
+    warn "${APP_DNS}-rest did not report healthy within 90 seconds."
+    warn "  docker logs ${APP_DNS}-rest --tail=40"
     warn "The usual cause is that the database has no tables yet, which is"
     warn "expected before the dump is restored."
   fi
