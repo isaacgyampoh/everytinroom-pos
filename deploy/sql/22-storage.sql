@@ -33,6 +33,13 @@ END $$;
 -- storage-api runs its own migrations on first boot and needs to create the
 -- 'storage' schema and its tables.
 GRANT CREATE ON DATABASE :"dbname" TO :"st_user";
+
+-- storage-api does SET ROLE to the role named in the request's JWT, exactly
+-- as PostgREST does, so it must be a member of the three. Without this every
+-- call fails with:
+--   permission denied to set role "service_role"
+-- which arrives as an opaque HTTP 400 carrying a 403 inside it.
+GRANT anon, authenticated, service_role TO :"st_user";
 GRANT USAGE  ON SCHEMA public TO :"st_user";
 -- No owner-role membership: see 10-create-app-db.sql.
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO :"st_user";

@@ -59,6 +59,10 @@ services:
       PGRST_DB_POOL: ${PGRST_DB_POOL:-10}
       PGRST_SERVER_PORT: "3000"
       PGRST_ADMIN_SERVER_PORT: "3001"
+      # Declared explicitly: `postgrest --ready`, which is the healthcheck,
+      # probes the admin server, and leaving the host to a default is one more
+      # thing that can differ between versions.
+      PGRST_ADMIN_SERVER_HOST: "0.0.0.0"
       # The schema introspection endpoint lists every table and function to
       # anyone holding the anon key, which ships in the browser bundle.
       # supabase-js never reads it -- it builds its own URLs.
@@ -71,8 +75,11 @@ services:
       test: ["CMD", "postgrest", "--ready"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 15s
+      retries: 10
+      # Generous, because a schema-cache reload makes --ready report not-ready
+      # for a moment and a restored production database takes longer to cache
+      # than an empty one.
+      start_period: 60s
     deploy:
       resources:
         limits: { memory: 512M }

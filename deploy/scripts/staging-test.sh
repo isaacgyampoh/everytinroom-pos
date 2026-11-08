@@ -421,6 +421,24 @@ pgq "select count(*) from pg_publication_tables where pubname='supabase_realtime
   | grep -q 1 && pass "public.tick is in the supabase_realtime publication" \
               || fail "could not add public.tick to the publication"
 
+# Realtime reads its tenant's published tables when it starts. A table added
+# to the publication afterwards is not noticed, which is why the subscription
+# was ACCEPTED and then no event ever arrived -- the channel was fine and the
+# table was simply not in the set Realtime was watching.
+#
+# In production the publication is set up before the service starts, so this
+# restart is a property of the TEST's ordering, not of the platform.
+note "restarting Realtime so it picks up the newly published table"
+docker restart "${APP_DNS}.realtime" >/dev/null 2>&1 || true
+rt_ready=0
+for _ in $(seq 1 24); do
+  if docker exec "${APP_DNS}.realtime" curl -sSf -o /dev/null --max-time 3 \
+       "http://127.0.0.1:4000/api/tenants/${APP_DNS}/health" 2>/dev/null; then rt_ready=1; break; fi
+  sleep 5
+done
+[ "$rt_ready" = "1" ] && pass "Realtime answered its health endpoint after the restart" \
+                      || note "Realtime did not answer its health endpoint; the subscription below will show whether it works"
+
 if command -v node >/dev/null 2>&1; then
   mkdir -p /tmp/rt && cd /tmp/rt
   npm init -y >/dev/null 2>&1
@@ -638,10 +656,12 @@ fi
 # And a job that calls an HTTP endpoint with the NEW url, which is what the two
 # real jobs that hardcode the old project URL will have to become.
 pgq "select cron.schedule_in_database('staging-http', '* * * * *',
-       \$\$select net.http_post(url := 'http://alpha-shop.staging.test/rest/v1/tick',
+       \$\$select net.http_post(url := 'http://alpha-shop-rest:3000/tick',
          headers := '{\"Content-Type\":\"application/json\",\"apikey\":\"$ANON\",\"Authorization\":\"Bearer $ANON\"}'::jsonb,
          body := '{\"label\":\"from-cron\"}'::jsonb)\$\$, 'alpha_shop')" >/dev/null 2>&1
-note "waiting up to 100s for the http job to reach the new URL"
+note "waiting up to 100s for the http job to reach PostgREST"
+note "the URL is the container alias, not the staging hostname: pg_net runs"
+note "inside the postgres container, which has no /etc/hosts entry for it"
 http_ok=0
 for _ in $(seq 1 20); do
   n="$(pgq "select count(*) from public.tick where label='from-cron'" "$APP")"
@@ -649,7 +669,7 @@ for _ in $(seq 1 20); do
   sleep 5
 done
 [ "$http_ok" = "1" ] && pass "a cron job reached the new API URL through pg_net and the proxy" \
-                     || fail "the cron job did not reach the new URL (pg_net or routing)"
+                     || fail "the cron job did not reach PostgREST through pg_net"
 pgq "select cron.unschedule('staging-proof')" >/dev/null 2>&1
 pgq "select cron.unschedule('staging-http')" >/dev/null 2>&1
 
