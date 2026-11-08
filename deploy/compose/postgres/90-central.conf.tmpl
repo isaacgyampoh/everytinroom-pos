@@ -72,6 +72,26 @@ max_parallel_maintenance_workers = __MAX_PARALLEL_GATHER__
 cron.database_name = 'postgres'
 cron.use_background_workers = on
 
+# --- outbound HTTP from the database -------------------------------------
+# pg_net has the same one-database limitation as pg_cron, and it is easier to
+# miss. Its background worker reads net.http_request_queue in exactly the
+# database named here -- "running pg_net on multiple databases in one cluster
+# is not supported". A net.http_post() called from any OTHER database inserts
+# its row into that database's queue, returns an id, and is never processed:
+# no error, no response row, no request.
+#
+# That matters here because this platform gives every application its own
+# database in one cluster. Set explicitly rather than left to the default, so
+# the value is visible where the consequence is written down.
+#
+# The consequence for migration, in full, is in deploy/README.md under
+# "Scheduled jobs": a job that makes an HTTP call is registered in THIS
+# database with cron.schedule(), while a job that only runs SQL is registered
+# against the application's own database with cron.schedule_in_database().
+# A job that needs both must be split -- the SQL half behind a PostgREST RPC
+# that the HTTP half calls.
+pg_net.database_name = 'postgres'
+
 # --- logging --------------------------------------------------------------
 # Enough to answer "why was the till slow at four o'clock" without recording
 # every statement, which on a trading day is both noise and a privacy problem.

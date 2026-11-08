@@ -28,6 +28,7 @@
 
 SCRIPT_NAME="migrate-from-supabase.sh"
 HERE="$(cd "$(dirname "$0")" && pwd)"
+DEPLOY="$(cd "$HERE/.." && pwd)"
 . "$HERE/../lib/common.sh"
 
 ROOT_DIR="/srv/central"
@@ -141,15 +142,47 @@ printf '\n%s[3/6] Capturing the scheduled jobs%s\n' "$C_BLD" "$C_RESET"
 # reports and payment reminders after cutover.
 JOBS="$WORK/cron-jobs.sql"
 if srcq "select 1 from pg_extension where extname='pg_cron'" | grep -q 1; then
-  src "psql -tAqX \"\$SRC_URL\" -c \"
-    select format('-- %s (%s)%sselect cron.schedule_in_database(%L, %L, \\\$job\\\$%s\\\$job\\\$, %L);',
-      jobname, case when active then 'active' else 'INACTIVE' end, chr(10),
-      jobname, schedule, command, '${APP_DB}')
-    from cron.job order by jobname\"" > "$JOBS" 2>/dev/null || true
-  NJOBS="$(grep -c 'cron.schedule_in_database' "$JOBS" 2>/dev/null || echo 0)"
+  # WHERE EACH JOB GOES depends on what it DOES, not on who owns it.
+  #
+  # pg_net's background worker reads net.http_request_queue in exactly one
+  # database (pg_net.database_name = 'postgres'); running it on several
+  # databases in a cluster is not supported. A net.http_post() called from the
+  # application's database queues a row, returns an id and is never processed
+  # -- no error, no response, no request.
+  #
+  # So this file previously rewrote EVERY job as schedule_in_database(), which
+  # would have moved every HTTP-calling job into a database where pg_net can
+  # never serve it. The reports would simply stop, with nothing in any log.
+  #
+  #   calls net.http_*  -> cron.schedule()            , stays in postgres
+  #   SQL only          -> cron.schedule_in_database(), the application's own
+  #
+  # A job that reads application data AND THEN calls out cannot do both from
+  # postgres; it is flagged for splitting rather than quietly rewritten.
+  # The query lives in deploy/sql/migrate/classify-cron-jobs.sql and is piped
+  # in with -f -, rather than embedded here as a -c string. That string had to
+  # survive this shell, then `sh -c` inside the container, then psql, and every
+  # dollar-quote and backslash in it needed three levels of escaping. The file
+  # needs none, and it can be run against a throwaway cluster and checked --
+  # which is how the HTTP/SQL split and the ?from= false positive were found.
+  src 'psql -tAqX -v app_db='"$APP_DB"' "$SRC_URL" -f -' \
+    < "$DEPLOY/sql/migrate/classify-cron-jobs.sql" > "$JOBS" 2>/dev/null || true
+  NJOBS="$(grep -c 'cron.schedule' "$JOBS" 2>/dev/null || echo 0)"
+  NHTTP="$(grep -c 'cron.schedule(' "$JOBS" 2>/dev/null || echo 0)"
+  NSQL="$(grep -c 'cron.schedule_in_database(' "$JOBS" 2>/dev/null || echo 0)"
+  NSPLIT="$(grep -c 'NEEDS SPLITTING' "$JOBS" 2>/dev/null || echo 0)"
   ok "$NJOBS scheduled job(s) written to $JOBS"
+  dim "  $NHTTP make HTTP calls and stay in the postgres database"
+  dim "  $NSQL run SQL only and are registered against $APP_DB"
 
-  # Two things about these jobs need a human, and both are easy to miss.
+  # Three things about these jobs need a human, and all three are easy to miss.
+  if [ "${NSPLIT:-0}" -gt 0 ]; then
+    printf '\n'
+    warn "$NSPLIT job(s) BOTH read data and make an HTTP call. Those cannot run"
+    warn "from either database as written: pg_net only works in postgres, and"
+    warn "postgres cannot see $APP_DB's tables. Each is marked NEEDS SPLITTING"
+    warn "in $JOBS with what to do."
+  fi
   if grep -q 'supabase\.co' "$JOBS" 2>/dev/null; then
     printf '\n'
     warn "The job bodies contain the OLD Supabase URL, hardcoded inside the SQL."
@@ -157,10 +190,8 @@ if srcq "select 1 from pg_extension where extname='pg_cron'" | grep -q 1; then
     grep -o "https://[a-z0-9.]*supabase\.co[^']*" "$JOBS" | sort -u | sed 's/^/      /' | head -5
     warn "Edit $JOBS and replace that host with this server's API domain before applying it."
   fi
-  warn "They are rewritten as cron.schedule_in_database() rather than cron.schedule()."
-  warn "That is required here: pg_cron's scheduler runs in the 'postgres' database"
-  warn "(cron.database_name), so a job for $APP_DB must name its database."
-  warn "Apply them AFTER you have checked the URLs:"
+  warn "Apply them AFTER you have checked the URLs. Both kinds go in through the"
+  warn "postgres database -- schedule_in_database() names its target inside the call:"
   warn "  docker exec -i central-postgres psql -U postgres -d postgres < $JOBS"
 else
   dim "the source has no pg_cron extension, so there are no jobs to carry over"

@@ -104,11 +104,34 @@ that, not to eliminate it.
 `postgres` here, deliberately neutral rather than belonging to a tenant, so
 every application registers its jobs with `cron.schedule_in_database()`.
 
+**pg_net has the same limitation, and it is the one that bites.** Its
+background worker reads `net.http_request_queue` in exactly the database named
+by `pg_net.database_name` — `postgres` here — and running it on several
+databases in one cluster is not supported. Called from any other database,
+`net.http_post()` inserts a queue row, returns an id, and is never processed:
+no error, no response row in `net._http_response`, no request. A job that
+looks fine and does nothing.
+
+So jobs split by what they do, not by which application owns them:
+
+| The job | Where it is registered | How |
+|---|---|---|
+| runs SQL only | the application's own database | `cron.schedule_in_database('name', sched, sql, 'app_db')` |
+| makes an HTTP call | the `postgres` database | `cron.schedule('name', sched, $$select net.http_post(...)$$)` |
+| reads app data **and then** calls out | must be split | the SQL half becomes a PostgREST RPC in the app database; the HTTP job calls that URL |
+
+The staging run measures this rather than asserting it: section 9 schedules an
+HTTP job in `postgres` and requires it to arrive, then makes the same call from
+the application's own database and records that it queues and is never served.
+
 Everytinroom's six jobs need attention at cutover, for two reasons found by
 reading the live database:
 
 1. They are registered with `cron.schedule()`, which schedules in whichever
-   database it is called from. They need translating.
+   database it is called from — on Supabase there is only one, so every job
+   lands together. Here they have to be sorted by the table above: the
+   HTTP-calling ones stay on `cron.schedule()` in `postgres`, the SQL-only
+   ones become `cron.schedule_in_database(..., 'everytinroom')`.
 2. **The job bodies have the old project URL hardcoded in them**:
    ```sql
    SELECT cron.schedule('morning-report', '0 6 * * *', $$SELECT net.http_post(

@@ -58,15 +58,17 @@ GRANT ALL ON ALL TABLES IN SCHEMA storage TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA storage TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA storage GRANT ALL ON TABLES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA storage GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
--- And for tables storage-api creates as its own role, so the switched-to
--- roles can still read them.
-SELECT set_config('provision.st_user_dp', :'st_user', false);
-DO $$
-DECLARE u text := current_setting('provision.st_user_dp');
-BEGIN
-  EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA storage GRANT ALL ON TABLES TO anon, authenticated, service_role', u);
-  EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA storage GRANT ALL ON SEQUENCES TO anon, authenticated, service_role', u);
-END $$;
+-- NOT done here: ALTER DEFAULT PRIVILEGES FOR ROLE <storage role>.
+--
+-- That is a fourth form of "act as another role" and fails the same way:
+--   ERROR:  permission denied to change default privileges
+-- A role may change its OWN default privileges; another role may not do it
+-- for it without membership, and membership crashes this image.
+--
+-- It is not needed. storage-api's own migrations grant on the tables they
+-- create -- that is what DB_INSTALL_ROLES is for, and it is set to true in
+-- app.compose.yml so those grants run. The roles themselves already exist,
+-- and storage-api's migration is idempotent about that.
 GRANT USAGE  ON SCHEMA public TO :"st_user";
 -- No owner-role membership: see 10-create-app-db.sql.
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO :"st_user";

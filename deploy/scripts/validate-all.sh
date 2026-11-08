@@ -123,16 +123,18 @@ hdr "No SQL takes ownership of an object for another role"
 # supabase/postgres server. This pattern broke provisioning in three separate
 # files, so it is banned: grant rights on the object instead of transferring
 # ownership of it.
-BADO=$(grep -rniE "(create +(schema|table|database)[^;]* authorization |alter +(schema|table|database|sequence|type|function)[^;]* owner +to )" \
+# Four forms of "act as another role" have now broken provisioning, each in a
+# different file. ALTER DEFAULT PRIVILEGES FOR ROLE is the fourth.
+BADO=$(grep -rniE "(create +(schema|table|database)[^;]* authorization |alter +(schema|table|database|sequence|type|function)[^;]* owner +to |alter +default +privileges +for +role )" \
   "$DEPLOY"/sql/*.sql 2>/dev/null \
   | awk '{ line=$0; sub(/^[^:]*:[0-9]+:/, "", line);
            if (line ~ /^[[:space:]]*--/) next;
            if (tolower(line) ~ /raise +(exception|warning|notice)/) next;
            print }' || true)
 if [ -z "$BADO" ]; then
-  ok "no file transfers ownership or uses AUTHORIZATION"
+  ok "no file transfers ownership, uses AUTHORIZATION, or sets default privileges for another role"
 else
-  bad "a file transfers object ownership — this needs SET ROLE, which is unavailable"
+  bad "a file acts as another role (ownership, AUTHORIZATION or DEFAULT PRIVILEGES FOR ROLE)"
   printf '%s\n' "$BADO" | sed 's/^/     /'
 fi
 
@@ -142,6 +144,39 @@ for f in "$DEPLOY"/compose/caddy-site.template "$DEPLOY"/compose/Caddyfile.tmpl 
   [ "$n" -gt 0 ] && ok "$(basename "$f") has $n placeholder(s), as a template should" \
                  || bad "$(basename "$f") has none — the substitution step would be a no-op"
 done
+
+hdr "HTTP-making scheduled jobs are registered where pg_net can serve them"
+# pg_net's background worker reads net.http_request_queue in exactly ONE
+# database -- pg_net.database_name, which is 'postgres' here. A net.http_post()
+# from any other database queues a row, returns an id, and is never processed:
+# no error, no response, no request. Run 17 failed on precisely that, with an
+# empty net._http_response and no explanation.
+#
+# So nothing may wrap a net.http_* call in cron.schedule_in_database(), which
+# is how the migration script used to rewrite EVERY job.
+if grep -q "^pg_net.database_name = 'postgres'$" "$DEPLOY/compose/postgres/90-central.conf.tmpl"; then
+  ok "pg_net.database_name is pinned to postgres in the config template"
+else
+  bad "pg_net.database_name is not pinned in 90-central.conf.tmpl — HTTP jobs would depend on a default"
+fi
+# This file is excluded from its own scan: the failure message below contains
+# both "schedule_in_database" and "net.http_*", so a clean tree failed the
+# check on the wording of the check. Same trap as the Caddyfile guard that
+# matched the comment explaining the bug it was looking for.
+BADNET="$(grep -rn "schedule_in_database" "$DEPLOY"/scripts/*.sh "$DEPLOY"/sql/*.sql "$DEPLOY"/sql/migrate/*.sql 2>/dev/null \
+  | grep -v "/validate-all\.sh:" \
+  | grep -i "net\.http" | grep -v '^[^:]*:[0-9]*: *#' | grep -v '^[^:]*:[0-9]*: *--' || true)"
+if [ -z "$BADNET" ]; then
+  ok "no net.http_* call is scheduled into an application database"
+else
+  bad "a net.http_* call is wrapped in schedule_in_database() — it would never run"
+  printf '%s\n' "$BADNET" | sed 's/^/     /'
+fi
+if grep -q "cron.schedule(" "$DEPLOY/sql/migrate/classify-cron-jobs.sql" 2>/dev/null; then
+  ok "the migration classifier can emit cron.schedule() for HTTP jobs"
+else
+  bad "deploy/sql/migrate/classify-cron-jobs.sql does not emit cron.schedule() at all"
+fi
 
 hdr "No secret-looking value is committed"
 # A JWT, a private key or a long hex string in a tracked file.

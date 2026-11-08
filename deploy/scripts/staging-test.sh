@@ -92,6 +92,46 @@ fail() { FAIL=$((FAIL+1)); printf '  %sFAIL%s %s\n' "$C_R" "$C_0" "$*"; RESULTS=
 skip() { SKIP=$((SKIP+1)); printf '  %sSKIP%s %s\n' "$C_Y" "$C_0" "$*"; RESULTS="$RESULTS- SKIP $*\n"; }
 note() { printf '       %s\n' "$*"; RESULTS="$RESULTS      $*\n"; }
 
+# Diagnostic output belongs in the REPORT, not only in the CI log.
+#
+# Every failure detail here used to be piped through `sed` straight to stdout.
+# Only pass/fail/skip/note write to $RESULTS, so the report -- the evidence
+# file readiness-package.py reads -- recorded a bare "**FAIL** provisioning
+# alpha_shop failed" with no cause, and finding out why meant opening the CI
+# log by hand. Run 17 cost exactly that.
+#
+# Secrets are redacted on the way in. Every secret in this job is generated on
+# the runner and dies with it, but the report is committed to a public branch
+# and the rule is that no report carries a secret, whatever its lifetime.
+DETAIL_LINES="${DETAIL_LINES:-20}"
+detail() {                      # detail <command> [args...]   -- stderr included
+  local tmp n=0 l
+  tmp="$(mktemp)"
+  # Run the command here rather than taking a pipe. A function on the right of
+  # a pipe runs in a SUBSHELL, so its assignment to $RESULTS is thrown away:
+  # the first version of this helper printed every diagnostic to the screen
+  # and still wrote none of it to the report. Taking the command as arguments
+  # keeps it in this shell. "$@" invokes shell functions too, so `detail pgq
+  # "select ..."` works.
+  "$@" >"$tmp" 2>&1 || true
+  # sed -E, not BRE. BSD sed has no \| alternation, so the BRE version matched
+  # nothing on a Mac and the password in the test fixture came through intact
+  # while the run still reported success. ERE behaves the same in both.
+  # A literal ESC rather than \x1b, for the same portability reason.
+  sed -E -e "s/$(printf '\033')\[[0-9;]*m//g" \
+         -e 's/eyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]*/<jwt redacted>/g' \
+         -e 's/(PASSWORD|password|PASSWD|SECRET|secret|TOKEN|token|APIKEY|apikey|api_key)([=:]{1,2}"?[[:space:]]*)[^[:space:]"'"'"',;]{8,}/\1\2<redacted>/g' \
+         -e 's/[A-Za-z0-9+/]{40,}={0,2}/<redacted-blob>/g' \
+         "$tmp" > "$tmp.red" || cp "$tmp" "$tmp.red"
+  while IFS= read -r l; do
+    n=$((n+1))
+    [ "$n" -gt "$DETAIL_LINES" ] && { note "... truncated at $DETAIL_LINES lines"; break; }
+    note "$l"
+  done < "$tmp.red"
+  [ "$n" = "0" ] && note "(the command produced no output)"
+  rm -f "$tmp" "$tmp.red"
+}
+
 [ "$(uname -s)" = "Linux" ] || { echo "This must run on Linux. It is a server test."; exit 2; }
 [ "$(id -u)" = "0" ] || { echo "Run with sudo: sudo $0"; exit 2; }
 
@@ -145,7 +185,7 @@ if "$DEPLOY/bootstrap.sh" --acme-email staging@example.invalid --yes --no-firewa
   pass "bootstrap.sh completed"
 else
   fail "bootstrap.sh exited non-zero"
-  tail -25 "$BOOT_LOG" | sed 's/^/       /'
+  detail tail -25 "$BOOT_LOG"
 fi
 
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
@@ -291,13 +331,13 @@ if "$ROOT_DIR/provision-app.sh" --name alpha_shop --domain alpha-shop.staging.te
      --realtime --storage --no-start > /tmp/prov-alpha_shop.log 2>&1; then
   pass "provisioned alpha_shop (realtime + storage, no auth)"
 else
-  fail "provisioning alpha_shop failed"; tail -20 /tmp/prov-alpha_shop.log | sed 's/^/       /'
+  fail "provisioning alpha_shop failed"; detail tail -20 /tmp/prov-alpha_shop.log
 fi
 if "$ROOT_DIR/provision-app.sh" --name beta_shop --domain beta-shop.staging.test \
      --auth --no-start > /tmp/prov-beta_shop.log 2>&1; then
   pass "provisioned beta_shop (auth, no realtime or storage)"
 else
-  fail "provisioning beta_shop failed"; tail -20 /tmp/prov-beta_shop.log | sed 's/^/       /'
+  fail "provisioning beta_shop failed"; detail tail -20 /tmp/prov-beta_shop.log
 fi
 
 # The services each one asked for, and crucially the ones it did NOT.
@@ -395,7 +435,7 @@ for _ in $(seq 1 24); do
   [ "$(docker inspect -f '{{.State.Health.Status}}' "${APP_DNS}-rest" 2>/dev/null)" = "healthy" ] && { ok=1; break; }
   sleep 5
 done
-[ "$ok" = "1" ] && pass "${APP_DNS}-rest became healthy" || { fail "${APP_DNS}-rest never became healthy"; docker logs "${APP_DNS}-rest" --tail=20 2>&1 | sed 's/^/       /'; }
+[ "$ok" = "1" ] && pass "${APP_DNS}-rest became healthy" || { fail "${APP_DNS}-rest never became healthy"; detail docker logs "${APP_DNS}-rest" --tail=20; }
 
 RT_UP=0
 for _ in $(seq 1 24); do
@@ -415,7 +455,7 @@ CODE=$(curl -s -o /tmp/rest.json -w '%{http_code}' --max-time 15 \
   -H "apikey: $ANON" -H "Authorization: Bearer $ANON" \
   "http://$APP_DNS.staging.test/rest/v1/tick?select=id&limit=1")
 [ "$CODE" = "200" ] && pass "PostgREST answers through the proxy at /rest/v1/ (HTTP 200)" \
-                    || { fail "PostgREST through the proxy returned HTTP $CODE"; head -c 200 /tmp/rest.json | sed 's/^/       /'; }
+                    || { fail "PostgREST through the proxy returned HTTP $CODE"; detail head -c 200 /tmp/rest.json; }
 
 # Now the subscription. Add the table to the publication Realtime reads.
 pgq "do \$\$ begin if not exists (select 1 from pg_publication where pubname='supabase_realtime')
@@ -494,7 +534,7 @@ EOL
       note "$(echo "$OUT" | grep EVENT_RECEIVED | cut -c1-120)"
     else
       fail "no Realtime event arrived: $(echo "$OUT" | tail -2 | tr '\n' ' ')"
-      docker logs "${APP_DNS}.realtime" --tail=25 2>&1 | sed 's/^/       /'
+      detail docker logs "${APP_DNS}.realtime" --tail=25
     fi
   else
     skip "could not install @supabase/supabase-js, so Realtime was not tested end to end"
@@ -535,7 +575,7 @@ if docker run -d --name staging-s3 --network central_edge \
     sleep 3
   done
   [ "$s3_up" = "1" ] && pass "an S3-compatible endpoint is running (adobe/s3mock, standing in for R2)" \
-                     || { fail "the S3 endpoint never answered"; docker logs staging-s3 --tail=15 2>&1 | sed 's/^/       /'; }
+                     || { fail "the S3 endpoint never answered"; detail docker logs staging-s3 --tail=15; }
 
   sed -i 's|^R2_BUCKET=.*|R2_BUCKET=staging-images|' "$ENV"
   sed -i 's|^R2_ENDPOINT=.*|R2_ENDPOINT=http://staging-s3:9090|' "$ENV"
@@ -577,7 +617,7 @@ if docker run -d --name staging-s3 --network central_edge \
       pass "the object is physically in the S3 bucket, so the backend is really S3"
     else
       fail "the object is not in the S3 bucket — storage may have fallen back to local files"
-      docker exec staging-s3 find /s3data -maxdepth 3 2>/dev/null | head -8 | sed 's/^/       /'
+      detail bash -c 'docker exec staging-s3 find /s3data -maxdepth 3 | head -8'
     fi
 
     c=$(curl -s -o /tmp/rm.json -w '%{http_code}' -X DELETE "$B/object/product-images/test/probe.txt" \
@@ -589,7 +629,7 @@ if docker run -d --name staging-s3 --network central_edge \
       || pass "the object is gone from the bucket"
   else
     fail "storage-api never became healthy"
-    docker logs "${APP_DNS}-storage" --tail=25 2>&1 | sed 's/^/       /'
+    detail docker logs "${APP_DNS}-storage" --tail=25
   fi
   cd "$ROOT_DIR"
 else
@@ -609,7 +649,7 @@ note "alpha_shop now holds $BEFORE_ROWS rows summing to $BEFORE_SUM"
 if "$ROOT_DIR/scripts/backup.sh" --all --verify >/tmp/backup.log 2>&1; then
   pass "backup.sh completed with verification"
 else
-  fail "backup.sh exited non-zero"; tail -15 /tmp/backup.log | sed 's/^/       /'
+  fail "backup.sh exited non-zero"; detail tail -15 /tmp/backup.log
 fi
 BK="$(ls -t "$ROOT_DIR"/backups/alpha_shop-*.sql.gz 2>/dev/null | head -1)"
 [ -n "$BK" ] && pass "a dump was produced: $(basename "$BK") ($(du -h "$BK" | awk '{print $1}'))" \
@@ -623,7 +663,7 @@ if [ -n "$BK" ]; then
        --into alpha_restore_probe >/tmp/restore.log 2>&1; then
     pass "restore.sh restored into a separate database without touching the live one"
   else
-    fail "restore.sh exited non-zero"; tail -20 /tmp/restore.log | sed 's/^/       /'
+    fail "restore.sh exited non-zero"; detail tail -20 /tmp/restore.log
   fi
   R_ROWS="$(pgq 'select count(*) from public.money' alpha_restore_probe)"
   R_SUM="$(pgq 'select sum(total)::numeric(14,2) from public.money' alpha_restore_probe)"
@@ -667,17 +707,39 @@ if [ "$fired" = "1" ]; then
   pass "the job actually executed in the other database (rows: $(pgq 'select count(*) from public.cron_proof' "$APP"))"
 else
   fail "the job never ran — scheduled reports would silently stop after migration"
-  pgq "select status, return_message from cron.job_run_details where jobid in (select jobid from cron.job where jobname='staging-proof') order by start_time desc limit 3" \
-    | sed 's/^/       /'
+  detail pgq "select status, return_message from cron.job_run_details where jobid in (select jobid from cron.job where jobname='staging-proof') order by start_time desc limit 3"
 fi
 
+# ---------------------------------------------------------------------------
 # And a job that calls an HTTP endpoint with the NEW url, which is what the two
 # real jobs that hardcode the old project URL will have to become.
-pgq "select cron.schedule_in_database('staging-http', '* * * * *',
+#
+# WHERE THE JOB LIVES IS NOT A DETAIL. pg_net's background worker reads
+# net.http_request_queue in exactly ONE database -- pg_net.database_name,
+# which is 'postgres' here -- and running it on several databases in a cluster
+# is not supported. A net.http_post() from an application's own database
+# inserts a queue row, returns an id, and is NEVER processed: no error, no
+# response row, no request. Run 17 failed here with an empty net._http_response
+# and no explanation, which is exactly what that looks like.
+#
+# So the platform's rule is: a job that makes an HTTP call is registered in the
+# postgres database with cron.schedule(); a job that only runs SQL is
+# registered against the application's database with schedule_in_database().
+# Both are tested, and the second half of this section MEASURES the limitation
+# rather than leaving it as a mystery.
+# ---------------------------------------------------------------------------
+PGNET_DB="$(pgq "select setting from pg_settings where name='pg_net.database_name'")"
+[ "$PGNET_DB" = "postgres" ] \
+  && pass "pg_net.database_name is 'postgres' — HTTP-making jobs belong there" \
+  || fail "pg_net.database_name is '${PGNET_DB:-unset}'; HTTP jobs scheduled elsewhere would be silently dropped"
+
+pgq "create extension if not exists pg_net" >/dev/null 2>&1
+pgq "select cron.schedule('staging-http', '* * * * *',
        \$\$select net.http_post(url := 'http://alpha-shop-rest:3000/tick',
          headers := '{\"Content-Type\":\"application/json\",\"apikey\":\"$ANON\",\"Authorization\":\"Bearer $ANON\"}'::jsonb,
-         body := '{\"label\":\"from-cron\"}'::jsonb)\$\$, 'alpha_shop')" >/dev/null 2>&1
+         body := '{\"label\":\"from-cron\"}'::jsonb)\$\$)" >/dev/null 2>&1
 note "waiting up to 100s for the http job to reach PostgREST"
+note "the job is registered in the postgres database, where pg_net's worker is"
 note "the URL is the container alias, not the staging hostname: pg_net runs"
 note "inside the postgres container, which has no /etc/hosts entry for it"
 http_ok=0
@@ -690,14 +752,38 @@ if [ "$http_ok" = "1" ]; then
   pass "a cron job reached the new API URL through pg_net and the proxy"
 else
   # pg_net records every response. Without reading it, a failure here is just
-  # a timeout with no cause.
-  note "----- pg_net responses and cron run details -----"
-  while IFS= read -r line; do note "$line"; done <<EOL
-$(pgq "select id, status_code, left(coalesce(error_msg,''),120) as err, left(coalesce(content,''),100) as body from net._http_response order by id desc limit 5" "$APP" 2>&1)
-$(pgq "select jobname, status, left(coalesce(return_message,''),160) as msg, start_time from cron.job_run_details d join cron.job j using (jobid) where j.jobname like 'staging-%' order by start_time desc limit 5" 2>&1)
-EOL
+  # a timeout with no cause. Read it from the database the worker serves.
+  note "----- pg_net responses, queue depth and cron run details -----"
+  detail pgq "select 'responses: ' || count(*) from net._http_response"
+  detail pgq "select id, status_code, left(coalesce(error_msg,''),120), left(coalesce(content,''),100) from net._http_response order by id desc limit 5"
+  detail pgq "select 'queued and unprocessed in postgres: ' || count(*) from net.http_request_queue"
+  detail pgq "select jobname, status, left(coalesce(return_message,''),160), start_time from cron.job_run_details d join cron.job j using (jobid) where j.jobname like 'staging-%' order by start_time desc limit 5"
   fail "the cron job did not reach PostgREST through pg_net"
 fi
+
+# Now MEASURE the limitation, so the migration note rests on evidence from
+# this cluster rather than on a sentence in someone's documentation. The same
+# call from the application's own database must queue and never be served.
+pgq "select net.http_post(url := 'http://alpha-shop-rest:3000/tick',
+       headers := '{\"Content-Type\":\"application/json\",\"apikey\":\"$ANON\",\"Authorization\":\"Bearer $ANON\"}'::jsonb,
+       body := '{\"label\":\"from-app-db\"}'::jsonb)" "$APP" >/dev/null 2>&1
+sleep 15
+Q_APP="$(pgq "select count(*) from net.http_request_queue" "$APP")"
+R_APP="$(pgq "select count(*) from net._http_response" "$APP")"
+if [ "${R_APP:-0}" = "0" ] && [ "${Q_APP:-0}" -gt 0 ]; then
+  pass "pg_net from an application's own database queues ($Q_APP) and is never served (0 responses) — measured, and the reason HTTP jobs are registered in postgres"
+elif [ "${R_APP:-0}" != "0" ]; then
+  note "pg_net answered from the application database too (responses: $R_APP)."
+  note "That is more than the extension documents; the platform still registers"
+  note "HTTP jobs in postgres, which is supported, rather than relying on this."
+  pass "pg_net behaviour from an application database recorded (responses: $R_APP)"
+else
+  note "neither a queue row nor a response appeared in $APP"
+  detail pgq "select count(*) from pg_extension where extname='pg_net'" "$APP"
+  fail "could not measure pg_net's behaviour from an application database"
+fi
+pgq "delete from net.http_request_queue" "$APP" >/dev/null 2>&1
+
 pgq "select cron.unschedule('staging-proof')" >/dev/null 2>&1
 pgq "select cron.unschedule('staging-http')" >/dev/null 2>&1
 
@@ -725,20 +811,25 @@ else
                   || note "capacity.sh exited $rc"
 fi
 grep -q "room for more applications" /tmp/capacity.log \
-  && { pass "capacity.sh produced a headroom estimate"; grep -A3 "room for more applications" /tmp/capacity.log | sed 's/^/       /'; } \
+  && { pass "capacity.sh produced a headroom estimate"; detail grep -A3 "room for more applications" /tmp/capacity.log; } \
   || fail "no headroom estimate in the capacity output"
 
 if "$ROOT_DIR/scripts/health.sh" >/tmp/health.log 2>&1; then
   pass "health.sh reported every service healthy"
 else
-  note "health.sh reported problems:"; grep -E "FAIL|WARN" /tmp/health.log | head -8 | sed 's/^/       /'
+  # A note, not a fail, was the wrong call: health.sh exiting non-zero means a
+  # service on this machine is not healthy, which is a failure of the thing
+  # under test. Recording it as a remark kept the run's own score green while
+  # the report said nothing either way.
+  fail "health.sh reported problems across the provisioned applications"
+  detail bash -c 'grep -E "FAIL|WARN" /tmp/health.log | head -12'
 fi
 
 # Provisioning a third application from scratch, now that the machine is busy.
 if "$ROOT_DIR/provision-app.sh" --name gamma_shop --no-start >/tmp/prov-gamma.log 2>&1; then
   pass "a third application provisioned on an already-configured machine"
 else
-  fail "provisioning a third application failed"; tail -15 /tmp/prov-gamma.log | sed 's/^/       /'
+  fail "provisioning a third application failed"; detail tail -15 /tmp/prov-gamma.log
 fi
 # Re-running must be a no-op, not a lockout: the generated password must not change.
 P1="$(sed -n 's/^APP_DB_PASSWORD=//p' "$ROOT_DIR/apps/alpha_shop/.env" | tail -1)"
