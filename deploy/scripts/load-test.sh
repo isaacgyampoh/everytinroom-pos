@@ -18,6 +18,11 @@
 #   iteration, through Caddy and PostgREST, with the anon key, exactly as the
 #   browser does it.
 #
+# IT WRITES TO THE DATABASE IT IS GIVEN
+#   It creates its own load_* tables and fills them. It refuses to run against
+#   a database that already holds application rows unless --force is passed,
+#   because the difference between staging and the real thing is one argument.
+#
 # WHAT IT IS NOT
 #   It is not a prediction of a trading day. It is one application, with
 #   generated rows, on whatever machine this runs on. Every number it prints
@@ -27,8 +32,10 @@
 set -uo pipefail
 
 APP=""; BASE=""; KEY=""; CLIENTS=8; SECONDS_TO_RUN=60; PG_CONTAINER="central-postgres"
+FORCE=0
 while [ $# -gt 0 ]; do
   case "$1" in
+    --force) FORCE=1; shift ;;
     --app) APP="${2:-}"; shift 2 ;;
     --base-url) BASE="${2:-}"; shift 2 ;;
     --key) KEY="${2:-}"; shift 2 ;;
@@ -45,6 +52,46 @@ done
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 pg() { docker exec "$PG_CONTAINER" psql -tAqX -U postgres -d "$1" -c "$2"; }
+
+# ---------------------------------------------------------------------------
+# THIS SCRIPT WRITES TO THE DATABASE IT IS POINTED AT. It creates its own
+# load_* tables and fills them with thousands of rows. Nothing it writes
+# touches an application's own tables, but a database with a shop's data in it
+# is not a thing to run a load generator against by accident -- and the
+# difference between the staging database and the real one is one argument.
+#
+# So: if the target holds application tables with rows in them, stop and say
+# so. --force is for the case where that is genuinely wanted, such as
+# measuring a restored copy before cutover.
+# ---------------------------------------------------------------------------
+# Any application table at all, not "any table with rows". reltuples is an
+# estimate that is 0 until something analyses the table and -1 when nothing
+# ever has, so a freshly restored production dump can read as empty. Counting
+# tables is deterministic, and it errs towards refusing: a newly provisioned
+# application database has none, so the safe case needs no flag.
+REAL="$(pg "$APP" "
+  select count(*) from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relkind in ('r','p')
+     and c.relname not like 'load\_%'" 2>/dev/null | tr -d ' ')"
+case "$REAL" in ''|*[!0-9]*) REAL=0 ;; esac
+if [ "$REAL" -gt 0 ] && [ "$FORCE" = "0" ]; then
+  cat >&2 <<EOT
+
+REFUSING to generate load against "$APP".
+
+  It already has $REAL application table(s) in public, so it is not an
+  empty, freshly provisioned database. This script creates load_* tables and
+  writes thousands of rows into them. It would not alter an application's own
+  tables, but it would put sustained write traffic on a database that holds
+  someone's data, and that is not something to do by accident.
+
+  If you do want it -- measuring a restored copy before cutover, say -- pass
+  --force. If you did not, check the --app argument.
+
+EOT
+  exit 2
+fi
 
 # ---------------------------------------------------------------------------
 # A till-shaped schema. Created if absent, so this is safe to re-run and safe
