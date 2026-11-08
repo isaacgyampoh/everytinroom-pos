@@ -26,8 +26,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SQL_DIR="$HERE/../sql"
 PFX="zzprovtest"
-A_DB="${PFX}_a"; A_OWNER="${PFX}_a_owner"; A_AUTHN="${PFX}_a_authn"
-B_DB="${PFX}_b"; B_OWNER="${PFX}_b_owner"; B_AUTHN="${PFX}_b_authn"
+A_DB="${PFX}_a"; A_AUTHN="${PFX}_a_authn"
+B_DB="${PFX}_b"; B_AUTHN="${PFX}_b_authn"
 A_PW="$(openssl rand -hex 16)"
 B_PW="$(openssl rand -hex 16)"
 MADE_MONITOR=0
@@ -68,7 +68,7 @@ cleanup() {
   for db in "$A_DB" "$B_DB" "${PFX}_central"; do
     psql -qX -d postgres -c "DROP DATABASE IF EXISTS \"$db\" WITH (FORCE)" >/dev/null 2>&1
   done
-  for r in "$A_AUTHN" "$B_AUTHN" "${PFX}_a_realtime" "${PFX}_a_storage" "$A_OWNER" "$B_OWNER"; do
+  for r in "$A_AUTHN" "$B_AUTHN" "${PFX}_a_realtime" "${PFX}_a_storage"; do
     psql -qX -d postgres -c "DROP ROLE IF EXISTS \"$r\"" >/dev/null 2>&1
   done
   # Only if THIS run created it. If it was already there it belongs to
@@ -158,12 +158,12 @@ done
 # Everything the provisioning SQL does runs through the non-superuser.
 mgd() { PGPASSWORD="$MGD_PW" psql -qX -v ON_ERROR_STOP=1 -h "${PGHOST:-localhost}" -U "$MGD" "$@"; }
 
-provision() { # db owner authn password
+provision() { # db (unused) authn password
   mgd -d postgres \
-    -v app="$1" -v dbname="$1" -v owner="$2" -v authn="$3" \
+    -v app="$1" -v dbname="$1" -v authn="$2" \
     -f "$SQL_DIR/10-create-app-db.sql" >/dev/null
   mgd -d "$1" \
-    -v dbname="$1" -v owner="$2" -v authn="$3" -v authn_password="$4" \
+    -v dbname="$1" -v authn="$2" -v authn_password="$3" \
     -v require_extensions="$REQ_EXT" \
     -f "$GRANTS_SQL" >/dev/null
 }
@@ -195,12 +195,12 @@ psql -qX -v ON_ERROR_STOP=1 -v require_extensions="$REQ_EXT" -d "$CENTRAL_DB" \
 
 echo
 echo "Creating two applications"
-provision "$A_DB" "$A_OWNER" "$A_AUTHN" "$A_PW"; say "application A: $A_DB"
-provision "$B_DB" "$B_OWNER" "$B_AUTHN" "$B_PW"; say "application B: $B_DB"
+provision "$A_DB" "$A_AUTHN" "$A_PW"; say "application A: $A_DB"
+provision "$B_DB" "$B_AUTHN" "$B_PW"; say "application B: $B_DB"
 
 echo
 echo "Idempotency"
-provision "$A_DB" "$A_OWNER" "$A_AUTHN" "$A_PW" && pass "re-provisioning A changed nothing and did not error"
+provision "$A_DB" "$A_AUTHN" "$A_PW" && pass "re-provisioning A changed nothing and did not error"
 
 echo
 echo "Isolation"
@@ -267,21 +267,21 @@ psql -qX -d postgres -c "CREATE ROLE \"$RT_USER\" LOGIN REPLICATION" >/dev/null
 psql -qX -d postgres -c "CREATE ROLE \"$ST_USER\" LOGIN" >/dev/null
 
 if psql -qX -v ON_ERROR_STOP=1 -d "$A_DB" \
-     -v dbname="$A_DB" -v owner="$A_OWNER" -v rt_user="$RT_USER" -v rt_password="$RT_PW" \
+     -v dbname="$A_DB" -v rt_user="$RT_USER" -v rt_password="$RT_PW" \
      -f "$SQL_DIR/21-realtime.sql" >/dev/null 2>&1; then
   pass "21-realtime.sql ran"
   [ "$(q "select count(*) from pg_namespace where nspname='_realtime'" "$A_DB")" = "1" ] \
     && pass "_realtime schema exists" || fail "_realtime schema missing"
 else
-  fail "21-realtime.sql failed: $(psql -qX -v ON_ERROR_STOP=1 -d "$A_DB" -v dbname="$A_DB" -v owner="$A_OWNER" -v rt_user="$RT_USER" -v rt_password="$RT_PW" -f "$SQL_DIR/21-realtime.sql" 2>&1 | head -2 | tr '\n' ' ')"
+  fail "21-realtime.sql failed: $(psql -qX -v ON_ERROR_STOP=1 -d "$A_DB" -v dbname="$A_DB" -v rt_user="$RT_USER" -v rt_password="$RT_PW" -f "$SQL_DIR/21-realtime.sql" 2>&1 | head -2 | tr '\n' ' ')"
 fi
 
 if psql -qX -v ON_ERROR_STOP=1 -d "$A_DB" \
-     -v dbname="$A_DB" -v owner="$A_OWNER" -v st_user="$ST_USER" -v st_password="$ST_PW" \
+     -v dbname="$A_DB" -v st_user="$ST_USER" -v st_password="$ST_PW" \
      -f "$SQL_DIR/22-storage.sql" >/dev/null 2>&1; then
   pass "22-storage.sql ran"
 else
-  fail "22-storage.sql failed: $(psql -qX -v ON_ERROR_STOP=1 -d "$A_DB" -v dbname="$A_DB" -v owner="$A_OWNER" -v st_user="$ST_USER" -v st_password="$ST_PW" -f "$SQL_DIR/22-storage.sql" 2>&1 | head -2 | tr '\n' ' ')"
+  fail "22-storage.sql failed: $(psql -qX -v ON_ERROR_STOP=1 -d "$A_DB" -v dbname="$A_DB" -v st_user="$ST_USER" -v st_password="$ST_PW" -f "$SQL_DIR/22-storage.sql" 2>&1 | head -2 | tr '\n' ' ')"
 fi
 
 # The realtime role is privileged inside its own database. It must still be

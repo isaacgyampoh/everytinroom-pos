@@ -37,8 +37,20 @@ GRANT ALL ON SCHEMA _realtime TO :"rt_user";
 
 -- It must be able to read the tables it replicates, and to create the
 -- publication it manages.
+--
+-- Granted EXPLICITLY rather than through membership in a per-application
+-- owner role. That role is gone: granting it to anything crashed the
+-- supabase/postgres image (see 10-create-app-db.sql), and explicit grants are
+-- easier to audit than privileges inherited through a role.
+--
+-- Broad read inside THIS database is inherent to logical replication -- it
+-- hands over every change to every replicated table, so there is no such
+-- thing as a partially-trusted replication user. What this role cannot do is
+-- reach any other application: it has CONNECT on this database alone.
 GRANT USAGE ON SCHEMA public TO :"rt_user";
-GRANT :"owner" TO :"rt_user";
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO :"rt_user";
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO :"rt_user";
+GRANT CREATE ON DATABASE :"dbname" TO :"rt_user";
 
 -- Best effort: these need superuser on some servers, and provisioning must
 -- not die over a logging preference. The point is to keep the password that

@@ -34,7 +34,9 @@ END $$;
 -- 'storage' schema and its tables.
 GRANT CREATE ON DATABASE :"dbname" TO :"st_user";
 GRANT USAGE  ON SCHEMA public TO :"st_user";
-GRANT :"owner" TO :"st_user";
+-- No owner-role membership: see 10-create-app-db.sql.
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO :"st_user";
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO :"st_user";
 
 -- If a dump has already brought the storage schema across, hand it over
 -- rather than leaving it owned by a role this server does not use.

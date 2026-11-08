@@ -17,12 +17,30 @@
 -- 'already exists' notices are expected on a re-run and drown out real ones.
 SET client_min_messages = warning;
 
--- The owner role: owns the schema and runs migrations. No login — nothing
--- should ever connect AS the owner over the network. Migrations are applied
--- by the provisioning script, which is already superuser locally.
-SELECT format('CREATE ROLE %I NOLOGIN', :'owner')
- WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'owner')
-\gexec
+-- NO PER-APPLICATION OWNER ROLE, and no GRANT to the provisioning role.
+--
+-- This used to create an <app>_owner role, make the database owned by it, and
+-- grant that role to the provisioning user so CREATE DATABASE ... OWNER would
+-- be permitted. On the supabase/postgres image that GRANT CRASHES THE SERVER:
+--
+--   server closed the connection unexpectedly
+--
+-- supautils guards reserved roles and reserved memberships on that image, and
+-- granting a role to the provisioning user trips it. The same shape of
+-- statement killed central setup earlier with WITH ADMIN OPTION.
+--
+-- It was not load-bearing. ISOLATION DOES NOT COME FROM OWNERSHIP -- it comes
+-- from the CONNECT grants below, which is what the isolation test actually
+-- verifies: one application's credentials are refused by another's database.
+-- Ownership by the provisioning role is normal on a managed platform, and
+-- removes three statements that can crash:
+--
+--   GRANT <owner> TO CURRENT_USER WITH SET TRUE   (crashed here)
+--   ALTER SCHEMA public OWNER TO <owner>          (needs that membership)
+--   GRANT <owner> TO <app>_realtime / _storage    (membership again)
+--
+-- The services that need broad read now get explicit grants instead of
+-- inheriting them through a role, which is also easier to audit.
 
 -- The role PostgREST logs in as. NOINHERIT is required, not cosmetic: it must
 -- hold no privileges of its own and gain them only by SET ROLE to the role
@@ -32,42 +50,7 @@ SELECT format('CREATE ROLE %I LOGIN NOINHERIT', :'authn')
  WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'authn')
 \gexec
 
--- Membership in the owner role, BEFORE creating a database owned by it.
---
--- CREATE DATABASE ... OWNER <role> requires the executing role to be a
--- superuser or a member of <role>. On a managed PostgreSQL -- Supabase's
--- included -- `postgres` is NOT a superuser, so without this the create
--- fails with:
---
---   ERROR:  must be able to SET ROLE "<app>_owner"
---
--- A local test as a superuser does not reveal this, which is exactly how it
--- reached a staging run. The creator of a role holds ADMIN OPTION on it, so
--- this grant is available to the same role that just created it.
-SELECT set_config('provision.owner', :'owner', false);
-
-DO $$
-DECLARE o text := current_setting('provision.owner');
-BEGIN
-  -- The test is 'SET', not 'MEMBER'.
-  --
-  -- When a non-superuser with CREATEROLE creates a role, PostgreSQL 16+ gives
-  -- the creator admin_option = true but set_option = FALSE. So
-  -- pg_has_role(..., 'MEMBER') already returns true while SET ROLE is still
-  -- refused -- and CREATE DATABASE ... OWNER needs SET. Testing MEMBER made
-  -- this grant skip itself and the create failed anyway.
-  IF NOT pg_has_role(current_user, o, 'SET') THEN
-    IF current_setting('server_version_num')::int >= 160000 THEN
-      EXECUTE format('GRANT %I TO CURRENT_USER WITH SET TRUE', o);
-    ELSE
-      -- Before 16 there was no SET option; plain membership allowed SET ROLE.
-      EXECUTE format('GRANT %I TO CURRENT_USER', o);
-    END IF;
-    RAISE NOTICE 'granted SET on % to %', o, current_user;
-  END IF;
-END $$;
-
-SELECT format('CREATE DATABASE %I OWNER %I ENCODING ''UTF8'' LC_COLLATE ''C'' LC_CTYPE ''C'' TEMPLATE template0', :'dbname', :'owner')
+SELECT format('CREATE DATABASE %I ENCODING ''UTF8'' LC_COLLATE ''C'' LC_CTYPE ''C'' TEMPLATE template0', :'dbname')
  WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = :'dbname')
 \gexec
 
@@ -85,7 +68,6 @@ SELECT format('CREATE DATABASE %I OWNER %I ENCODING ''UTF8'' LC_COLLATE ''C'' LC
 -- ---------------------------------------------------------------------------
 SELECT format('REVOKE ALL ON DATABASE %I FROM PUBLIC', :'dbname') \gexec
 SELECT format('GRANT CONNECT ON DATABASE %I TO %I', :'dbname', :'authn') \gexec
-SELECT format('GRANT ALL    ON DATABASE %I TO %I', :'dbname', :'owner') \gexec
 
 -- The monitor may ask this database its size and connection count. pg_monitor
 -- gives it statistics only; with no grants in the schema it reads no rows.

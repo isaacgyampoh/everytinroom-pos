@@ -105,7 +105,9 @@ fi
 # on an application called alpha_shop.
 APP_DNS="$(printf '%s' "$NAME" | tr '_' '-')"
 APP_DB="$NAME"
-APP_OWNER="${NAME}_owner"
+# No per-application owner role. Granting one to the provisioning user
+# crashes the supabase/postgres image, and ownership was never the isolation
+# boundary -- CONNECT grants are. See deploy/sql/10-create-app-db.sql.
 APP_AUTHN="${NAME}_authenticator"
 APP_RT_USER="${NAME}_realtime"
 APP_ST_USER="${NAME}_storage"
@@ -154,11 +156,11 @@ if [ "$DRY" = "1" ]; then
 else
   EXISTED=0
   psqlq -d postgres -c "select 1 from pg_database where datname='$APP_DB'" | grep -q 1 && EXISTED=1
-  psqlc -d postgres -v app="$NAME" -v dbname="$APP_DB" -v owner="$APP_OWNER" -v authn="$APP_AUTHN" \
+  psqlc -d postgres -v app="$NAME" -v dbname="$APP_DB" -v authn="$APP_AUTHN" \
     < "$ROOT_DIR/sql/10-create-app-db.sql" >/dev/null \
     || die "Creating the database failed." \
            "Run it by hand to see the error:" \
-           "  docker exec -i central-postgres psql -U postgres -d postgres -v app=$NAME -v dbname=$APP_DB -v owner=$APP_OWNER -v authn=$APP_AUTHN < $ROOT_DIR/sql/10-create-app-db.sql"
+           "  docker exec -i central-postgres psql -U postgres -d postgres -v app=$NAME -v dbname=$APP_DB -v authn=$APP_AUTHN < $ROOT_DIR/sql/10-create-app-db.sql"
   [ "$EXISTED" = "1" ] && ok "database $APP_DB already existed — left alone, roles confirmed" \
                        || ok "database $APP_DB created"
 fi
@@ -200,7 +202,7 @@ else
   # require_extensions=on, explicitly: an application whose database lacks
   # pgcrypto cannot hash a staff PIN, and one without pg_net cannot run a
   # scheduled job. Those must stop provisioning, not warn.
-  psqlc -d "$APP_DB" -v dbname="$APP_DB" -v owner="$APP_OWNER" -v authn="$APP_AUTHN" \
+  psqlc -d "$APP_DB" -v dbname="$APP_DB" -v authn="$APP_AUTHN" \
     -v require_extensions=on \
     -v authn_password="$APP_DB_PASSWORD" < "$ROOT_DIR/sql/20-app-grants.sql" >/dev/null \
     || die "Configuring the database internals failed." \
@@ -246,7 +248,7 @@ else
     psqlq -d postgres -c "select 1 from pg_roles where rolname='$APP_RT_USER'" | grep -q 1 \
       || psqlc -d postgres -c "CREATE ROLE \"$APP_RT_USER\" LOGIN REPLICATION" >/dev/null
     psqlc -d postgres -c "GRANT CONNECT ON DATABASE \"$APP_DB\" TO \"$APP_RT_USER\"" >/dev/null
-    psqlc -d "$APP_DB" -v dbname="$APP_DB" -v owner="$APP_OWNER" \
+    psqlc -d "$APP_DB" -v dbname="$APP_DB" \
       -v rt_user="$APP_RT_USER" -v rt_password="$RT_PW" \
       < "$ROOT_DIR/sql/21-realtime.sql" >/dev/null \
       || die "Preparing the database for Realtime failed." \
@@ -279,7 +281,7 @@ else
     psqlq -d postgres -c "select 1 from pg_roles where rolname='$APP_ST_USER'" | grep -q 1 \
       || psqlc -d postgres -c "CREATE ROLE \"$APP_ST_USER\" LOGIN" >/dev/null
     psqlc -d postgres -c "GRANT CONNECT ON DATABASE \"$APP_DB\" TO \"$APP_ST_USER\"" >/dev/null
-    psqlc -d "$APP_DB" -v dbname="$APP_DB" -v owner="$APP_OWNER" \
+    psqlc -d "$APP_DB" -v dbname="$APP_DB" \
       -v st_user="$APP_ST_USER" -v st_password="$ST_PW" \
       < "$ROOT_DIR/sql/22-storage.sql" >/dev/null \
       || die "Preparing the database for Storage failed." "Re-running is safe."
@@ -319,7 +321,7 @@ else
     psqlq -d postgres -c "select 1 from pg_roles where rolname='$APP_AUTH_USER'" | grep -q 1 \
       || psqlc -d postgres -c "CREATE ROLE \"$APP_AUTH_USER\" LOGIN" >/dev/null
     psqlc -d postgres -c "GRANT CONNECT ON DATABASE \"$APP_DB\" TO \"$APP_AUTH_USER\"" >/dev/null
-    psqlc -d "$APP_DB" -v dbname="$APP_DB" -v owner="$APP_OWNER" \
+    psqlc -d "$APP_DB" -v dbname="$APP_DB" \
       -v auth_user="$APP_AUTH_USER" -v auth_password="$AU_PW" \
       < "$ROOT_DIR/sql/23-auth.sql" >/dev/null \
       || die "Preparing the database for Supabase Auth failed." "Re-running is safe."

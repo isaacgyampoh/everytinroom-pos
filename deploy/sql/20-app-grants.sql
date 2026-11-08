@@ -117,10 +117,12 @@ END $$;
 -- below -- and then puts the application's own roles back.
 -- ---------------------------------------------------------------------------
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
-ALTER SCHEMA public OWNER TO :"owner";
 
-GRANT USAGE  ON SCHEMA public TO anon, authenticated, service_role;
-GRANT CREATE, USAGE ON SCHEMA public TO :"owner";
+-- No ALTER SCHEMA ... OWNER TO here. The schema stays owned by the role that
+-- created the database, because transferring it needs membership in the target
+-- role, and granting that membership crashes this image. See
+-- 10-create-app-db.sql.
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
 -- SET ROLE: how PostgREST becomes the role named in the request's JWT.
