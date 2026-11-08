@@ -4,12 +4,12 @@
 -- Approved by the owner on 2026-11-08.
 --
 -- WHAT THIS DOES NOT TOUCH
---   whatsapp_orders  -- 906 rows, the shop's MAIN order table, most of it
+--   whatsapp_orders  -- the shop's MAIN order table, most of it
 --                       source='web' and still arriving. Not a chat feature.
 --   ussd_sessions    -- read by the payments function. Not a chat feature.
 --   Any sale, receipt, customer or order, of any age or source.
 --
--- MEASURED BEFORE RUNNING (2026-11-08)
+--   MEASURED BEFORE RUNNING (2026-11-08)
 --   wa_conversations    0 rows
 --   wa_messages         0 rows
 --   wa_agent_settings   2 rows: agent_master_enabled=false,
