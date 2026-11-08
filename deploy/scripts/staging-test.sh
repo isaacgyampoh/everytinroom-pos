@@ -34,8 +34,55 @@ DEPLOY="$(cd "$HERE/.." && pwd)"
 ROOT_DIR="/srv/central"
 REPORT="${STAGING_REPORT:-/tmp/staging-report.md}"
 
+# --until N stops cleanly after section N. The prerequisites (1-5) are where
+# every failure so far has been, and they finish in a few minutes while the
+# full run takes twenty-five. A fast job and a full job run in parallel; the
+# fast one is never a substitute for the full one and its report says so.
+UNTIL=99
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --until) UNTIL="${2:-99}"; shift 2 ;;
+    --until=*) UNTIL="${1#*=}"; shift ;;
+    *) echo "unknown option: $1" >&2; exit 2 ;;
+  esac
+done
+
 PASS=0; FAIL=0; SKIP=0
 RESULTS=""
+
+# Called at the top of each section: stops once the requested depth is passed.
+gate_section() {
+  if [ "$1" -gt "$UNTIL" ]; then
+    printf '\n  stopping after section %s as asked (--until %s)\n' "$UNTIL" "$UNTIL"
+    RESULTS="$RESULTS\n## Sections $1 onwards\n- NOT RUN: this job was asked to stop after section $UNTIL\n"
+    finish_report "stopped after section $UNTIL"
+    exit "$( [ "$FAIL" = "0" ] && echo 0 || echo 1 )"
+  fi
+}
+
+# One place that writes the report, so every exit path produces one.
+finish_report() {
+  printf '\n\033[1m===== Result =====\033[0m\n'
+  printf '  passed %s   failed %s   skipped %s\n\n' "$PASS" "$FAIL" "$SKIP"
+  {
+    echo "# Staging validation"
+    echo
+    echo "- Machine: ${PRETTY_NAME:-unknown}, ${CPUS:-?} processors, ${RAM_MB:-?} MB RAM"
+    echo "- Docker: $(docker --version 2>/dev/null | cut -d, -f1)"
+    echo "- Scope: ${1:-full run}"
+    echo "- Result: **$PASS passed, $FAIL failed, $SKIP skipped**"
+    echo
+    if [ "$UNTIL" != "99" ]; then
+      echo "This was the FAST prerequisites job. It stops after section $UNTIL and is"
+      echo "not a full validation: Realtime, storage, backups and cron were not run."
+      echo
+    fi
+    echo "No production credential was used. Every secret here was generated on"
+    echo "this machine and dies with it."
+    printf '%b' "$RESULTS"
+  } > "$REPORT"
+  echo "  report written to $REPORT"
+}
 
 C_G=$'\033[32m'; C_R=$'\033[31m'; C_Y=$'\033[33m'; C_B=$'\033[1m'; C_0=$'\033[0m'
 
@@ -205,25 +252,13 @@ $(tail -25 "$BOOT_LOG")
 EOL
   }
 
-  printf '\n%s===== Result =====%s\n' "$C_B" "$C_0"
-  printf '  passed %s   failed %s   skipped %s\n\n' "$PASS" "$FAIL" "$SKIP"
-  {
-    echo "# Staging validation"
-    echo
-    echo "- Machine: $PRETTY_NAME, ${CPUS} processors, ${RAM_MB} MB RAM"
-    echo "- Docker: $(docker --version 2>/dev/null | cut -d, -f1)"
-    echo "- Result: **$PASS passed, $FAIL failed, $SKIP skipped — STOPPED EARLY**"
-    echo
-    echo "The stack did not come up, so the checks past section 3 were never"
-    echo "reached. They are skipped, not passed and not failed."
-    printf '%b' "$RESULTS"
-  } > "$REPORT"
-  echo "  report written to $REPORT"
+  finish_report "stopped early: the stack was not up"
   exit 1
 fi
 ok "the stack is up, so the remaining checks can mean something"
 
 # ===========================================================================
+gate_section 4
 section "4. Startup, health, restart recovery and resource usage"
 # ===========================================================================
 # A restart must come back healthy by itself. This is what happens after a
@@ -246,6 +281,7 @@ POL="$(docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' central-postgres 2
                               || fail "restart policy is '$POL'"
 
 # ===========================================================================
+gate_section 5
 section "5. Two independent applications, and isolation between them"
 # ===========================================================================
 # alpha gets realtime+storage, beta gets auth instead. Two applications with
@@ -323,6 +359,7 @@ for app in alpha_shop beta_shop; do
 done
 
 # ===========================================================================
+gate_section 6
 section "6. Realtime, end to end"
 # ===========================================================================
 # The risky part is not that Realtime runs; it is that the proxy sends the
@@ -432,6 +469,7 @@ else
 fi
 
 # ===========================================================================
+gate_section 7
 section "7. Object storage: upload, download, delete"
 # ===========================================================================
 # Cloudflare R2 needs the owner's account credentials, which this machine does
@@ -523,6 +561,7 @@ else
 fi
 
 # ===========================================================================
+gate_section 8
 section "8. Backup and restore rehearsal"
 # ===========================================================================
 pgq "create table if not exists public.money (id serial primary key, total numeric)" "$APP" >/dev/null
@@ -563,6 +602,7 @@ if [ -n "$BK" ]; then
 fi
 
 # ===========================================================================
+gate_section 9
 section "9. Scheduled jobs in another database, calling a new URL"
 # ===========================================================================
 # The architectural claim: pg_cron's scheduler lives in one database, so each
@@ -614,6 +654,7 @@ pgq "select cron.unschedule('staging-proof')" >/dev/null 2>&1
 pgq "select cron.unschedule('staging-http')" >/dev/null 2>&1
 
 # ===========================================================================
+gate_section 10
 section "10. Resource usage, capacity, and provisioning from clean"
 # ===========================================================================
 RUNNING="$(docker ps --format '{{.Names}}' | wc -l | tr -d ' ')"
@@ -683,21 +724,6 @@ done
 [ "$any_bad" = "0" ] && note "every container is running and healthy"
 
 # ===========================================================================
-printf '\n%s===== Result =====%s\n' "$C_B" "$C_0"
-printf '  passed %s   failed %s   skipped %s\n\n' "$PASS" "$FAIL" "$SKIP"
-
-{
-  echo "# Staging validation"
-  echo
-  echo "- Machine: $PRETTY_NAME, ${CPUS} processors, ${RAM_MB} MB RAM"
-  echo "- Docker: $(docker --version 2>/dev/null | cut -d, -f1)"
-  echo "- PostgreSQL: $(pgq 'select version()' | cut -c1-40)"
-  echo "- Result: **$PASS passed, $FAIL failed, $SKIP skipped**"
-  echo
-  echo "No production credential was used. Every secret here was generated on"
-  echo "this machine and dies with it."
-  printf '%b' "$RESULTS"
-} > "$REPORT"
-echo "  report written to $REPORT"
+finish_report "full run"
 
 [ "$FAIL" = "0" ] || exit 1

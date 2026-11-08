@@ -26,6 +26,66 @@ permissions:
   contents: write        # only to commit the report back to this branch
 
 jobs:
+  # Fast feedback on the prerequisites: Docker install, the shared stack,
+  # central roles, provisioning and isolation. Every failure so far has been in
+  # that range, and this finishes in minutes while the full job takes twenty-
+  # five. It runs in PARALLEL with the full job and never replaces it; its
+  # report says so in its own header.
+  prereq:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Run sections 1-5 only
+        id: fast
+        continue-on-error: true
+        run: |
+          chmod +x deploy/scripts/*.sh deploy/*.sh
+          sudo -E STAGING_REPORT=/tmp/prereq-report.md \
+            deploy/scripts/staging-test.sh --until 5 2>&1 | tee /tmp/prereq-console.log
+          echo "rc=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+      - name: Logs from anything unhealthy
+        if: always()
+        continue-on-error: true
+        run: |
+          sudo docker ps -a --format 'table {{.Names}}\t{{.Status}}' || true
+          for c in $(sudo docker ps -a --format '{{.Names}}'); do
+            s=$(sudo docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null)
+            [ "$s" = "running" ] || { echo "===== $c ($s) ====="; sudo docker logs "$c" --tail=40 2>&1 || true; }
+          done
+          echo "===== central-roles.log ====="
+          sudo cat /srv/central/logs/central-roles.log 2>/dev/null || echo "(absent)"
+      - name: Publish the fast report
+        if: always()
+        run: |
+          mkdir -p deploy/staging-results
+          sudo cp /tmp/prereq-report.md  deploy/staging-results/prereq-report.md 2>/dev/null || true
+          sudo cp /tmp/prereq-console.log deploy/staging-results/prereq-console.log 2>/dev/null || true
+          sudo cp /srv/central/logs/central-roles.log deploy/staging-results/central-roles.log 2>/dev/null || true
+          sudo chown "$(id -u):$(id -g)" deploy/staging-results/* 2>/dev/null || true
+          for f in deploy/staging-results/*; do
+            [ -f "$f" ] && tail -c 200000 "$f" > /tmp/t && mv /tmp/t "$f"
+          done
+          { echo "Run: ${{ github.run_id }}"; echo "Scope: prerequisites only (sections 1-5)";
+            echo "Commit: ${{ github.sha }}"; echo "Finished: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"; } \
+            > deploy/staging-results/run-info.txt
+          cat deploy/staging-results/prereq-report.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git stash -u -- deploy/staging-results >/dev/null 2>&1 || true
+          git checkout --orphan staging-results-fast
+          git rm -rq --cached . 2>/dev/null || true
+          git stash pop >/dev/null 2>&1 || true
+          git add -A -f deploy/staging-results
+          git commit -q -m "Prerequisite results from run ${{ github.run_id }}"
+          git push --force origin HEAD:staging-results-fast
+      - name: Fail if a prerequisite failed
+        if: always()
+        run: |
+          grep -q '\*\*FAIL\*\*' /tmp/prereq-report.md 2>/dev/null && {
+            grep '\*\*FAIL\*\*' /tmp/prereq-report.md; exit 1; }
+          echo "prerequisites passed"
+
   staging:
     # Pinned rather than ubuntu-latest: the Ubuntu release decides which
     # Docker apt repository codename is used, and a silent bump of that is
