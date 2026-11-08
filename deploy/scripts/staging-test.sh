@@ -1053,8 +1053,23 @@ STOPPED="$(docker ps -q | wc -l | tr -d ' ')"
 ( cd "$ROOT_DIR/compose" \
   && docker compose --env-file "$ROOT_DIR/.env" -f docker-compose.yml up -d \
        >/tmp/restack.log 2>&1 ) || true
+# staging-s3 is this test's own fixture, started with `docker run` and so not
+# part of any compose project. Stopping every container stops it too, and
+# nothing above would bring it back -- the health loop below would then wait
+# for a container that is never coming and fail the recovery check for a
+# reason that has nothing to do with recovery.
+docker start staging-s3 >>/tmp/restack.log 2>&1 || true
 for a in $(pgq "select name from central.applications order by name"); do
   [ -x "$ROOT_DIR/apps/$a/compose.sh" ] || continue
+  # Only applications that were actually running before the stop. gamma_shop
+  # is provisioned with --no-start on purpose, and starting it here would be
+  # starting an application for the first time while calling the result
+  # "recovery" -- as well as risking failures that have nothing to do with it.
+  adns="$(printf '%s' "$a" | tr '_' '-')"
+  case " $RESTART_LIST " in
+    *" $adns-rest "*|*" $adns.realtime "*|*" $adns-storage "*|*" $adns-auth "*|*" $adns-functions "*) ;;
+    *) note "  $a was not running before the stop, so it is left alone"; continue ;;
+  esac
   ( cd "$ROOT_DIR/apps/$a" && ./compose.sh up -d >>/tmp/restack.log 2>&1 ) || true
 done
 
@@ -1062,8 +1077,10 @@ done
 back=0
 for _ in $(seq 1 36); do
   bad=0
-  for c in $(docker ps -a --format '{{.Names}}'); do
-    st="$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null)"
+  # Only the containers that were running before the stop. Anything that was
+  # already absent or deliberately stopped is not part of what recovery means.
+  for c in $RESTART_LIST; do
+    st="$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo missing)"
     h="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$c" 2>/dev/null)"
     [ "$st" = "running" ] || { bad=$((bad+1)); continue; }
     [ "$h" = "healthy" ] || [ "$h" = "none" ] || bad=$((bad+1))
