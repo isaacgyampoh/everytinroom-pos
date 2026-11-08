@@ -192,6 +192,12 @@ $(docker logs "$c" --tail=30 2>&1 | tail -30)
 EOL
     fi
   done
+  [ -s /srv/central/logs/central-roles.log ] && {
+    note "----- central-roles.sql output -----"
+    while IFS= read -r line; do note "$line"; done <<EOL
+$(tail -30 /srv/central/logs/central-roles.log)
+EOL
+  }
   [ -s "$BOOT_LOG" ] && {
     note "----- the last lines bootstrap.sh printed -----"
     while IFS= read -r line; do note "$line"; done <<EOL

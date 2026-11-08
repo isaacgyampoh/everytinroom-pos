@@ -478,6 +478,24 @@ else
   # only when the volume is first created -- so on an existing server they
   # would never run at all.
   info "applying central roles and the application registry"
+
+  # Prove the exact invocation works on a trivial query first. When the real
+  # one failed with no output at all, there was no way to tell whether psql
+  # had rejected the SQL or `docker exec` had never reached psql. One line
+  # separates those two.
+  if ! PROBE="$(docker exec -i central-postgres psql -tAqX -U postgres -d postgres \
+       -c 'select 1' 2>&1)" || [ "$(printf '%s' "$PROBE" | tr -d '[:space:]')" != "1" ]; then
+    die "Cannot run psql inside central-postgres, so the central schema cannot be created.
+
+The probe returned:
+$(printf '%s' "$PROBE" | tail -10 | sed 's/^/  /')
+$( [ -z "$PROBE" ] && printf '  (nothing at all -- docker exec is not reaching psql)' )" \
+      "Is the container up?   docker ps --filter name=central-postgres" \
+      "What does it say?      docker logs central-postgres --tail=40" \
+      "Try it by hand:        docker exec -it central-postgres psql -U postgres -c 'select 1'"
+  fi
+  dim "psql inside the container answers"
+
   MON_PW="$(get_env_var "$ENV_FILE" MONITOR_PASSWORD)"
   # The output is CAPTURED, not discarded. An earlier version sent both
   # streams to /dev/null, so when this step failed the report said only "could
@@ -497,12 +515,22 @@ SET log_min_duration_statement = -1;
 SET log_statement = 'none';
 ALTER ROLE central_monitor PASSWORD '${MON_PW}';
 EOSQL
+    printf '%s\n' "$ROLES_OUT" > "$ROOT_DIR/logs/central-roles.log" 2>/dev/null || true
+    printf '%s' "$ROLES_OUT" | grep -i 'WARNING' | head -4 | while IFS= read -r w; do warn "$w"; done
     ok "central schema ready (central.applications, central_monitor)"
   else
+    # Written to a file AND printed verbatim. The previous version grepped for
+    # ERROR/DETAIL/HINT, and when the failure was a psql META-COMMAND problem
+    # -- which does not contain the word ERROR -- the report said "PostgreSQL
+    # said:" followed by nothing. A filter on an error you have not seen yet
+    # is a filter that can hide it.
+    printf '%s\n' "$ROLES_OUT" > "$ROOT_DIR/logs/central-roles.log" 2>/dev/null || true
     die "Could not apply $ROOT_DIR/sql/00-central-roles.sql.
 
-PostgreSQL said:
-$(printf '%s' "$ROLES_OUT" | grep -iE 'ERROR|DETAIL|HINT|CONTEXT' | head -8 | sed 's/^/  /')" \
+Its last 25 lines of output, verbatim:
+$(printf '%s' "$ROLES_OUT" | tail -25 | sed 's/^/  /')
+$( [ -z "$ROLES_OUT" ] && printf '  (it produced NO output at all, which usually means docker exec itself failed\n   rather than psql -- check: docker ps --filter name=central-postgres)' )" \
+      "Full output: $ROOT_DIR/logs/central-roles.log" \
       "Reproduce it:  docker exec -i central-postgres psql -U postgres -d postgres < $ROOT_DIR/sql/00-central-roles.sql" \
       "The containers are running; only this step failed, and it is safe to re-run."
   fi
