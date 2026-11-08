@@ -793,15 +793,63 @@ section "10. Resource usage, capacity, and provisioning from clean"
 # ===========================================================================
 RUNNING="$(docker ps --format '{{.Names}}' | wc -l | tr -d ' ')"
 note "containers running: $RUNNING"
+
+# AT REST first, for comparison only. This is NOT the figure anything is sized
+# from: an idle machine measures an idle machine, and a server bought on that
+# basis is bought for a shop with nobody in it.
+note "at rest, before any load:"
 printf '\n       %-28s %8s %8s\n' "CONTAINER" "MEM" "CPU%"
 docker stats --no-stream --format '{{.Name}}|{{.MemUsage}}|{{.CPUPerc}}' 2>/dev/null \
   | while IFS='|' read -r n m c; do printf '       %-28s %8s %8s\n' "$n" "${m%% /*}" "$c"; done
-TOTAL_MB=$(docker stats --no-stream --format '{{.MemUsage}}' 2>/dev/null \
-  | awk -F'/' '{print $1}' | sed 's/[^0-9.]//g;s/^$/0/' | awk '{s+=$1} END {printf "%d", s}')
+docker stats --no-stream --format '{{.Name}}|{{.MemUsage}}' 2>/dev/null \
+  | while IFS='|' read -r n m; do note "  idle $n ${m%% /*}"; done
+USED_IDLE=$(( RAM_MB - $(awk '/^MemAvailable:/{print $2}' /proc/meminfo) / 1024 ))
+note "memory used on the machine at rest: ${USED_IDLE} MB of ${RAM_MB} MB"
+
+# ---------------------------------------------------------------------------
+# UNDER LOAD. Four requests per iteration through Caddy and PostgREST with the
+# anon key -- product lookup, open a sale, add its lines, read the running
+# daily total -- with container stats sampled every three seconds WHILE those
+# requests are in flight, and the peak per container kept.
+# ---------------------------------------------------------------------------
+LOAD_CLIENTS="${LOAD_CLIENTS:-8}"
+LOAD_SECONDS="${LOAD_SECONDS:-60}"
+note "driving $LOAD_CLIENTS concurrent clients at alpha_shop for ${LOAD_SECONDS}s"
+if "$HERE/load-test.sh" --app "$APP" --base-url "http://$APP_DNS.staging.test" \
+     --key "$ANON" --clients "$LOAD_CLIENTS" --seconds "$LOAD_SECONDS" \
+     > /tmp/load.log 2>&1; then
+  pass "the application served a sustained load with no non-2xx response"
+else
+  fail "the application returned errors under load, or the load test could not run"
+fi
+# Throughput, latency and rows written belong in the report whether it passed
+# or not: a failure with no numbers is as hard to act on as a silent pass.
+detail bash -c "grep -E 'REQUEST|lookup|open-sale|add-items|daily-total|requests/second|rows written' /tmp/load.log"
+if grep -q "requests/second" /tmp/load.log; then
+  RPS="$(sed -n 's/.*= \([0-9]*\) requests\/second.*/\1/p' /tmp/load.log | head -1)"
+  P95="$(awk '$1=="open-sale"{print $5}' /tmp/load.log | head -1)"
+  pass "measured throughput: ${RPS:-?} requests/second, opening a sale at p95 ${P95:-?} ms"
+else
+  fail "the load test produced no throughput figure"
+  detail tail -12 /tmp/load.log
+fi
+
+# The PEAK figures go into the report's fenced block, because
+# size-from-measurement.py reads that block to size the VPS. It used to read
+# the idle numbers.
+PEAK="$(sed -n '/PEAK container usage/,/stat sample/p' /tmp/load.log \
+        | grep -E '^\s+[a-z0-9]' | grep -v CONTAINER || true)"
+if [ -n "$PEAK" ]; then
+  RESULTS="$RESULTS\n\`\`\`\n$PEAK\n\`\`\`\n"
+  pass "resource usage captured under load, with two applications provisioned"
+  note "peak, per container, measured while requests were being served:"
+  printf '%s\n' "$PEAK" | while IFS= read -r l; do note "$l"; done
+else
+  fail "no peak resource figures were captured, so nothing can be sized from this run"
+  detail tail -20 /tmp/load.log
+fi
 USED_MB=$(( RAM_MB - $(awk '/^MemAvailable:/{print $2}' /proc/meminfo) / 1024 ))
-note "memory used on the machine: ${USED_MB} MB of ${RAM_MB} MB"
-RESULTS="$RESULTS\n\`\`\`\n$(docker stats --no-stream --format '{{.Name}}  {{.MemUsage}}  {{.CPUPerc}}' 2>/dev/null)\n\`\`\`\n"
-pass "resource usage captured with two applications provisioned"
+note "memory used on the machine after the load: ${USED_MB} MB of ${RAM_MB} MB"
 
 if "$ROOT_DIR/capacity.sh" > /tmp/capacity.log 2>&1; then
   pass "capacity.sh reported everything within limits (exit 0)"

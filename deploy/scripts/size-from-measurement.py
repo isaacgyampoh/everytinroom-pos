@@ -11,11 +11,19 @@ starving the others. They are not what the services use, and sizing a server
 from them overbuys. This reads what the staging run actually measured and
 scales it by the services each inventoried project needs.
 
+The figures it reads are PEAK per container, sampled while the staging run was
+actually serving requests -- eight concurrent clients doing product lookups,
+opening sales, writing sale lines and reading a running total through Caddy and
+PostgREST. They are not idle figures. An earlier version of this read the idle
+numbers, which is how a server gets sized for a shop with nobody in it.
+
 It is deliberately explicit about two things it cannot know:
 
-  - staging runs ONE application with generated data. A real application with
-    a restored database and live traffic uses more, so a headroom multiplier
-    is applied and stated rather than hidden.
+  - staging runs ONE application, with generated rows and a synthetic load, on
+    a CI runner. Eight concurrent clients is a busier till than Everytinroom
+    has, but a restored database is larger than generated rows and another
+    project may be busier, so a factor is applied and stated rather than
+    hidden.
   - PostgreSQL's own usage scales with shared_buffers, which bootstrap sets
     from the machine's RAM. So postgres is sized from the TARGET machine, not
     from what staging measured on a different one.
@@ -44,9 +52,11 @@ SERVICE_OF = {
 
 OS_MB = 512          # Ubuntu at rest
 CADDY_MB = 64        # measured below if present
-# Real traffic against a restored database costs more than one staging app
-# with generated rows. Stated, not buried.
-LOAD_FACTOR = 1.6
+# Applied to the PEAK measured under load. The staging load is synthetic and
+# the database is generated, so this covers a restored database's larger
+# working set and a busier project than Everytinroom -- not the traffic
+# itself, which is now measured. Stated, not buried.
+LOAD_FACTOR = 1.4
 # Never size to 100%: a server with no slack cannot take a backup or restore a
 # dump, which are the moments it matters most.
 HEADROOM = 1.35
@@ -90,7 +100,13 @@ def classify(stats):
         else:
             for suffix, svc in SERVICE_OF.items():
                 if name.endswith("-" + suffix) or name.endswith("." + suffix):
-                    per_app[svc] = max(per_app.get(svc, 0), mem)
+                    # SUM, not max. imgproxy and storage-api are two separate
+                    # containers that both belong to the "storage" service, and
+                    # taking the larger of the two dropped imgproxy's memory
+                    # from every sizing. parse_stats() has already reduced
+                    # repeated samples of one container to its peak, so there
+                    # is nothing here to de-duplicate.
+                    per_app[svc] = per_app.get(svc, 0) + mem
                     break
     return per_app, shared
 
@@ -130,7 +146,7 @@ def main():
     fallback = {"postgrest": 512, "realtime": 1024, "storage": 1280,
                 "functions": 512, "gotrue": 512}
 
-    print(f"\nPER PROJECT (measured x {LOAD_FACTOR} for real traffic)")
+    print(f"\nPER PROJECT (peak under load x {LOAD_FACTOR})")
     print(f"  {'project':<40} {'services':<34} {'MB':>7}")
     total = 0.0
     for p in sorted(projects, key=lambda x: x.get("name") or ""):
@@ -179,13 +195,21 @@ def main():
 
     print(f"""
   Factors, stated rather than hidden:
-    x{LOAD_FACTOR} on measured usage, because staging runs one application with
-         generated data and no traffic.
+    x{LOAD_FACTOR} on the peak measured under load, because staging runs one
+         application with generated rows and a synthetic load, not a restored
+         database on a busy day.
     x{HEADROOM} overall, so the server can still take a backup or restore a dump.
     Disk sized at 3x current data, for backups and growth.
 
-  These are measurements of this platform under a staging load. They are not
-  a prediction of a busy shop, and no amount of arithmetic makes them one.
+  One more thing this cannot know: the staging load is driven at ONE
+  application. Every container is sampled, but a service that only the second
+  application runs -- gotrue, in this staging layout -- is sampled while idle,
+  so its figure is a floor rather than a peak. Any project sized on it is
+  sized on less evidence than the rest.
+
+  These are peak measurements of this platform under a synthetic load on a CI
+  runner. They are not a prediction of a busy shop, and no amount of
+  arithmetic makes them one.
 """)
 
 
