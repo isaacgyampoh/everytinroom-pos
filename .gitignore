@@ -20,3 +20,12 @@ desktop/release/
 # Python bytecode from the studio tools
 __pycache__/
 *.pyc
+
+# --- deploy/ : generated on the server, never committed ---
+# Site files carry a real domain; .env files carry real passwords.
+deploy/compose/caddy-sites/*.caddy
+deploy/compose/.env*
+deploy/compose/postgres/90-central.conf
+deploy/**/.env
+deploy/**/functions.env
+deploy/**/*.local

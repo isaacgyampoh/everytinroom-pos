@@ -1,0 +1,57 @@
+# ===========================================================================
+# The only thing on this server listening to the internet.
+#
+# It terminates HTTPS, gets its own certificates, and routes the four URL
+# prefixes supabase-js expects. One file per application lives in
+# /etc/caddy/sites and is written by provision-app.sh, so adding an
+# application never means editing this file.
+# ===========================================================================
+
+{
+	# A real address: Let's Encrypt uses it for expiry warnings, and without
+	# one you find out a certificate failed to renew from a customer.
+	email {$ACME_EMAIL}
+
+	# Caddy's admin API can reconfigure the proxy over HTTP. It binds to
+	# localhost by default, which is already not public, but nothing here
+	# needs it and a management interface that does not exist cannot be
+	# reached. Reload with `docker compose restart caddy`.
+	admin off
+
+	servers {
+		# Cloudflare sits in front, so the client address arrives in a header.
+		# Without this every request appears to come from Cloudflare and rate
+		# limiting and logs become useless.
+		trusted_proxies cloudflare
+	}
+}
+
+(security_headers) {
+	header {
+		# HSTS. Only safe because every hostname here is served over HTTPS.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Do not advertise the proxy or its version.
+		-Server
+	}
+}
+
+# CORS IS DELIBERATELY NOT SET HERE.
+#
+# PostgREST and storage-api already send Access-Control-Allow-Origin, exactly
+# as Supabase's hosted API does today. Adding a second header here would make
+# the browser see two values for one header and refuse the response outright,
+# so the till would fail in a way that looks like the database is down.
+# If origins ever need restricting, strip the upstream header first:
+#   header_down -Access-Control-Allow-Origin
+
+# A plain health endpoint on the bare IP, for uptime checks that run before
+# DNS exists and for `curl localhost/healthz` on the box itself.
+:80 {
+	respond /healthz "ok" 200
+	respond "not found" 404
+}
+
+import /etc/caddy/sites/*.caddy

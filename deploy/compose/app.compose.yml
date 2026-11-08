@@ -1,0 +1,263 @@
+# ===========================================================================
+# ONE APPLICATION — the same file for every application on the server.
+#
+# Nothing here is generated or templated. Each application has its own
+# directory holding its own .env, and runs as its own compose project:
+#
+#   cd /srv/central/apps/everytinroom
+#   docker compose -p app_everytinroom --env-file .env \
+#     -f /srv/central/compose/app.compose.yml up -d
+#
+# provision-app.sh writes that .env and a small Makefile-style wrapper, so in
+# practice nobody types the above.
+#
+# OPTIONAL SERVICES ARE PROFILES, not copies of this file. The .env sets
+# COMPOSE_PROFILES=realtime,storage and only then do those containers exist.
+# An application that needs neither runs one container and ~25 MB.
+#
+# WHAT IS NOT HERE, AND WHY
+#   gotrue (Supabase Auth)   Everytinroom signs staff in with a PIN checked by
+#                            verify_pin() against its own staff_sessions table.
+#                            There is not one call to supabase.auth in the
+#                            codebase, so running GoTrue would cost ~256 MB to
+#                            serve nothing.
+#   studio / postgres-meta   A database admin panel on the public internet is
+#                            the single most attacked thing you can host. Use
+#                            psql over an SSH tunnel; see deploy/README.md.
+#   kong / envoy             Caddy already terminates TLS and does the path
+#                            routing, and it gets certificates by itself.
+# ===========================================================================
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-app-env: &app-env
+  APP_NAME: ${APP_NAME:?APP_NAME is not set - are you using the app .env file?}
+
+services:
+  # -------------------------------------------------------------------------
+  # PostgREST — the data API. This is what supabase-js talks to for every
+  # sb.from(...) and sb.rpc(...) call, which is 73 of the 76 call sites in
+  # Everytinroom.
+  # -------------------------------------------------------------------------
+  rest:
+    image: postgrest/postgrest:v14.18
+    container_name: ${APP_NAME}-rest
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      <<: *app-env
+      PGRST_DB_URI: postgres://${APP_DB_USER}:${APP_DB_PASSWORD}@postgres:5432/${APP_DB}
+      PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS:-public}
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_DB_EXTRA_SEARCH_PATH: public, extensions
+      PGRST_JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is not set}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_DB_POOL: ${PGRST_DB_POOL:-10}
+      PGRST_SERVER_PORT: "3000"
+      PGRST_ADMIN_SERVER_PORT: "3001"
+      # The schema introspection endpoint lists every table and function to
+      # anyone holding the anon key, which ships in the browser bundle.
+      # supabase-js never reads it -- it builds its own URLs.
+      PGRST_OPENAPI_MODE: disabled
+      # PGRST_DB_MAX_ROWS is deliberately NOT set. A cap here does not error;
+      # it silently returns fewer rows, so a catalogue of 690 products would
+      # quietly become 1000-row pages and a stock report would be wrong with
+      # no sign that anything had happened.
+    healthcheck:
+      test: ["CMD", "postgrest", "--ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits: { memory: 512M }
+    networks:
+      central_db:
+      central_edge:
+        aliases: ["${APP_NAME}-rest"]
+
+  # -------------------------------------------------------------------------
+  # Realtime — the WAL listener behind the three sb.channel() subscriptions
+  # (products, sales, whatsapp_orders) that drive the sale confirmation, the
+  # till sound and the customer display.
+  #
+  # Realtime is multi-tenant even when self-hosted, and it reads the tenant
+  # from the FIRST LABEL OF THE HOST HEADER. That is why this container is
+  # named "<app>.realtime" and why the Caddy site file sends that exact name
+  # upstream. Get it wrong and the websocket connects, authenticates, and then
+  # never delivers an event -- no error anywhere.
+  # -------------------------------------------------------------------------
+  realtime:
+    image: supabase/realtime:v2.148.3
+    container_name: ${APP_NAME}.realtime
+    profiles: ["realtime"]
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      <<: *app-env
+      PORT: "4000"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${APP_DB}
+      DB_USER: ${APP_REALTIME_USER}
+      DB_PASSWORD: ${APP_REALTIME_PASSWORD}
+      DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
+      DB_ENC_KEY: ${REALTIME_ENC_KEY:?REALTIME_ENC_KEY is not set}
+      API_JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${REALTIME_SECRET_KEY_BASE:?REALTIME_SECRET_KEY_BASE is not set}
+      # The seed names the tenant after the application, so two applications
+      # on this server never share one.
+      SELF_HOST_TENANT_NAME: ${APP_NAME}
+      SEED_SELF_HOST: "true"
+      RUN_JANITOR: "true"
+      APP_NAME: realtime
+      ERL_AFLAGS: -proto_dist inet_tcp
+      DNS_NODES: "''"
+      RLIMIT_NOFILE: "10000"
+      DISABLE_HEALTHCHECK_LOGGING: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sSfL --head -o /dev/null -H \"Authorization: Bearer ${ANON_KEY}\" http://localhost:4000/api/tenants/${APP_NAME}/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits: { memory: 1G }
+    networks:
+      central_db:
+      central_edge:
+        aliases: ["${APP_NAME}.realtime"]
+
+  # -------------------------------------------------------------------------
+  # Storage — kept so that sb.storage.from(...).upload() keeps working
+  # unchanged, with Cloudflare R2 underneath instead of Supabase's disks.
+  # -------------------------------------------------------------------------
+  storage:
+    image: supabase/storage-api:v1.89.12
+    container_name: ${APP_NAME}-storage
+    profiles: ["storage"]
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      <<: *app-env
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      POSTGREST_URL: http://${APP_NAME}-rest:3000
+      DATABASE_URL: postgres://${APP_STORAGE_USER}:${APP_STORAGE_PASSWORD}@postgres:5432/${APP_DB}
+      DB_SUPER_USER: ${APP_STORAGE_USER}
+      DB_ANON_ROLE: anon
+      DB_SERVICE_ROLE: service_role
+      DB_AUTHENTICATED_ROLE: authenticated
+      DB_INSTALL_ROLES: "false"        # the roles already exist; see 22-storage.sql
+      TENANT_ID: ${APP_NAME}
+      STORAGE_PUBLIC_URL: https://${APP_DOMAIN}
+      REQUEST_ALLOW_X_FORWARDED_PATH: "true"
+      FILE_SIZE_LIMIT: ${STORAGE_FILE_SIZE_LIMIT:-52428800}
+      # --- Cloudflare R2, which is S3-compatible ---
+      STORAGE_BACKEND: s3
+      STORAGE_S3_BUCKET: ${R2_BUCKET}
+      STORAGE_S3_ENDPOINT: ${R2_ENDPOINT}
+      STORAGE_S3_FORCE_PATH_STYLE: "true"
+      STORAGE_S3_REGION: auto
+      # R2 rejects the trailing-checksum headers the AWS SDK adds by default.
+      # Without this, uploads fail with an opaque signature error.
+      STORAGE_S3_REQUEST_CHECKSUM_CALCULATION: WHEN_REQUIRED
+      STORAGE_S3_RESPONSE_CHECKSUM_VALIDATION: WHEN_REQUIRED
+      AWS_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      # Thumbnails, resizing and format conversion, done by imgproxy below.
+      # On Supabase this is a billed add-on; here it is CPU we already pay for.
+      ENABLE_IMAGE_TRANSFORMATION: "true"
+      IMGPROXY_URL: http://${APP_NAME}-imgproxy:5001
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/status"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits: { memory: 768M }
+    networks:
+      central_db:
+      central_edge:
+        aliases: ["${APP_NAME}-storage"]
+
+  imgproxy:
+    image: darthsim/imgproxy:v4.0.21
+    container_name: ${APP_NAME}-imgproxy
+    profiles: ["storage"]
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      IMGPROXY_BIND: ":5001"
+      IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
+      IMGPROXY_USE_ETAG: "true"
+      IMGPROXY_ENABLE_WEBP_DETECTION: "true"
+      # A resize is CPU-bound; left unbounded, a burst of thumbnail requests
+      # starves PostgREST and the till goes slow for everybody.
+      IMGPROXY_WORKERS: "2"
+      IMGPROXY_MAX_SRC_RESOLUTION: "50"
+    healthcheck:
+      test: ["CMD", "imgproxy", "health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits: { memory: 512M }
+    networks:
+      central_edge:
+        aliases: ["${APP_NAME}-imgproxy"]
+
+  # -------------------------------------------------------------------------
+  # Edge functions — the Deno runtime for charge-momo, paystack-webhook,
+  # sms-reports and ussd-handler. wa-agent and whatsapp-bot are gone.
+  # -------------------------------------------------------------------------
+  functions:
+    image: supabase/edge-runtime:v1.77.9
+    container_name: ${APP_NAME}-functions
+    profiles: ["functions"]
+    restart: unless-stopped
+    logging: *logging
+    command: ["start", "--main-service", "/home/deno/functions/main"]
+    volumes:
+      - ./functions:/home/deno/functions:ro
+    environment:
+      <<: *app-env
+      JWT_SECRET: ${JWT_SECRET}
+      SUPABASE_URL: http://${APP_NAME}-rest:3000
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: postgres://${APP_DB_USER}:${APP_DB_PASSWORD}@postgres:5432/${APP_DB}
+      # Each function's own secrets (payment keys, SMS credentials) come from
+      # this file, which is mode 600 and never committed.
+      VERIFY_JWT: "${FUNCTIONS_VERIFY_JWT:-false}"
+    env_file:
+      - path: ./functions.env
+        required: false
+    deploy:
+      resources:
+        limits: { memory: 512M }
+    networks:
+      central_db:
+      central_edge:
+        aliases: ["${APP_NAME}-functions"]
+
+networks:
+  # Created by the shared stack. `external` means an application never
+  # accidentally brings up a second, isolated copy of the network and then
+  # cannot see the database.
+  central_db:
+    external: true
+    name: central_db
+  central_edge:
+    external: true
+    name: central_edge

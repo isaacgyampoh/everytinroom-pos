@@ -1,0 +1,102 @@
+# ===========================================================================
+# Central PostgreSQL tuning — ONE SERVER, ONE DATABASE PER APPLICATION
+#
+# This is an OVERRIDE file, not a replacement. The supabase/postgres image
+# ships its own /etc/postgresql/postgresql.conf and ends it with
+#
+#     include_dir = '/etc/postgresql-custom/conf.d'
+#
+# so this file is read last and the settings in it win. That is the supported
+# way to tune the image.
+#
+# WHAT IS DELIBERATELY NOT SET HERE
+#
+#   shared_preload_libraries
+#     The image preloads twelve libraries, among them pgsodium, supabase_vault
+#     and pg_tle. Setting this key here REPLACES that list rather than adding
+#     to it, and a shorter list silently disables the rest. Everytinroom's
+#     production database has supabase_vault installed, and supabase_vault
+#     needs pgsodium preloaded, so an override naming only the extensions this
+#     application calls directly would stop the restored database from
+#     starting. pg_cron and pg_net are already in the image's list.
+#
+#   wal_level, max_wal_senders
+#     Already 'logical' and 10 in the image, which is what Realtime needs.
+#
+# This is a TEMPLATE: bootstrap.sh substitutes the placeholders from the RAM
+# and CPU count it finds, so one file suits a 24 GB Cloud VPS 8 and a 4 GB box.
+# ===========================================================================
+
+# --- connections ----------------------------------------------------------
+# Every application adds a PostgREST pool and possibly a Realtime connection,
+# so the ceiling has to allow for more than one tenant.
+max_connections = __MAX_CONNECTIONS__
+superuser_reserved_connections = 5
+
+# --- memory ---------------------------------------------------------------
+shared_buffers = __SHARED_BUFFERS__
+effective_cache_size = __EFFECTIVE_CACHE__
+maintenance_work_mem = __MAINTENANCE_WORK_MEM__
+work_mem = __WORK_MEM__
+# work_mem is PER SORT, not per connection: one query with three sorts across
+# many connections can ask for many multiples of it. Kept deliberately modest.
+
+# --- replication ----------------------------------------------------------
+# One slot per application that uses Realtime, plus room for a backup tool.
+max_replication_slots = 10
+
+# The outage this prevents: Realtime is redeployed, its replication slot stays
+# behind, Postgres retains every WAL segment the slot has not read, and the
+# disk fills until writes stop. Past this bound Postgres drops the slot
+# instead. A dropped slot costs missed events and recreates itself; a full
+# disk closes the till.
+max_slot_wal_keep_size = 2GB
+
+# --- planner / IO ---------------------------------------------------------
+random_page_cost = 1.1              # NVMe/SSD, not spinning rust
+effective_io_concurrency = 200
+
+# --- parallelism ----------------------------------------------------------
+max_worker_processes = __MAX_WORKERS__
+max_parallel_workers = __MAX_WORKERS__
+max_parallel_workers_per_gather = __MAX_PARALLEL_GATHER__
+max_parallel_maintenance_workers = __MAX_PARALLEL_GATHER__
+
+# --- scheduled jobs -------------------------------------------------------
+# pg_cron's scheduler runs in exactly ONE database. Naming the neutral
+# 'postgres' database keeps it from belonging to any single tenant; each
+# application registers its jobs from there with cron.schedule_in_database().
+# See deploy/README.md, "Scheduled jobs" — Everytinroom's six jobs need their
+# registration translated, and their bodies carry a hardcoded URL that must
+# change at cutover.
+cron.database_name = 'postgres'
+cron.use_background_workers = on
+
+# --- logging --------------------------------------------------------------
+# Enough to answer "why was the till slow at four o'clock" without recording
+# every statement, which on a trading day is both noise and a privacy problem.
+log_min_duration_statement = 1000
+log_checkpoints = on
+log_lock_waits = on
+log_autovacuum_min_duration = 0
+log_temp_files = 0
+log_line_prefix = '%m [%p] %q%u@%d '
+
+# --- time -----------------------------------------------------------------
+# The application formats in Ghana time; the server stores UTC, so a server
+# timezone change can never retro-date a sale.
+timezone = 'UTC'
+log_timezone = 'UTC'
+
+# --- safety ---------------------------------------------------------------
+# statement_timeout is set PER ROLE in deploy/sql/20-app-grants.sql rather
+# than globally: a till query and a dump restore do not deserve the same
+# ceiling.
+idle_in_transaction_session_timeout = 60s
+lock_timeout = 10s
+
+# --- autovacuum -----------------------------------------------------------
+autovacuum_max_workers = 3
+autovacuum_naptime = 30s
+autovacuum_vacuum_scale_factor = 0.1
+autovacuum_analyze_scale_factor = 0.05

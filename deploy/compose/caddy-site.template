@@ -1,0 +1,71 @@
+# ===========================================================================
+# __APP__  ->  https://__DOMAIN__
+#
+# Rendered by provision-app.sh. Do not edit in place: re-run provisioning, or
+# the next run will overwrite what you changed.
+#
+# The four prefixes below are the ones Supabase's own gateway serves, with the
+# same path rewriting, so supabase-js needs no change beyond its base URL.
+# Routes are matched most-specific first.
+# ===========================================================================
+
+__DOMAIN__ {
+	import security_headers
+
+	encode zstd gzip
+
+	# --- PostgREST: every sb.from() and sb.rpc() call ---------------------
+	# /rest/v1/products?select=*  ->  rest:3000/products?select=*
+	handle_path /rest/v1/* {
+		reverse_proxy __APP__-rest:3000
+	}
+
+	# --- Realtime --------------------------------------------------------
+	# The management API first, because /realtime/v1/api must not be treated
+	# as a websocket path.
+	handle_path /realtime/v1/api/* {
+		rewrite * /api{uri}
+		reverse_proxy __APP__.realtime:4000 {
+			header_up Host __APP__.realtime
+		}
+	}
+
+	# The websocket. /realtime/v1/websocket -> realtime:4000/socket/websocket
+	#
+	# `header_up Host` is load-bearing, not tidiness: Realtime reads the
+	# tenant from the first label of the Host header, so this is what tells it
+	# the connection belongs to __APP__. Send the browser's Host instead and
+	# the socket opens, authenticates, and silently delivers nothing.
+	handle_path /realtime/v1/* {
+		rewrite * /socket{uri}
+		reverse_proxy __APP__.realtime:4000 {
+			header_up Host __APP__.realtime
+		}
+	}
+
+	# --- Storage: sb.storage.from(...).upload() / public image URLs -------
+	handle_path /storage/v1/* {
+		reverse_proxy __APP__-storage:5000 {
+			# storage-api builds public URLs from the forwarded path.
+			header_up X-Forwarded-Path /storage/v1
+		}
+	}
+
+	# --- Edge functions ---------------------------------------------------
+	handle_path /functions/v1/* {
+		reverse_proxy __APP__-functions:9000
+	}
+
+	# Anything else is not part of the API surface. A 404 here, rather than a
+	# fall-through, keeps an unrouted path from reaching a service by accident.
+	handle {
+		respond "not found" 404
+	}
+
+	log {
+		output file /var/log/caddy/__APP__.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

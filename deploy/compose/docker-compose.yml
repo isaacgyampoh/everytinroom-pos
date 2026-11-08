@@ -1,0 +1,111 @@
+# ===========================================================================
+# SHARED INFRASTRUCTURE — runs once on the server, serves every application.
+#
+# Two services only: the database every application gets its own schema inside,
+# and the reverse proxy that terminates HTTPS. Each application then runs as
+# its own compose project from app.compose.yml and joins these networks.
+#
+# Image tags are the set Supabase itself ships and tests together in
+# supabase/supabase/docker/docker-compose.yml, not the newest release of each
+# component. See deploy/VERSIONS.md before bumping any of them.
+#
+#   docker compose -f docker-compose.yml up -d
+# ===========================================================================
+name: central
+
+x-logging: &logging
+  # Without this, one chatty container's log grows until the disk is full and
+  # every application on the server stops at once.
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: supabase/postgres:17.6.1.136
+    container_name: central-postgres
+    restart: unless-stopped
+    logging: *logging
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is not set - run bootstrap.sh, which generates it}
+      POSTGRES_DB: postgres
+      POSTGRES_HOST: /var/run/postgresql
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Tuning layered on top of the image's own config, which ends with
+      # include_dir = '/etc/postgresql-custom/conf.d'. bootstrap.sh generates
+      # this file from 90-central.conf.tmpl for the RAM the server has.
+      - ./postgres/90-central.conf:/etc/postgresql-custom/conf.d/90-central.conf:ro
+      - ./backups:/backups
+    ports:
+      # 127.0.0.1 ONLY. The database must never be reachable from the
+      # internet: reach it with `docker compose exec postgres psql`, or from
+      # your laptop over an SSH tunnel:
+      #   ssh -L 5432:127.0.0.1:5432 user@server
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    shm_size: 256mb          # parallel workers and large sorts use /dev/shm
+    stop_grace_period: 60s   # let a checkpoint finish rather than killing it
+    networks:
+      central_db:
+        aliases: [postgres, db]
+
+  caddy:
+    image: caddy:2.11.9-alpine
+    container_name: central-caddy
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # One file per application, written by provision-app.sh. Adding an
+      # application never edits the main Caddyfile.
+      - ./caddy-sites:/etc/caddy/sites:ro
+      - caddy_data:/data        # ACME certificates and keys live here. Losing
+                                # this volume means re-issuing certificates and
+                                # can hit Let's Encrypt rate limits.
+      - caddy_config:/config
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      central_edge:
+        aliases: [caddy]
+
+networks:
+  # The database network. Applications join it to reach Postgres; Caddy does
+  # NOT, so a flaw in the proxy cannot talk to the database directly.
+  #
+  # Not marked `internal`, on purpose: pg_net makes outbound HTTP calls from
+  # inside Postgres -- that is how the six scheduled jobs reach the edge
+  # functions -- and an internal network has no route out.
+  central_db:
+    name: central_db
+    driver: bridge
+
+  # The HTTP network: Caddy and each application's web-facing services.
+  central_edge:
+    name: central_edge
+    driver: bridge
+
+volumes:
+  pgdata:
+    name: central_pgdata
+  caddy_data:
+    name: central_caddy_data
+  caddy_config:
+    name: central_caddy_config
