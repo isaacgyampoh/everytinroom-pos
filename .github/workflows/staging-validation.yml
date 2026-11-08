@@ -1,0 +1,129 @@
+name: Staging validation
+
+# Runs the whole central hosting platform on a throwaway Ubuntu runner and
+# checks that it works: Docker installed from scratch, the stack up, two
+# isolated applications, Realtime end to end, object storage, a backup and
+# restore rehearsal, and scheduled jobs firing in another database.
+#
+# WHY A RUNNER AND NOT A VPS
+#   No server has been bought, and Docker is deliberately not installed on the
+#   owner's Mac. A GitHub-hosted runner is a disposable Ubuntu machine with
+#   root, free on a public repository, and it is thrown away afterwards.
+#
+# NO PRODUCTION CREDENTIAL IS USED OR NEEDED. Every password, JWT secret and
+# API key in this job is generated on the runner and dies with it. Nothing
+# here can reach the live Supabase project or the shop's data.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [staging-validation]
+    paths:
+      - 'deploy/**'
+      - '.github/workflows/staging-validation.yml'
+
+permissions:
+  contents: write        # only to commit the report back to this branch
+
+jobs:
+  staging:
+    # Pinned rather than ubuntu-latest: the Ubuntu release decides which
+    # Docker apt repository codename is used, and a silent bump of that is
+    # exactly what this job exists to catch.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Node, for the Realtime subscription test
+        uses: actions/setup-node@v4.1.0
+        with:
+          node-version: '20'
+
+      - name: Facts about this runner
+        run: |
+          . /etc/os-release
+          echo "$PRETTY_NAME ($VERSION_CODENAME)"
+          echo "processors: $(nproc)"
+          echo "memory:     $(( $(awk '/^MemTotal:/{print $2}' /proc/meminfo) / 1024 )) MB"
+          echo "disk free:  $(df -h / | awk 'NR==2{print $4}')"
+          echo "docker:     $(docker --version 2>/dev/null || echo 'not installed')"
+
+      - name: Run the staging validation
+        id: staging
+        continue-on-error: true      # the report is wanted even when a check fails
+        run: |
+          chmod +x deploy/scripts/*.sh deploy/*.sh
+          sudo -E STAGING_REPORT=/tmp/staging-report.md \
+            deploy/scripts/staging-test.sh 2>&1 | tee /tmp/staging-console.log
+          echo "rc=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Container state at the end
+        if: always()
+        continue-on-error: true
+        run: |
+          sudo docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' || true
+          echo
+          sudo docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}' || true
+
+      - name: Logs from anything unhealthy
+        if: always()
+        continue-on-error: true
+        run: |
+          for c in $(sudo docker ps -a --format '{{.Names}}'); do
+            h=$(sudo docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$c" 2>/dev/null)
+            s=$(sudo docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null)
+            if [ "$s" != "running" ] || { [ "$h" != "healthy" ] && [ "$h" != "none" ]; }; then
+              echo "===== $c ($s/$h) ====="
+              sudo docker logs "$c" --tail=40 2>&1 || true
+            fi
+          done
+
+      - name: Publish the report to the job summary
+        if: always()
+        run: |
+          if [ -f /tmp/staging-report.md ]; then
+            cat /tmp/staging-report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '# Staging validation did not produce a report' >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            tail -60 /tmp/staging-console.log >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Commit the report back to this branch
+        if: always()
+        # The report is committed rather than only uploaded as an artifact so
+        # it can be read from a clone of this public repository without any
+        # credentials.
+        run: |
+          mkdir -p deploy/staging-results
+          sudo cp /tmp/staging-report.md  deploy/staging-results/report.md 2>/dev/null || true
+          sudo cp /tmp/staging-console.log deploy/staging-results/console.log 2>/dev/null || true
+          sudo chown "$(id -u):$(id -g)" deploy/staging-results/* 2>/dev/null || true
+          # Trim the console log: the point is the verdicts, not every apt line.
+          if [ -f deploy/staging-results/console.log ]; then
+            tail -c 200000 deploy/staging-results/console.log > /tmp/t && mv /tmp/t deploy/staging-results/console.log
+          fi
+          {
+            echo "Run: ${{ github.run_id }}"
+            echo "Commit: ${{ github.sha }}"
+            echo "Runner: ubuntu-24.04"
+            echo "Finished: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          } > deploy/staging-results/run-info.txt
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A deploy/staging-results
+          git diff --cached --quiet || git commit -m "Staging validation results from run ${{ github.run_id }}"
+          git push origin HEAD:${{ github.ref_name }} || echo "push skipped"
+
+      - name: Fail the job if any check failed
+        if: always()
+        run: |
+          grep -q '\*\*FAIL\*\*' /tmp/staging-report.md 2>/dev/null && {
+            echo "At least one check failed. See the summary."
+            grep '\*\*FAIL\*\*' /tmp/staging-report.md
+            exit 1
+          }
+          echo "No failures recorded."
