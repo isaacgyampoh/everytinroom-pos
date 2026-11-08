@@ -17,6 +17,12 @@ SET client_min_messages = warning;
 
 -- Realtime keeps its own tables (tenants, extensions, migration history) in
 -- this schema, and connects with search_path set to it.
+-- Created WITHOUT an AUTHORIZATION clause, and not reassigned afterwards.
+-- `CREATE SCHEMA ... AUTHORIZATION <role>` and `ALTER SCHEMA ... OWNER TO
+-- <role>` both require the executing role to be able to SET ROLE to that
+-- role, which a non-superuser cannot without a membership grant -- and
+-- granting membership crashes this image. Realtime does not need to OWN the
+-- schema; it needs to CREATE IN it, which the grant below provides.
 CREATE SCHEMA IF NOT EXISTS _realtime;
 
 -- psql does NOT interpolate :variables inside a dollar-quoted string, so a
@@ -32,8 +38,9 @@ BEGIN
   END IF;
 END $$;
 
-ALTER SCHEMA _realtime OWNER TO :"rt_user";
 GRANT ALL ON SCHEMA _realtime TO :"rt_user";
+ALTER DEFAULT PRIVILEGES IN SCHEMA _realtime GRANT ALL ON TABLES TO :"rt_user";
+ALTER DEFAULT PRIVILEGES IN SCHEMA _realtime GRANT ALL ON SEQUENCES TO :"rt_user";
 
 -- It must be able to read the tables it replicates, and to create the
 -- publication it manages.

@@ -44,9 +44,12 @@ DO $$
 DECLARE u text := current_setting('provision.st_user');
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'storage') THEN
-    EXECUTE format('ALTER SCHEMA storage OWNER TO %I', u);
+    -- Granted, not reassigned: ALTER SCHEMA ... OWNER TO needs SET ROLE on
+    -- the target, which a non-superuser cannot do here.
     EXECUTE format('GRANT ALL ON SCHEMA storage TO %I', u);
-    RAISE WARNING 'An existing "storage" schema was found and reassigned to %. Check its object owners with: \dn+ storage', u;
+    EXECUTE format('GRANT ALL ON ALL TABLES IN SCHEMA storage TO %I', u);
+    EXECUTE format('GRANT ALL ON ALL SEQUENCES IN SCHEMA storage TO %I', u);
+    RAISE WARNING 'An existing "storage" schema was found; % was granted full rights on it rather than taking ownership.', u;
   END IF;
 END $$;
 

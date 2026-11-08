@@ -34,8 +34,13 @@ END $$;
 
 -- GoTrue runs its own migrations and needs to create the auth schema and its
 -- tables on first boot.
-CREATE SCHEMA IF NOT EXISTS auth AUTHORIZATION :"auth_user";
+-- No AUTHORIZATION clause: that needs SET ROLE on the target, which a
+-- non-superuser cannot do here. GoTrue does not need to own the schema, only
+-- to create its tables in it.
+CREATE SCHEMA IF NOT EXISTS auth;
 GRANT ALL ON SCHEMA auth TO :"auth_user";
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON TABLES TO :"auth_user";
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON SEQUENCES TO :"auth_user";
 GRANT CREATE ON DATABASE :"dbname" TO :"auth_user";
 
 -- PostgREST needs to read auth.uid() and auth.role() from a JWT for RLS
@@ -44,11 +49,12 @@ GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
 
 -- If a restored dump already brought the auth schema across, hand it over
 -- rather than leaving it owned by a role this server does not have.
+-- A restored dump may already carry the auth schema. Grant on it rather than
+-- taking ownership, for the same reason as above.
 DO $$
 DECLARE u text := current_setting('provision.auth_user');
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'auth') THEN
-    EXECUTE format('ALTER SCHEMA auth OWNER TO %I', u);
     EXECUTE format('GRANT ALL ON ALL TABLES IN SCHEMA auth TO %I', u);
     EXECUTE format('GRANT ALL ON ALL SEQUENCES IN SCHEMA auth TO %I', u);
   END IF;

@@ -116,6 +116,26 @@ else
   printf '%s\n' "$BADG" | sed 's/^/     /'
 fi
 
+hdr "No SQL takes ownership of an object for another role"
+# CREATE ... AUTHORIZATION <role> and ALTER ... OWNER TO <role> both require
+# the executing role to be able to SET ROLE to that role. A non-superuser
+# cannot, and the membership grant that would allow it CRASHES the
+# supabase/postgres server. This pattern broke provisioning in three separate
+# files, so it is banned: grant rights on the object instead of transferring
+# ownership of it.
+BADO=$(grep -rniE "(create +(schema|table|database)[^;]* authorization |alter +(schema|table|database|sequence|type|function)[^;]* owner +to )" \
+  "$DEPLOY"/sql/*.sql 2>/dev/null \
+  | awk '{ line=$0; sub(/^[^:]*:[0-9]+:/, "", line);
+           if (line ~ /^[[:space:]]*--/) next;
+           if (tolower(line) ~ /raise +(exception|warning|notice)/) next;
+           print }' || true)
+if [ -z "$BADO" ]; then
+  ok "no file transfers ownership or uses AUTHORIZATION"
+else
+  bad "a file transfers object ownership — this needs SET ROLE, which is unavailable"
+  printf '%s\n' "$BADO" | sed 's/^/     /'
+fi
+
 hdr "Templates have no leftover placeholders in committed form"
 for f in "$DEPLOY"/compose/caddy-site.template "$DEPLOY"/compose/Caddyfile.tmpl "$DEPLOY"/compose/postgres/90-central.conf.tmpl; do
   n="$(grep -c '__[A-Z_]*__' "$f" 2>/dev/null || echo 0)"
