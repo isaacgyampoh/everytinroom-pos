@@ -527,6 +527,56 @@ def main():
     A("may be described as R2-verified.")
     A("")
 
+    # ----- remaining risks, derived ---------------------------------------
+    A("## Remaining risks")
+    A("")
+    A("Derived from the states above and the inventory, not listed by hand, so")
+    A("this section cannot quietly fall out of date with the evidence.")
+    A("")
+    A("| Risk | Why it is open | What closes it |")
+    A("|---|---|---|")
+    for name, _, st, ev in results:
+        if st == "FAILED":
+            A(f"| {name} is FAILING | the run recorded a failure: "
+              f"{ev.replace('|', '/')[:70]} | fix the cause and re-run; the "
+              f"verdict is computed from the report, so it cannot be signed off "
+              f"while this stands |")
+    for name, _, st, _ in results:
+        if st == "NOT VERIFIED":
+            A(f"| {name} is unproven | no check for it was found in any report "
+              f"| run the check; until then this capability is not claimed |")
+    # Risks that are true regardless of how the run went.
+    A("| No VPS has ever run this | every result here is from a CI runner, "
+      "which is a different machine with different disks | provision the "
+      "server and re-run the same staging script on it before cutover |")
+    A("| The production database has never been restored here | staging runs "
+      "generated rows, so nothing proves the real dump restores or that its "
+      "functions, policies and publications survive | restore a copy of the "
+      "dump into a scratch database on the new server and run "
+      "`verify-migration.sh` against it |")
+    if projects:
+        paused = [p.get("name") for p in projects if not p.get("reachable")]
+        if paused:
+            A(f"| {len(paused)} project(s) cannot be assessed at all | they are "
+              f"paused, so their size, extensions and services are unknown | "
+              f"resume each one long enough to inspect it, or decide it is not "
+              f"migrating |")
+        flagged = [(p["name"], f) for p in projects if p.get("reachable")
+                   for f in (p.get("flags") or [])]
+        if flagged:
+            A(f"| {len(flagged)} per-project finding(s) from the inventory | "
+              f"listed under the per-project notes above | each is that "
+              f"project's own decision and needs its own approval |")
+    A("| Scheduled jobs that both read data and call out | pg_net serves one "
+      "database, so such a job cannot run from either side as written | the "
+      "migration script flags each one; the SQL half becomes a PostgREST RPC "
+      "that the HTTP job calls |")
+    A("| Cutover has no rehearsal | the order of restore, Realtime start and "
+      "publication creation matters, and doing it once in production is doing "
+      "it for the first time | rehearse the whole cutover on the new server "
+      "with a copy of the data, with the live system still serving |")
+    A("")
+
     A("## Limits of this evidence")
     A("")
     A("- The staging environment is a GitHub-hosted runner, not a VPS. No real")

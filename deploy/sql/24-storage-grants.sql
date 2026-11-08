@@ -2,7 +2,13 @@
 -- Grant the roles storage-api switches into their rights on the tables
 -- storage-api's OWN migrations created.
 --
---   psql -d <app_db> -f 24-storage-grants.sql
+--   psql -d <app_db> -U <app>_storage -f 24-storage-grants.sql
+--
+-- RUN AS THE STORAGE ROLE, not as the provisioning role. storage-api's
+-- migrations create these tables and functions, so the storage role owns them,
+-- and in PostgreSQL only an object's owner may grant on it. Run as postgres
+-- this emitted "no privileges were granted for ..." per object and granted
+-- nothing -- as warnings, not errors, so it looked close to working.
 --
 -- WHY THIS RUNS AFTER THE SERVICE STARTS, AND NOT WITH THE REST
 --
@@ -55,7 +61,14 @@ BEGIN
   RAISE NOTICE 'storage schema: % table(s)/view(s), % sequence(s), % function(s)', n_tab, n_seq, n_fun;
 END $$;
 
-GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;
+-- Deliberately NOT here: GRANT USAGE ON SCHEMA storage. The schema is created
+-- and owned by the provisioning role in 22-storage.sql, which grants USAGE
+-- there, as its owner. This file runs as the STORAGE role -- the owner of the
+-- tables and functions, which is the only role that may grant on them -- and a
+-- non-owner granting on a schema produces
+--   WARNING:  no privileges were granted for "storage"
+-- not an error. A warning that is expected teaches you to ignore warnings, so
+-- the line that causes it is gone and any warning from this file is real.
 GRANT ALL ON ALL TABLES    IN SCHEMA storage TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA storage TO anon, authenticated, service_role;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA storage TO anon, authenticated, service_role;

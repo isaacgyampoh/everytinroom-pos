@@ -80,15 +80,44 @@ case ",$PROFILES," in
       RC=1
     else
       ok "storage-api has created $n table(s)"
-      if OUT="$(docker exec -i central-postgres psql -X -v ON_ERROR_STOP=1 -U postgres \
-                 -d "$APP_DB" -f - < "$DEPLOY/sql/24-storage-grants.sql" 2>&1)"; then
-        ok "grants applied to the storage schema"
-        printf '%s\n' "$OUT" | grep -E 'NOTICE|storage grants' | sed 's/^/      /'
+      # Run the grants AS THE STORAGE ROLE, not as postgres.
+      #
+      # storage-api's migrations create those tables and functions, so the
+      # storage role owns them -- and in PostgreSQL only an object's owner (or
+      # a member of its owning role) may grant on it. Running them as postgres
+      # produced a WARNING per object, "no privileges were granted for
+      # \"search\"", and left the roles storage-api switches into with nothing.
+      # The warnings are not errors, so this looked close to working.
+      #
+      # Granting the storage role to postgres would make postgres a member and
+      # is the other way to do it. It is not taken: the membership grants on
+      # this image are the operation that crashed the server twice already.
+      # The owner granting on its own objects needs no new privilege at all.
+      ST_USER="$(sed -n 's/^APP_STORAGE_USER=//p' "$APP_ENV" | tail -1)"
+      PGPASSWORD="$(sed -n 's/^APP_STORAGE_PASSWORD=//p' "$APP_ENV" | tail -1)"
+      export PGPASSWORD
+      if [ -z "$ST_USER" ] || [ -z "$PGPASSWORD" ]; then
+        warn "could not read the storage role's credentials from $APP_ENV"
+        RC=1
+      # -e PGPASSWORD with no value passes it from this environment rather than
+      # putting it on the command line, where `ps` would show it.
+      elif OUT="$(docker exec -i -e PGPASSWORD central-postgres \
+                   psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U "$ST_USER" \
+                   -d "$APP_DB" -f - < "$DEPLOY/sql/24-storage-grants.sql" 2>&1)"; then
+        if printf '%s' "$OUT" | grep -q "no privileges were granted"; then
+          warn "some objects were not granted even as their owner:"
+          printf '%s\n' "$OUT" | grep "no privileges were granted" | head -10 | sed 's/^/      /'
+          RC=1
+        else
+          ok "grants applied to the storage schema, by the role that owns it"
+          printf '%s\n' "$OUT" | grep -E 'NOTICE|storage grants' | sed 's/^/      /'
+        fi
       else
-        warn "applying the storage grants failed:"
-        printf '%s\n' "$OUT" | tail -8 | sed 's/^/      /'
+        warn "applying the storage grants failed. The whole output follows:"
+        printf '%s\n' "$OUT" | tail -15 | sed 's/^/      /'
         RC=1
       fi
+      unset PGPASSWORD
     fi
     ;;
 esac

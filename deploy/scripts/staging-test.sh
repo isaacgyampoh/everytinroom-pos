@@ -523,10 +523,17 @@ JS
     # The HEAD of the log, where the tenant migrations run. Run 18 captured
     # only the tail, which showed the downstream "schema realtime does not
     # exist" and not the migration failure that caused it.
-    note "----- ${APP_DNS}.realtime log, FIRST 40 lines (where migrations run) -----"
-    detail bash -c "docker logs '${APP_DNS}.realtime' 2>&1 | head -40"
-    note "----- any migration or permission line anywhere in that log -----"
-    detail bash -c "docker logs '${APP_DNS}.realtime' 2>&1 | grep -iE 'migrat|permission|reserved role|does not exist|CREATE SCHEMA|tenant' | head -20"
+    # Realtime runs TWO sets of migrations: Realtime.Repo.Migrations build
+    # _realtime (its own tenants and extensions), and the tenant migrations
+    # build `realtime` (subscription, apply_rls, list_changes). Run 19 showed
+    # the first set succeeding and the second stopping after two tables, and
+    # the 20-line cap hid where. So: the tenant set specifically, and enough
+    # lines to contain the failure.
+    note "----- Realtime's TENANT migrations, and anything that stopped them -----"
+    DETAIL_LINES=60 detail bash -c "docker logs '${APP_DNS}.realtime' 2>&1 | grep -iE 'Tenants\.Migrations|MigrationsFailed|tenant_db_dump|dump_not_found|== Migrated 2|== Running 2|\[error\]|permission denied|must be owner|already exists|relation .* does not exist' | grep -v PoolingReplicationError | head -60"
+    note "----- how far its own migration history got -----"
+    detail pgq "select version from realtime.schema_migrations order by version" "$APP"
+    detail pgq "select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='realtime' order by 1" "$APP"
     note "----- what Realtime actually built in ${APP} -----"
     detail pgq "select coalesce((select 'realtime schema: yes' from pg_namespace where nspname='realtime'), 'realtime schema: NO')" "$APP"
     detail pgq "select 'realtime tables: ' || count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='realtime' and c.relkind in ('r','p')" "$APP"
@@ -566,34 +573,70 @@ section "7. Object storage: upload, download, delete"
 # storage-api talks to either way, so this tests OUR configuration -- the
 # backend selection, the bucket wiring, the signing and the proxy route. It
 # does NOT test R2 itself. That difference is stated in the report.
-# adobe/s3mock rather than MinIO. MinIO is no longer published to Docker Hub
-# and its server image carries no `mc` client, so the first run skipped this
-# whole section with "could not start MinIO". s3mock is built for exactly this
-# job: it creates buckets from an environment variable, needs no client, and
-# keeps objects as plain files that can be checked with `find`.
-# Generated, not written down: a literal credential in a repository is a bad
-# habit even when the value is a throwaway, and the repository's own secret
-# scan correctly refuses it.
+# WHICH S3 SERVER STANDS IN FOR R2, AND WHY IT CHANGED TWICE
+#
+# MinIO first, which is what storage-api is developed against -- but MinIO is
+# no longer published to Docker Hub and its server image carries no `mc`
+# client, so the first run skipped this section entirely.
+#
+# Then adobe/s3mock, which creates buckets from an environment variable and
+# keeps objects as plain files. It got further and then stopped being useful:
+# storage-api issues a multi-object delete when it writes, s3mock's response
+# does not satisfy the AWS SDK, and every upload failed with
+#   HTTP 500 "Backend did not confirm deletion of 2 of 2 keys"
+# Its on-disk layout is also documented as an implementation detail that may
+# change, and the old "is the object really there" check poked at /s3data
+# directly -- which had already stopped existing.
+#
+# Now LocalStack, whose S3 is a full implementation rather than a mock. It
+# ships `awslocal`, so the "did the object really reach the object store"
+# question is answered through the S3 API itself. That check is now backend-
+# agnostic: the same question, asked the same way, works against R2.
+#
+# LocalStack accepts any credentials; these are still generated rather than
+# written down, because a literal credential in a repository is a bad habit
+# even when the value is a throwaway and the repository's own secret scan
+# correctly refuses it.
 S3_KEY="stg$(openssl rand -hex 6)"
 S3_SECRET="$(openssl rand -hex 16)"
+S3_BUCKET=staging-images
 if docker run -d --name staging-s3 --network central_edge \
-     -e initialBuckets=staging-images \
-     -e root=/s3data \
-     adobe/s3mock:5.2.3 >/dev/null 2>&1; then
-  # Wait for it to answer rather than guessing at a sleep.
+     -e SERVICES=s3 -e DEBUG=0 -e EAGER_SERVICE_LOADING=1 \
+     -e AWS_DEFAULT_REGION=us-east-1 \
+     localstack/localstack:2026.10.2 >/dev/null 2>&1; then
+  # Wait for S3 to report available, rather than for the container to exist.
   s3_up=0
-  for _ in $(seq 1 20); do
-    if docker run --rm --network central_edge curlimages/curl:8.11.1 \
-         -s -o /dev/null --max-time 4 "http://staging-s3:9090/" 2>/dev/null; then s3_up=1; break; fi
+  for _ in $(seq 1 40); do
+    if docker exec staging-s3 curl -sf --max-time 4 \
+         http://127.0.0.1:4566/_localstack/health 2>/dev/null | grep -q '"s3": *"\(available\|running\)"'; then
+      s3_up=1; break
+    fi
     sleep 3
   done
-  [ "$s3_up" = "1" ] && pass "an S3-compatible endpoint is running (adobe/s3mock, standing in for R2)" \
-                     || { fail "the S3 endpoint never answered"; detail docker logs staging-s3 --tail=15; }
+  if [ "$s3_up" = "1" ]; then
+    pass "an S3-compatible endpoint is running (LocalStack S3, standing in for R2)"
+  else
+    fail "the S3 endpoint never reported S3 as available"
+    detail docker logs staging-s3 --tail=20
+  fi
 
-  sed -i 's|^R2_BUCKET=.*|R2_BUCKET=staging-images|' "$ENV"
-  sed -i 's|^R2_ENDPOINT=.*|R2_ENDPOINT=http://staging-s3:9090|' "$ENV"
+  # The bucket, created through the S3 API.
+  if docker exec staging-s3 awslocal s3 mb "s3://$S3_BUCKET" >/tmp/mb.log 2>&1 \
+     || grep -qi "already exists\|BucketAlreadyOwnedByYou" /tmp/mb.log; then
+    pass "the S3 bucket exists"
+  else
+    fail "could not create the S3 bucket"
+    detail cat /tmp/mb.log
+  fi
+
+  sed -i "s|^R2_BUCKET=.*|R2_BUCKET=$S3_BUCKET|" "$ENV"
+  sed -i 's|^R2_ENDPOINT=.*|R2_ENDPOINT=http://staging-s3:4566|' "$ENV"
   sed -i "s|^R2_ACCESS_KEY_ID=.*|R2_ACCESS_KEY_ID=$S3_KEY|" "$ENV"
   sed -i "s|^R2_SECRET_ACCESS_KEY=.*|R2_SECRET_ACCESS_KEY=$S3_SECRET|" "$ENV"
+  # LocalStack rejects R2's 'auto'. Set explicitly for staging; production
+  # keeps 'auto' because that is what R2 wants.
+  grep -q '^R2_REGION=' "$ENV" && sed -i 's|^R2_REGION=.*|R2_REGION=us-east-1|' "$ENV" \
+                               || printf 'R2_REGION=us-east-1\n' >> "$ENV"
   cd "$ROOT_DIR/apps/$APP" && ./compose.sh up -d >/tmp/st-up.log 2>&1
   ok=0
   for _ in $(seq 1 24); do
@@ -633,22 +676,29 @@ if docker run -d --name staging-s3 --network central_edge \
     fi
 
     # Confirm the object really landed in the object store rather than on
-    # storage-api's own disk. s3mock keeps objects as files, so this is a
-    # direct check on the S3 server's contents with no client involved.
-    if docker exec staging-s3 find /s3data -name '*probe*' 2>/dev/null | grep -q .; then
+    # storage-api's own disk -- asked through the S3 API, not by looking for
+    # files. The old version poked at s3mock's /s3data, which is an
+    # implementation detail and had already stopped existing; a question asked
+    # this way is the same question R2 can be asked.
+    if docker exec staging-s3 awslocal s3 ls "s3://$S3_BUCKET" --recursive \
+         >/tmp/s3ls.txt 2>&1 && grep -q 'probe' /tmp/s3ls.txt; then
       pass "the object is physically in the S3 bucket, so the backend is really S3"
+      detail bash -c "grep probe /tmp/s3ls.txt | head -3"
     else
       fail "the object is not in the S3 bucket — storage may have fallen back to local files"
-      detail bash -c 'docker exec staging-s3 find /s3data -maxdepth 3 | head -8'
+      detail bash -c "head -10 /tmp/s3ls.txt"
     fi
 
     c=$(curl -s -o /tmp/rm.json -w '%{http_code}' -X DELETE "$B/object/product-images/test/probe.txt" \
       -H "Authorization: Bearer $SVC")
     case "$c" in 200|204) pass "DELETE removed the object (HTTP $c)" ;;
       *) fail "delete returned HTTP $c: $(head -c 150 /tmp/rm.json)" ;; esac
-    docker exec staging-s3 find /s3data -name '*probe*' 2>/dev/null | grep -q . \
-      && fail "the object is still in the bucket after the delete" \
-      || pass "the object is gone from the bucket"
+    if docker exec staging-s3 awslocal s3 ls "s3://$S3_BUCKET" --recursive 2>/dev/null \
+         | grep -q 'probe'; then
+      fail "the object is still in the bucket after the delete"
+    else
+      pass "the object is gone from the bucket, confirmed through the S3 API"
+    fi
   else
     fail "storage-api never became healthy"
     detail docker logs "${APP_DNS}-storage" --tail=25
@@ -847,10 +897,20 @@ fi
 # Throughput, latency and rows written belong in the report whether it passed
 # or not: a failure with no numbers is as hard to act on as a silent pass.
 detail bash -c "grep -E 'REQUEST|lookup|open-sale|add-items|daily-total|requests/second|rows written' /tmp/load.log"
-if grep -q "requests/second" /tmp/load.log; then
+if grep -q "NOTHING SUCCEEDED" /tmp/load.log; then
+  # Run 19 printed "measured throughput: 444 requests/second" for a run in
+  # which every one of 27,124 requests was non-2xx. That is the speed of
+  # producing errors and it was reported as a pass.
+  fail "no request succeeded, so nothing was measured — the latency figures above are meaningless"
+elif grep -q "requests/second" /tmp/load.log; then
   RPS="$(sed -n 's/.*= \([0-9]*\) requests\/second.*/\1/p' /tmp/load.log | head -1)"
   P95="$(awk '$1=="open-sale"{print $5}' /tmp/load.log | head -1)"
-  pass "measured throughput: ${RPS:-?} requests/second, opening a sale at p95 ${P95:-?} ms"
+  OKC="$(awk '$1=="open-sale"{print $3}' /tmp/load.log | head -1)"
+  if [ "${OKC:-0}" -gt 0 ]; then
+    pass "measured throughput: ${RPS:-?} requests/second, opening a sale at p95 ${P95:-?} ms over ${OKC} successful writes"
+  else
+    fail "no sale was successfully opened, so the write path was not measured"
+  fi
 else
   fail "the load test produced no throughput figure"
   detail tail -12 /tmp/load.log
@@ -859,8 +919,12 @@ fi
 # The PEAK figures go into the report's fenced block, because
 # size-from-measurement.py reads that block to size the VPS. It used to read
 # the idle numbers.
+# Only the container rows. The closing "84 stat sample(s)..." line begins with
+# a digit and so matched the old pattern, which put it inside the fenced block
+# the sizing script reads.
 PEAK="$(sed -n '/PEAK container usage/,/stat sample/p' /tmp/load.log \
-        | grep -E '^\s+[a-z0-9]' | grep -v CONTAINER || true)"
+        | grep -E '^[[:space:]]+[a-z][a-z0-9_.-]*[[:space:]]+[0-9.]+[KMGT]?i?B' \
+        | grep -v CONTAINER || true)"
 if [ -n "$PEAK" ]; then
   RESULTS="$RESULTS\n\`\`\`\n$PEAK\n\`\`\`\n"
   pass "resource usage captured under load, with two applications provisioned"
@@ -892,7 +956,10 @@ else
   # under test. Recording it as a remark kept the run's own score green while
   # the report said nothing either way.
   fail "health.sh reported problems across the provisioned applications"
-  detail bash -c 'grep -E "FAIL|WARN" /tmp/health.log | head -12'
+  # The whole tail, not a grep for FAIL|WARN. Run 19 matched neither and the
+  # report said "(the command produced no output)" beside a failure, which is
+  # the least useful thing a diagnostic can do.
+  DETAIL_LINES=25 detail tail -25 /tmp/health.log
 fi
 
 # Provisioning a third application from scratch, now that the machine is busy.

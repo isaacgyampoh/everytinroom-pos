@@ -268,7 +268,10 @@ services:
       STORAGE_S3_BUCKET: ${R2_BUCKET}
       STORAGE_S3_ENDPOINT: ${R2_ENDPOINT}
       STORAGE_S3_FORCE_PATH_STYLE: "true"
-      STORAGE_S3_REGION: auto
+      # 'auto' is R2's region. Other S3-compatible servers reject it and need
+      # a real one, so the staging run can set a different value without the
+      # production default changing.
+      STORAGE_S3_REGION: ${R2_REGION:-auto}
       # R2 rejects the trailing-checksum headers the AWS SDK adds by default.
       # Without this, uploads fail with an opaque signature error.
       STORAGE_S3_REQUEST_CHECKSUM_CALCULATION: WHEN_REQUIRED

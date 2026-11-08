@@ -71,6 +71,29 @@ grant select on public.load_daily to anon, authenticated, service_role;
 grant usage, select on all sequences in schema public to anon, authenticated, service_role;
 " >/dev/null 2>&1 || { echo "could not prepare the load schema in $APP" >&2; exit 1; }
 
+# PostgREST caches the database schema at boot and reloads it on a NOTIFY.
+# Without this every request below is a 404 against a table PostgREST does not
+# know about -- which is exactly what happened: 27,124 requests, 444 per
+# second, every one of them non-2xx, and a throughput figure that measured the
+# speed of producing errors.
+pg "$APP" "notify pgrst, 'reload schema'" >/dev/null 2>&1
+
+# And then WAIT for it to have taken effect, rather than sleeping and hoping.
+probe_url="$BASE/rest/v1/load_products?select=id&limit=1"
+ready=0
+for _ in $(seq 1 20); do
+  code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+    -H "apikey: $KEY" -H "Authorization: Bearer $KEY" "$probe_url" 2>/dev/null || echo 000)"
+  [ "$code" = "200" ] && { ready=1; break; }
+  sleep 2
+done
+if [ "$ready" != "1" ]; then
+  echo "the load tables are not reachable through $BASE (last HTTP ${code:-000})." >&2
+  echo "PostgREST may not have reloaded its schema cache, or the key is wrong." >&2
+  echo "Nothing was measured; a run of failed requests is not a load test." >&2
+  exit 1
+fi
+
 NPROD="$(pg "$APP" "select count(*) from public.load_products" | tr -d ' ')"
 # An empty count would make `RANDOM % NPROD` a division by zero inside every
 # client, which fails one request at a time rather than once, visibly.
@@ -169,6 +192,11 @@ for kind in lookup open-sale add-items daily-total; do
 done
 printf '\n  %s requests in %ss = %s requests/second, %s non-2xx\n' \
   "$TOTAL" "$ELAPSED" "$(( TOTAL / ELAPSED ))" "$BAD"
+if [ "$GOOD" = "0" ]; then
+  printf '\n  NOTHING SUCCEEDED. The figures above are the speed of producing\n'
+  printf '  errors and measure nothing about this platform. Treat the whole run\n'
+  printf '  as failed rather than reading the latency columns.\n'
+fi
 SALES="$(pg "$APP" "select count(*) from public.load_sales" | tr -d ' ')"
 ITEMS="$(pg "$APP" "select count(*) from public.load_sale_items" | tr -d ' ')"
 printf '  rows written: %s sales, %s sale lines\n' "$SALES" "$ITEMS"

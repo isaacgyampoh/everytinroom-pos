@@ -121,9 +121,13 @@ fi
 # is NOT edited -- an earlier version rewrote it with sed, which meant the
 # test exercised a different file from the one that ships.
 SKIPPED=""
+# Record a thing this run could NOT check, so the closing notice names it.
+# Without this a skip printed in the middle scrolls away and the run's last
+# word is "All checks passed."
+skipped() { SKIPPED="$SKIPPED;$*"; printf '  \033[33mSKIP\033[0m %s\n' "$*"; }
 for ext in pg_net pg_cron; do
   [ "$(q "select count(*) from pg_available_extensions where name='$ext'")" = "0" ] \
-    && SKIPPED="$SKIPPED $ext"
+    && SKIPPED="$SKIPPED;$ext"
 done
 GRANTS_SQL="$SQL_DIR/20-app-grants.sql"
 REQ_EXT=on
@@ -310,7 +314,11 @@ fi
 # ---------------------------------------------------------------------------
 echo
 echo "Storage grants, applied after the service's own migrations"
-err="$(psql -qX -v ON_ERROR_STOP=1 -d "$A_DB" -f "$SQL_DIR/24-storage-grants.sql" 2>&1 || true)"
+# Run as the STORAGE role throughout, which is how post-start.sh runs it: the
+# tables are owned by that role and in PostgreSQL only an owner may grant on
+# its own objects.
+stg() { PGPASSWORD="$ST_PW" psql -X -h "${PGHOST:-localhost}" -U "$ST_USER" -d "$A_DB" "$@"; }
+err="$(stg -q -v ON_ERROR_STOP=1 -f "$SQL_DIR/24-storage-grants.sql" 2>&1 || true)"
 printf '%s' "$err" | grep -qi "has not created its tables yet\|is empty" \
   && pass "it refuses to grant over an empty storage schema, and says why" \
   || fail "it did not refuse on an empty schema (got: $(printf '%s' "$err" | head -1))"
@@ -322,10 +330,18 @@ PGPASSWORD="$ST_PW" psql -qX -h "${PGHOST:-localhost}" -U "$ST_USER" -d "$A_DB" 
   -c "create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text)" \
   -c "create sequence storage.probe_seq" >/tmp/st-create.log 2>&1 \
   || fail "the storage role could not create tables in its own schema: $(tail -2 /tmp/st-create.log | tr '\n' ' ')"
-if psql -qX -v ON_ERROR_STOP=1 -d "$A_DB" -f "$SQL_DIR/24-storage-grants.sql" >/dev/null 2>&1; then
+OUT2="$(stg -q -v ON_ERROR_STOP=1 -f "$SQL_DIR/24-storage-grants.sql" 2>&1)"; rc=$?
+if [ "$rc" = "0" ]; then
   pass "24-storage-grants.sql ran once the tables existed"
 else
-  fail "24-storage-grants.sql failed with tables present: $(psql -qX -v ON_ERROR_STOP=1 -d "$A_DB" -f "$SQL_DIR/24-storage-grants.sql" 2>&1 | head -2 | tr '\n' ' ')"
+  fail "24-storage-grants.sql failed with tables present: $(printf '%s' "$OUT2" | head -2 | tr '\n' ' ')"
+fi
+# A warning here means an object was NOT granted, which is the failure that
+# looks like success: psql still exits 0.
+if printf '%s' "$OUT2" | grep -q "no privileges were granted"; then
+  fail "some objects were not granted: $(printf '%s' "$OUT2" | grep 'no privileges' | head -2 | tr '\n' ' ')"
+else
+  pass "no object was skipped — nothing reported 'no privileges were granted'"
 fi
 for r in anon authenticated service_role; do
   g="$(q "select has_table_privilege('$r','storage.objects','SELECT')::text" "$A_DB")"
@@ -336,10 +352,26 @@ g="$(q "select has_table_privilege('service_role','storage.buckets','INSERT')::t
 [ "$g" = "true" ] && pass "service_role can write storage.buckets" \
                   || fail "service_role cannot write storage.buckets"
 # Re-running must be a no-op, not an error: storage-api upgrades add tables.
-if psql -qX -v ON_ERROR_STOP=1 -d "$A_DB" -f "$SQL_DIR/24-storage-grants.sql" >/dev/null 2>&1; then
+if stg -q -v ON_ERROR_STOP=1 -f "$SQL_DIR/24-storage-grants.sql" >/dev/null 2>&1; then
   pass "re-running it is idempotent"
 else
   fail "re-running 24-storage-grants.sql failed"
+fi
+# The same file run as the PROVISIONING role should be visibly ineffective,
+# since that is the mistake it was written to undo. But this harness connects
+# as whoever is superuser on the local server, and a superuser may grant on any
+# object, so the comparison cannot be made here. Saying that is better than
+# either failing on it or pretending it was checked.
+IS_SUPER="$(q "select rolsuper::text from pg_roles where rolname = current_user" "$A_DB")"
+if [ "$IS_SUPER" = "true" ]; then
+  skipped "the owner-only grant rule (this harness runs as a superuser, which may grant on anything)"
+  printf '       %s\n' "On the server the provisioning role is NOT a superuser, which is why"
+  printf '       %s\n' "running this file as it granted nothing. Only the staging run proves that."
+else
+  asp="$(psql -X -d "$A_DB" -f "$SQL_DIR/24-storage-grants.sql" 2>&1 || true)"
+  printf '%s' "$asp" | grep -q "no privileges were granted" \
+    && pass "run as the provisioning role it reports 'no privileges were granted', as expected" \
+    || fail "run as the provisioning role it granted silently, so the owner requirement is not what was diagnosed"
 fi
 
 # The realtime role is privileged inside its own database. It must still be
@@ -373,8 +405,9 @@ echo
 if [ "$FAILED" = "0" ]; then
   printf '  \033[32mAll checks passed.\033[0m\n'
   if [ -n "$SKIPPED" ]; then
-    printf '  \033[33mBut this run did not verify:%s — it is NOT a full pass.\033[0m\n' "$SKIPPED"
-    printf '  Only a run on a server that has them proves those paths.\n'
+    printf '  \033[33mBut this run did not verify:\033[0m\n'
+    printf '%s\n' "$SKIPPED" | tr ';' '\n' | sed 's/^ *//' | grep -v '^$' | sed 's/^/    - /'
+    printf '  It is NOT a full pass. Only a run on a real server proves those paths.\n'
   fi
   printf '\n'
 else
