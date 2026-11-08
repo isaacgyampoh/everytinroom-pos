@@ -58,9 +58,10 @@ export default function WhatsAppOrders() {
         { p_token: token, p_order_id: id },
         { p_order_id: id, p_processed_by: user?.name || '' })
       setLoading(false)
-      if (data?.success) { toast.success('Completed! ' + data.receiptNo); setSelected(null); loadAll() }
-      else toast.error(rpcMessage(error, data, 'Could not complete the order'))
-    } catch (e) { setLoading(false); toast.error('Error') }
+      if (data?.success) { toast.success('Completed! ' + data.receiptNo); setSelected(null); loadAll(); return true }
+      toast.error(rpcMessage(error, data, 'Could not complete the order'))
+      return false
+    } catch (e) { setLoading(false); toast.error('Error'); return false }
   }
 
   // Manually confirm a payment the gateway didn't auto-confirm (customer showed proof).
@@ -89,57 +90,42 @@ export default function WhatsAppOrders() {
     setLoading(false); setSelected(null); toast('Cancelled'); refreshWAOrders()
   }
 
+  // ==========================================================================
+  // PACKAGING IS A FULFILMENT STATE, NOT AN ACCOUNTING EVENT
+  //
+  // This used to write the sale itself: a direct INSERT into `sales` with
+  // `profit: 0` hardcoded, no stock deducted, no permission checked and no
+  // guard against doing it twice. complete_wa_order exists for that job and
+  // does all four — it is why migration 019 moved profit server-side at all.
+  //
+  // Worse, "Process & Package" called both, un-awaited, in parallel. This one
+  // won every time, because the other shows a confirm() first: by the time
+  // anybody clicked OK the order was already 'Completed', so complete_wa_order
+  // refused it and the zero-profit row stood.
+  //
+  // 230 of the shop's web sales are on the books with no profit and no stock
+  // movement because of that. Packaging now only marks packaging.
+  // ==========================================================================
   const markPackaged = async (id) => {
     const sb = getSupabase()
-    
-    // Get the full order to create a sales record
-    const { data: orderData } = await sb.from('whatsapp_orders')
-      .select('*')
-      .eq('id', id)
-      .limit(1)
-    
-    const order = orderData?.[0]
-    
-    // Update delivery status
-    await sb.from('whatsapp_orders').update({
+    const { error } = await sb.from('whatsapp_orders').update({
       delivery_status: 'Packaged',
-      status: 'Completed',
       processed_by: user?.name || '',
       processed_at: new Date().toISOString(),
     }).eq('id', id)
-
-    // Create a sales record if this is a paid order
-    if (order && (order.status === 'Paid' || order.status === 'Completed')) {
-      try {
-        let items = order.items
-        if (typeof items === 'string') items = JSON.parse(items)
-        
-        const saleTotal = Number(order.total) || 0
-        const receiptNo = order.order_no || 'WA-' + Date.now()
-        
-        await sb.from('sales').insert({
-          receipt_no: receiptNo,
-          date: order.paid_at || order.date || new Date().toISOString(),
-          items: items,
-          subtotal: Number(order.subtotal) || saleTotal,
-          discount: 0,
-          total: saleTotal,
-          profit: 0,
-          payment: 'Momo',
-          type: 'Retail',
-          customer: order.customer_phone || order.customer_name || '',
-          cashier: user?.name || 'Online',
-          voided: false,
-        })
-        console.log('Sales record created for:', receiptNo)
-      } catch (e) {
-        console.error('Failed to create sales record:', e)
-      }
-    }
-
-    setSelected(s => s ? { ...s, deliveryStatus: 'Packaged', status: 'Completed' } : s)
+    if (error) { toast.error(error.message || 'Could not mark it packaged'); return false }
+    setSelected(s => s ? { ...s, deliveryStatus: 'Packaged' } : s)
     refreshWAOrders()
-    toast.success('Packaged — sales recorded')
+    toast.success('Packaged')
+    return true
+  }
+
+  // Record the sale through the gated function FIRST — it deducts the stock
+  // and works out the profit — and mark it packaged only if that succeeded.
+  // In that order, and awaited, so the two cannot race each other again.
+  const processAndPackage = async (id) => {
+    const recorded = await complete(id)
+    if (recorded) await markPackaged(id)
   }
 
   const markDispatched = async (id, deliveryGuy) => {
@@ -590,7 +576,7 @@ export default function WhatsAppOrders() {
 
                 {/* Step 1: Process & Package */}
                 {(!o.deliveryStatus || o.deliveryStatus === '') && o.status === 'Paid' && (
-                  <button onClick={() => { markPackaged(o.id); complete(o.id) }} className="w-full h-12 bg-gray-900 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Process & Package</button>
+                  <button onClick={() => processAndPackage(o.id)} className="w-full h-12 bg-gray-900 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Process & Package</button>
                 )}
                 {(!o.deliveryStatus || o.deliveryStatus === '') && o.status === 'Completed' && (
                   <button onClick={() => markPackaged(o.id)} className="w-full h-12 bg-gray-900 text-white rounded-xl text-sm font-bold active:scale-[.98] transition">Mark as Packaged</button>
