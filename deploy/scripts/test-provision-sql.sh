@@ -284,12 +284,66 @@ else
   fail "22-storage.sql failed: $(psql -qX -v ON_ERROR_STOP=1 -d "$A_DB" -v dbname="$A_DB" -v st_user="$ST_USER" -v st_password="$ST_PW" -f "$SQL_DIR/22-storage.sql" 2>&1 | head -2 | tr '\n' ' ')"
 fi
 
+# ---------------------------------------------------------------------------
+# 24-storage-grants.sql runs AFTER storage-api has created its tables, so the
+# interesting case is what it does when they are not there. It must refuse
+# loudly rather than report success over an empty schema: a silent pass there
+# would mean the roles storage-api switches into end up with no rights and
+# every request fails later, at a point far from the cause.
+# ---------------------------------------------------------------------------
+echo
+echo "Storage grants, applied after the service's own migrations"
+err="$(psql -qX -v ON_ERROR_STOP=1 -d "$A_DB" -f "$SQL_DIR/24-storage-grants.sql" 2>&1 || true)"
+printf '%s' "$err" | grep -qi "has not created its tables yet\|is empty" \
+  && pass "it refuses to grant over an empty storage schema, and says why" \
+  || fail "it did not refuse on an empty schema (got: $(printf '%s' "$err" | head -1))"
+
+# Now stand in for storage-api: create what its migrations create, as the
+# storage role, and check the grants actually land on those tables.
+PGPASSWORD="$ST_PW" psql -qX -h "${PGHOST:-localhost}" -U "$ST_USER" -d "$A_DB" \
+  -c "create table storage.buckets (id text primary key, name text)" \
+  -c "create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text)" \
+  -c "create sequence storage.probe_seq" >/tmp/st-create.log 2>&1 \
+  || fail "the storage role could not create tables in its own schema: $(tail -2 /tmp/st-create.log | tr '\n' ' ')"
+if psql -qX -v ON_ERROR_STOP=1 -d "$A_DB" -f "$SQL_DIR/24-storage-grants.sql" >/dev/null 2>&1; then
+  pass "24-storage-grants.sql ran once the tables existed"
+else
+  fail "24-storage-grants.sql failed with tables present: $(psql -qX -v ON_ERROR_STOP=1 -d "$A_DB" -f "$SQL_DIR/24-storage-grants.sql" 2>&1 | head -2 | tr '\n' ' ')"
+fi
+for r in anon authenticated service_role; do
+  g="$(q "select has_table_privilege('$r','storage.objects','SELECT')::text" "$A_DB")"
+  [ "$g" = "true" ] && pass "$r can read storage.objects" \
+                    || fail "$r still cannot read storage.objects, so requests would be refused"
+done
+g="$(q "select has_table_privilege('service_role','storage.buckets','INSERT')::text" "$A_DB")"
+[ "$g" = "true" ] && pass "service_role can write storage.buckets" \
+                  || fail "service_role cannot write storage.buckets"
+# Re-running must be a no-op, not an error: storage-api upgrades add tables.
+if psql -qX -v ON_ERROR_STOP=1 -d "$A_DB" -f "$SQL_DIR/24-storage-grants.sql" >/dev/null 2>&1; then
+  pass "re-running it is idempotent"
+else
+  fail "re-running 24-storage-grants.sql failed"
+fi
+
 # The realtime role is privileged inside its own database. It must still be
 # unable to open another application's.
 rerr="$(PGPASSWORD="$RT_PW" psql -tAqX -h "${PGHOST:-localhost}" -U "$RT_USER" -d "$B_DB" -c 'select 1' 2>&1 || true)"
 printf '%s' "$rerr" | grep -qi "permission denied for database" \
   && pass "A's realtime role is refused by B's database" \
   || fail "A's realtime role reached B, or failed for another reason: $(printf '%s' "$rerr" | head -1)"
+
+# The storage role too. CONNECT on its OWN database was just moved into the
+# SQL, and a grant like that is exactly the kind that gets widened by accident,
+# so the other side of it is checked rather than assumed.
+serr="$(PGPASSWORD="$ST_PW" psql -tAqX -h "${PGHOST:-localhost}" -U "$ST_USER" -d "$B_DB" -c 'select 1' 2>&1 || true)"
+printf '%s' "$serr" | grep -qi "permission denied for database" \
+  && pass "A's storage role is refused by B's database" \
+  || fail "A's storage role reached B, or failed for another reason: $(printf '%s' "$serr" | head -1)"
+# And it must still be able to open its own.
+sown="$(PGPASSWORD="$ST_PW" psql -tAqX -h "${PGHOST:-localhost}" -U "$ST_USER" -d "$A_DB" -c 'select 1' 2>&1 || true)"
+[ "$(printf '%s' "$sown" | tr -d ' ')" = "1" ] \
+  && pass "A's storage role can open A — the grant it needs is in the SQL, not in shell" \
+  || fail "A's storage role cannot open its own database: $(printf '%s' "$sown" | head -1)"
 
 echo
 echo "Per-role limits"

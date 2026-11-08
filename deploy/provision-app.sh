@@ -247,7 +247,8 @@ else
     [ -n "$RT_PW" ] || RT_PW="$(gen_password)"
     psqlq -d postgres -c "select 1 from pg_roles where rolname='$APP_RT_USER'" | grep -q 1 \
       || psqlc -d postgres -c "CREATE ROLE \"$APP_RT_USER\" LOGIN REPLICATION" >/dev/null
-    psqlc -d postgres -c "GRANT CONNECT ON DATABASE \"$APP_DB\" TO \"$APP_RT_USER\"" >/dev/null
+    # CONNECT is granted by sql/21-realtime.sql, not here: a grant the SQL depends on
+    # belongs where the SQL test harness can see it.
     psqlc -d "$APP_DB" -v dbname="$APP_DB" \
       -v rt_user="$APP_RT_USER" -v rt_password="$RT_PW" \
       < "$ROOT_DIR/sql/21-realtime.sql" >/dev/null \
@@ -284,7 +285,8 @@ else
     [ -n "$ST_PW" ] || ST_PW="$(gen_password)"
     psqlq -d postgres -c "select 1 from pg_roles where rolname='$APP_ST_USER'" | grep -q 1 \
       || psqlc -d postgres -c "CREATE ROLE \"$APP_ST_USER\" LOGIN" >/dev/null
-    psqlc -d postgres -c "GRANT CONNECT ON DATABASE \"$APP_DB\" TO \"$APP_ST_USER\"" >/dev/null
+    # CONNECT is granted by sql/22-storage.sql, not here: a grant the SQL depends on
+    # belongs where the SQL test harness can see it.
     psqlc -d "$APP_DB" -v dbname="$APP_DB" \
       -v st_user="$APP_ST_USER" -v st_password="$ST_PW" \
       < "$ROOT_DIR/sql/22-storage.sql" >/dev/null \
@@ -324,7 +326,8 @@ else
     [ -n "$AU_PW" ] || AU_PW="$(gen_password)"
     psqlq -d postgres -c "select 1 from pg_roles where rolname='$APP_AUTH_USER'" | grep -q 1 \
       || psqlc -d postgres -c "CREATE ROLE \"$APP_AUTH_USER\" LOGIN" >/dev/null
-    psqlc -d postgres -c "GRANT CONNECT ON DATABASE \"$APP_DB\" TO \"$APP_AUTH_USER\"" >/dev/null
+    # CONNECT is granted by sql/23-auth.sql, not here: a grant the SQL depends on
+    # belongs where the SQL test harness can see it.
     psqlc -d "$APP_DB" -v dbname="$APP_DB" \
       -v auth_user="$APP_AUTH_USER" -v auth_password="$AU_PW" \
       < "$ROOT_DIR/sql/23-auth.sql" >/dev/null \
@@ -535,6 +538,22 @@ if [ "$DRY" = "0" ] && [ "$DO_START" = "1" ]; then
     warn "The usual cause is that the database has no tables yet, which is"
     warn "expected before the dump is restored."
   fi
+
+  # Two services build their own schema on first boot, and what they build
+  # needs finishing off from outside. storage-api's tables have to be granted
+  # to the roles it switches into, and Realtime's tenant migrations have to
+  # have actually produced realtime.list_changes -- without which it accepts
+  # subscriptions and delivers nothing, which is the failure that looks most
+  # like success. Neither can be done before the services run.
+  case ",$PROFILES," in
+    *,storage,*|*,realtime,*)
+      if ! "$HERE/scripts/post-start.sh" --app "$NAME"; then
+        warn "A post-start step did not complete. The application is provisioned"
+        warn "and running, but storage or Realtime is not finished:"
+        warn "  $HERE/scripts/post-start.sh --app $NAME"
+      fi
+      ;;
+  esac
 fi
 
 printf '\n%s%s %s is provisioned %s\n' "$C_GRN" "$C_BLD" "$NAME" "$C_RESET"

@@ -41,7 +41,11 @@ CREATE SCHEMA IF NOT EXISTS auth;
 GRANT ALL ON SCHEMA auth TO :"auth_user";
 ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON TABLES TO :"auth_user";
 ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON SEQUENCES TO :"auth_user";
-GRANT CREATE ON DATABASE :"dbname" TO :"auth_user";
+-- CONNECT as well as CREATE. This used to be granted by provision-app.sh in
+-- shell, outside the SQL and therefore outside what the SQL test harness
+-- could check; without it the role is refused at connection time.
+GRANT CONNECT ON DATABASE :"dbname" TO :"auth_user";
+GRANT CREATE  ON DATABASE :"dbname" TO :"auth_user";
 
 -- PostgREST needs to read auth.uid() and auth.role() from a JWT for RLS
 -- policies that use them. Those helpers live in the auth schema.

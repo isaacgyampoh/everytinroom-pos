@@ -241,13 +241,24 @@ services:
       DB_ANON_ROLE: anon
       DB_SERVICE_ROLE: service_role
       DB_AUTHENTICATED_ROLE: authenticated
-      # true, not false. This does not only create roles -- it is also what
-      # applies storage-api's own GRANTs to anon, authenticated and
-      # service_role on the tables its migrations create. With it false the
-      # schema existed, the service connected, and then every request failed
-      # with "permission denied for schema storage". The roles already exist
-      # and its migration is idempotent about them.
-      DB_INSTALL_ROLES: "true"
+      # false. Both values have now been tried on a real server and the
+      # evidence is in deploy/staging-results:
+      #
+      #   true  -> the 'storage-schema' migration is rolled back with
+      #            `"authenticator" is a reserved role, only superusers can
+      #            modify it`, no further migration runs, and the server never
+      #            starts. supautils guards the reserved roles in this image
+      #            and nothing short of superuser gets past it.
+      #   false -> the migrations run and create the tables, but the roles
+      #            storage-api switches into have no rights on them, so every
+      #            request fails with `permission denied for schema storage`.
+      #
+      # The grants are therefore applied by this platform, AFTER the
+      # migrations have created the tables -- which is the only moment they
+      # can be applied, since the tables do not exist before and are owned by
+      # a role whose default privileges nothing here may set. See
+      # deploy/sql/24-storage-grants.sql and deploy/scripts/post-start.sh.
+      DB_INSTALL_ROLES: "false"
       TENANT_ID: ${APP_NAME}
       STORAGE_PUBLIC_URL: https://${APP_DOMAIN}
       REQUEST_ALLOW_X_FORWARDED_PATH: "true"

@@ -69,6 +69,12 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA storage GRANT ALL ON SEQUENCES TO anon, authe
 -- create -- that is what DB_INSTALL_ROLES is for, and it is set to true in
 -- app.compose.yml so those grants run. The roles themselves already exist,
 -- and storage-api's migration is idempotent about that.
+-- CONNECT on this database and nothing on any other. Moved here from
+-- provision-app.sh's shell: the SQL test harness could not see a grant made
+-- outside the SQL, so it created the storage role, ran this file, and the
+-- role was then refused at connection time -- which is exactly how a real
+-- server would fail if this line were ever dropped.
+GRANT CONNECT ON DATABASE :"dbname" TO :"st_user";
 GRANT USAGE  ON SCHEMA public TO :"st_user";
 -- No owner-role membership: see 10-create-app-db.sql.
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO :"st_user";

@@ -57,7 +57,13 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA _realtime GRANT ALL ON SEQUENCES TO :"rt_user
 GRANT USAGE ON SCHEMA public TO :"rt_user";
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO :"rt_user";
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO :"rt_user";
-GRANT CREATE ON DATABASE :"dbname" TO :"rt_user";
+-- CONNECT and CREATE on this database, and nothing on any other. This used
+-- to be done by provision-app.sh in shell, which meant the SQL test harness
+-- never saw it: it created the role, ran this file, and the role then could
+-- not open the database at all. A grant this file depends on belongs in this
+-- file, where it is tested with the rest of it.
+GRANT CONNECT ON DATABASE :"dbname" TO :"rt_user";
+GRANT CREATE  ON DATABASE :"dbname" TO :"rt_user";
 
 -- Best effort: these need superuser on some servers, and provisioning must
 -- not die over a logging preference. The point is to keep the password that

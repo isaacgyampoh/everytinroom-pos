@@ -64,6 +64,8 @@ TESTS = [
     ("Realtime subscription accepted", True, [r"subscription was accepted"]),
     ("Realtime delivers a database change end to end", True,
      [r"INSERT produced a Realtime event"]),
+    ("Storage grants applied after the service's own migrations", True,
+     [r"post-start granted the storage schema"]),
     ("Object storage upload", True, [r"UPLOAD through storage-api"]),
     ("Object storage download returns identical bytes", True,
      [r"DOWNLOAD returned the same bytes"]),

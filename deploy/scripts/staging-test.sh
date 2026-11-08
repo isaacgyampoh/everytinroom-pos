@@ -519,7 +519,19 @@ JS
     # Realtime's log, unconditionally. It reports healthy while delivering
     # nothing, so a capture that only runs for unhealthy containers never
     # shows the one thing that would explain this.
-    note "----- ${APP_DNS}.realtime log (captured regardless of health) -----"
+    # The HEAD of the log, where the tenant migrations run. Run 18 captured
+    # only the tail, which showed the downstream "schema realtime does not
+    # exist" and not the migration failure that caused it.
+    note "----- ${APP_DNS}.realtime log, FIRST 40 lines (where migrations run) -----"
+    detail bash -c "docker logs '${APP_DNS}.realtime' 2>&1 | head -40"
+    note "----- any migration or permission line anywhere in that log -----"
+    detail bash -c "docker logs '${APP_DNS}.realtime' 2>&1 | grep -iE 'migrat|permission|reserved role|does not exist|CREATE SCHEMA|tenant' | head -20"
+    note "----- what Realtime actually built in ${APP} -----"
+    detail pgq "select coalesce((select 'realtime schema: yes' from pg_namespace where nspname='realtime'), 'realtime schema: NO')" "$APP"
+    detail pgq "select 'realtime tables: ' || count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='realtime' and c.relkind in ('r','p')" "$APP"
+    detail pgq "select 'list_changes present: ' || count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='realtime' and p.proname='list_changes'" "$APP"
+    detail pgq "select 'rt_user can create in db: ' || has_database_privilege('${APP}_realtime', '${APP}', 'CREATE')" "$APP"
+    note "----- ${APP_DNS}.realtime log (tail) -----"
     while IFS= read -r line; do note "$line"; done <<EOL
 $(docker logs "${APP_DNS}.realtime" --tail=30 2>&1 | tail -30)
 EOL
@@ -589,6 +601,15 @@ if docker run -d --name staging-s3 --network central_edge \
   done
   if [ "$ok" = "1" ]; then
     pass "storage-api started against the S3 backend"
+    # storage-api's migrations have now created its tables. The roles it
+    # switches into still have no rights on them, and there is no way to
+    # arrange that in advance on this image, so the grants are applied here.
+    if "$ROOT_DIR/scripts/post-start.sh" --app "$APP" >/tmp/poststart.log 2>&1; then
+      pass "post-start granted the storage schema to the roles storage-api uses"
+    else
+      fail "post-start did not complete, so storage requests will be refused"
+    fi
+    detail bash -c "grep -E 'storage|realtime|table|grant|MISSING|list_changes' /tmp/poststart.log | head -14"
     SVC="$(sed -n 's/^SERVICE_ROLE_KEY=//p' "$ENV" | tail -1)"
     B="http://$APP_DNS.staging.test/storage/v1"
     c=$(curl -s -o /tmp/mk.json -w '%{http_code}' -X POST "$B/bucket" \
