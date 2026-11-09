@@ -150,6 +150,75 @@ applying them.
 
 ---
 
+## Realtime
+
+Realtime needs one thing from this platform that nothing else does, and it
+fails in a way worth knowing about.
+
+**It builds its own schema.** Ninety-one tenant migrations create
+`realtime.subscription`, `realtime.apply_rls` and `realtime.list_changes` —
+the function its write-ahead-log poller calls on every cycle. The thirtieth of
+those creates `list_changes`, and the function is declared
+
+```sql
+create or replace function realtime.list_changes(...)
+  returns setof realtime.wal_rls
+  language sql
+  set log_min_messages to 'fatal'
+```
+
+`log_min_messages` is a superuser-only parameter, so a role that may not set
+it may not create that function. Ecto stops at the first failure, and
+**Realtime then starts anyway**: a client subscribes, the channel reports
+`SUBSCRIBED`, and no database change is ever delivered. The only sign is in
+Realtime's own log, repeating `function realtime.list_changes(...) does not
+exist` once per poll. On Supabase's own servers this never appears, because
+Realtime connects there as a superuser.
+
+So `21-realtime.sql` grants exactly one parameter privilege:
+
+```sql
+GRANT SET ON PARAMETER log_min_messages TO <app>_realtime;
+```
+
+That lets the role quiet its own logging and nothing else. Privileges on
+parameters are themselves granted and initially only a superuser holds them,
+so if the provisioning role cannot make the grant, `provision-app.sh` makes it
+once as the image's superuser and then **checks that the privilege is held**
+rather than trusting the statement — a GRANT that the grantor may not make
+raises, while a GRANT on an object it does not own only warns.
+
+### What does not work, and does not matter here
+
+A later migration wants to create the role `supabase_realtime_admin` and move
+ownership of Realtime's broadcast and presence tables to it. On this image
+that role does not exist, it is one of `supautils.reserved_roles`, and an
+application's realtime role cannot create roles — so that migration cannot
+succeed. Creating or granting a reserved role on this image is the operation
+that has crashed the server twice, and it is not worth doing to tidy a count.
+
+The consequence is specific:
+
+| Feature | Works | Why |
+|---|---|---|
+| live database updates (`postgres_changes`) | **yes** | everything it needs is in the first thirty migrations |
+| broadcast, presence | **no** | their migration needs that reserved role |
+
+Nothing in Everytinroom uses broadcast or presence. An application that does
+would need a superuser to create `supabase_realtime_admin` before it is
+provisioned. `post-start.sh` reports which of the two states a given
+application is in, every time it runs.
+
+### Checking it without a server
+
+`deploy/scripts/test-realtime-migrations.py` replays those migrations against
+a throwaway database as a non-superuser, and proves both directions in
+seconds: without the grant it stops at `20230328144023` for that exact
+reason, and with it `list_changes` and the five functions around it exist. It
+runs in the staging suite too, with `--via-docker`, against the real image.
+
+---
+
 ## Using it
 
 ### 1. The server
@@ -235,25 +304,51 @@ numbers into a config.
 
 ---
 
-## What has NOT been proven
+## What is proven, and by what
 
-`deploy/scripts/validate-all.sh` runs 72 checks: shell syntax, YAML, every
-image tag against Docker Hub, the SQL, the tuning arithmetic, the capacity
-thresholds, JWT signing against an independent implementation, and the
-isolation test against a real PostgreSQL.
+Three different kinds of evidence, which are worth keeping apart.
 
-It cannot prove:
+**On a real server.** `deploy/scripts/staging-test.sh` runs on a throwaway
+Ubuntu machine with no Docker on it: bootstrap installs Docker from the
+official repository, the shared stack comes up, two applications are
+provisioned with different services, and then twelve sections of checks run
+against them — isolation, Realtime end to end, object storage through the S3
+API, Supabase Auth, backup and restore into a separate database, scheduled
+jobs firing in another database, resource use under a generated load, the
+whole deployment re-run, and recovery from stopping every container. Each run
+publishes its report, and `deploy/scripts/archive-run.sh` keeps every report
+outside this repository, because the workflow force-pushes onto one branch and
+a report read once and then overwritten has already produced one wrong
+conclusion here.
 
-- **that the containers start.** There is no Docker on the laptop this was
-  written on.
-- **that Realtime delivers events.** Its tenant comes from the first label of
-  the Host header, which only a real request through Caddy exercises. This is
-  the most likely thing to need a second attempt.
-- **that uploads reach R2.** Needs Cloudflare credentials.
-- **that the restored database behaves.** Needs the production dump.
+**Locally, against a real PostgreSQL but not against the platform.**
+`validate-all.sh` runs the static checks and then four suites: the
+provisioning SQL end to end, Realtime's own tenant migrations replayed as a
+non-superuser, every inventoried scheduled job's placement, and bootstrap's
+secret handling and arithmetic. These are a weaker claim and are reported
+separately in the readiness package. One of them connects as a superuser,
+which is exactly why it cannot reproduce the permission walls this platform
+keeps finding — it says so in its own output.
 
-Those four need a staging server. Until then this is a validated foundation,
-not a tested deployment, and the difference matters.
+**Not at all, yet.** These are named rather than glossed:
+
+- **uploads to Cloudflare R2.** Needs the account owner's credentials.
+  `deploy/scripts/test-r2.py` runs the full upload, download, integrity, list
+  and delete check the moment they exist. The staging run uses an
+  S3-compatible server instead, which proves this platform's configuration and
+  nothing about R2 — R2 rejects the trailing-checksum headers the AWS SDK
+  sends by default, and no stand-in will ever show that.
+- **a restored production database.** Staging generates its own rows. Nothing
+  here proves the real dump restores, or that its functions, policies and
+  publications survive the trip.
+- **a real VPS.** Every result comes from a CI runner: a different machine,
+  different disks, different network. The same staging script should be run on
+  the server before cutover.
+- **Realtime's broadcast and presence features.** See the Realtime section
+  above: they need a reserved role this image does not have.
+
+Until those are done this is a tested platform, not a completed migration,
+and the difference matters.
 
 ---
 
