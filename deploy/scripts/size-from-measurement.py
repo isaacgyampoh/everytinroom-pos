@@ -153,7 +153,33 @@ def main():
         sys.exit("measured the shared stack but no per-application service; "
                  "the run did not get far enough to size applications.")
 
-    projects = [p for p in json.load(open(args.inventory)) if p.get("reachable")]
+    allp = json.load(open(args.inventory))
+    projects = [p for p in allp if p.get("reachable")]
+    unreachable = [p for p in allp if not p.get("reachable")]
+
+    # A paused project cannot be inspected, so its services and size are
+    # unknown. Excluding it from the sizing silently is the wrong answer: a
+    # server bought for five applications is the wrong server if seven move.
+    # So each one is INCLUDED, under an assumption that is stated here and in
+    # the output rather than buried: it needs the median service set of the
+    # projects that could be inspected, and the median amount of data.
+    if unreachable:
+        svc_counts = {}
+        for p in projects:
+            for sv in p.get("needs", []):
+                svc_counts[sv] = svc_counts.get(sv, 0) + 1
+        half = len(projects) / 2.0
+        median_services = sorted(sv for sv, n in svc_counts.items() if n >= half)
+        db_sizes = sorted((p.get("db_size_mb") or 0) for p in projects)
+        st_sizes = sorted((p.get("storage_mb") or 0) for p in projects)
+        med_db = db_sizes[len(db_sizes) // 2] if db_sizes else 0
+        med_st = st_sizes[len(st_sizes) // 2] if st_sizes else 0
+        for p in unreachable:
+            p["needs"] = list(median_services)
+            p["db_size_mb"] = med_db
+            p["storage_mb"] = med_st
+            p["assumed"] = True
+        projects = projects + unreachable
 
     print("\nMEASURED, from the staging run")
     print(f"  {'container':<26} {'MB':>8}")
@@ -187,13 +213,16 @@ def main():
         svcs = [s for s in p.get("needs", []) if s != "cron"]
         mb = sum(per_app.get(s, fallback.get(s, 0)) for s in svcs) * LOAD_FACTOR
         total += mb
-        print(f"  {p['name'][:39]:<40} {','.join(svcs)[:33]:<34} {mb:>7.0f}")
+        mark = "  ASSUMED" if p.get("assumed") else ""
+        print(f"  {p['name'][:39]:<40} {','.join(svcs)[:33]:<34} {mb:>7.0f}{mark}")
     print(f"  {'':<40} {'TOTAL':<34} {total:>7.0f}")
 
     print("\nWHOLE SERVER")
+    reachable_only = [p for p in projects if not p.get("assumed")]
     for label, apps in (("Everytinroom only",
                          [p for p in projects if p.get("ref") == "noiiuwkovoojkcwzupye"]),
-                        ("all reachable projects", projects)):
+                        ("the five projects that could be inspected", reachable_only),
+                        ("all seven, the two paused ones ASSUMED", projects)):
         if not apps:
             continue
         app_mb = sum(sum(per_app.get(s, fallback.get(s, 0))
@@ -228,6 +257,14 @@ def main():
         print(f"       {ram - need:>8.0f} MB spare after headroom")
 
     print(f"""
+  The two paused projects, stated rather than hidden:
+    They cannot be inspected, so nothing about them is measured. Each is
+    counted as needing the median service set of the five that could be
+    inspected, and the median amount of data. That is an assumption, marked
+    ASSUMED above, and it is here because leaving them out would quietly size
+    a server for five applications when seven are meant to move. Resume each
+    one long enough to inspect it and this becomes a measurement.
+
   Factors, stated rather than hidden:
     x{LOAD_FACTOR} on the peak measured under load, because staging runs one
          application with generated rows and a synthetic load, not a restored

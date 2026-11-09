@@ -430,7 +430,8 @@ def main():
     A("### What to order")
     A("")
     plans = re.findall(r"-> (Cloud VPS \d+): ([^\n]+)", sizing)
-    labels = re.findall(r"\n  (Everytinroom only|all reachable projects)\s+\(", sizing)
+    labels = re.findall(r"\n  (Everytinroom only|the five projects that could be inspected"
+                        r"|all seven, the two paused ones ASSUMED)\s+\(", sizing)
     if plans:
         A("| For | Plan | Specification and price |")
         A("|---|---|---|")
@@ -443,9 +444,12 @@ def main():
         A("been ordered: no account was created and no payment details were")
         A("entered, by instruction.")
         A("")
-        A("The second row is the one to order if every project moves. The first")
-        A("is there to show what Everytinroom alone would need, since it is the")
-        A("only application whose services have actually been prepared.")
+        A("The last row is the one to order if every project moves, including the")
+        A("two that are paused and could not be inspected — those are counted on")
+        A("a stated assumption, marked ASSUMED in the sizing above, because")
+        A("leaving them out would size a server for five when seven are meant to")
+        A("move. The first row shows what Everytinroom alone needs, since it is")
+        A("the only application whose services have actually been prepared.")
     else:
         A("No plan can be named: the sizing output above does not contain a")
         A("recommendation, which means the measurement it needs is missing.")
