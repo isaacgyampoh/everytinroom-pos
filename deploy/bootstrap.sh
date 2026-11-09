@@ -447,7 +447,7 @@ else
   # reported was "central-caddy is 'restarting'" -- true, but it did not say
   # why, and the reason was only in the container's own log. Validating here
   # puts Caddy's actual complaint in front of whoever ran the script.
-  CADDY_IMG="$(awk '/image: caddy:/{print $2; exit}' docker-compose.yml)"
+  CADDY_IMG="$(awk '/image: caddy:/{print $2; exit}' docker-compose.yml || true)"
   if [ -n "$CADDY_IMG" ]; then
     # No -e here, deliberately. The previous version passed ACME_EMAIL into
     # the validating container while the real one never received it, so

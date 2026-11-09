@@ -214,6 +214,25 @@ else
   ok "every \$ROOT_DIR/ and \$DEPLOY/ path resolves ($(printf '%s' "$XREF" | sed -n 's/^CHECKED //p') reference(s))"
 fi
 
+hdr "No command substitution can kill a script that runs under set -e"
+# lib/common.sh sets -euo pipefail, so every script that sources it dies if an
+# assignment from a command substitution fails. health.sh had one `docker
+# inspect` without a fallback: it printed the shared checks and one
+# application, then stopped mid-loop, never reached its own summary, and the
+# staging run reported that as "health.sh reported problems" -- a guess about
+# a script that had crashed.
+#
+# Every other inspect in that file already had `|| echo ...`. One did not, and
+# nothing noticed, because this only shows up when a container is absent at
+# the wrong moment. So it is checked statically instead.
+SUBOUT="$(python3 "$DEPLOY/scripts/check-set-e-subs.py" --deploy "$DEPLOY" 2>&1 || true)"
+if printf '%s' "$SUBOUT" | grep -q '^MISSING '; then
+  bad "a command substitution without a fallback will kill its script under set -e"
+  printf '%s\n' "$SUBOUT" | grep '^MISSING ' | sed 's/^MISSING /     /' | head -10
+else
+  ok "$(printf '%s' "$SUBOUT" | sed -n 's/^CHECKED //p')"
+fi
+
 hdr "No operator-only material is tracked"
 # This repository is public. A `git add -A` once committed five files of local
 # operator material to it: two privilege snapshots of the live database, the
@@ -243,6 +262,21 @@ for t in test-tuning.sh test-capacity.sh test-bootstrap-local.sh; do
   else bad "$t"; sed 's/^/      /' /tmp/.vt.$$ | tail -12; fi
   rm -f /tmp/.vt.$$
 done
+
+hdr "The extracted Realtime migrations still match their source"
+# deploy/sql/migrate/realtime-migrations-84-91.sql holds statements copied out
+# of Realtime's own migration files, because those eight do work an
+# application's role cannot and Realtime stops the tenant when any of them
+# fails. A hand-held copy of someone else's migrations drifts, so it is
+# re-extracted and compared.
+TAILOUT="$(python3 "$DEPLOY/scripts/check-realtime-tail-sql.py" \
+             --migrations "${REALTIME_MIGRATIONS:-/tmp/realtime-src/lib/realtime/tenants/repo/migrations}" 2>&1 || true)"
+case "$TAILOUT" in
+  *MISSING*) bad "the extracted migrations have drifted from Realtime's own files"
+             printf '%s\n' "$TAILOUT" | grep MISSING | sed 's/^/     /' | head -6 ;;
+  SKIP*)     printf '  skipped: %s\n' "$(printf '%s' "$TAILOUT" | sed -n 's/^SKIP //p')" ;;
+  *)         ok "$(printf '%s' "$TAILOUT" | sed -n 's/^CHECKED //p') match their source" ;;
+esac
 
 hdr "Realtime's own tenant migrations, replayed as a non-superuser"
 # The failure this covers is the one that looked most like success: Realtime

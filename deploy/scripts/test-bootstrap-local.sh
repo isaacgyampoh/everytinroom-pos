@@ -164,7 +164,7 @@ grep -q "header_up Host alpha-shop.realtime" "$SITE" \
 grep -q "handle_path /rest/v1/\*" "$SITE" && t_ok "/rest/v1/ is routed" || t_bad "/rest/v1/ is not routed"
 # Only the UPSTREAM, not the directive: `reverse_proxy` itself contains an
 # underscore, so matching the whole line reported every correct file as broken.
-UPSTREAMS="$(grep -oE 'reverse_proxy +[a-z0-9_.:-]+' "$SITE" | awk '{print $2}' | sort -u)"
+UPSTREAMS="$(grep -oE 'reverse_proxy +[a-z0-9_.:-]+' "$SITE" | awk '{print $2}' | sort -u || true)"
 t_note "upstreams: $(printf '%s' "$UPSTREAMS" | tr '\n' ' ')"
 if printf '%s' "$UPSTREAMS" | grep -q '_'; then
   t_bad "an upstream name contains an underscore, which is not valid in a hostname"

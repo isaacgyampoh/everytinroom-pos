@@ -583,7 +583,10 @@ else
     run docker restart central-caddy >/dev/null
     ok "Caddy reloaded"
   else
-    ERR="$(docker exec central-caddy caddy validate --config /etc/caddy/Caddyfile 2>&1 | tail -5)"
+    # `|| true`: caddy validate exits non-zero when the config is INVALID,
+  # which is the only time this line matters. Under set -e it took the script
+  # down instead of reporting the problem it had just found.
+  ERR="$(docker exec central-caddy caddy validate --config /etc/caddy/Caddyfile 2>&1 | tail -5 || true)"
     rm -f "$SITE"
     die "The new site file makes Caddy's configuration invalid, so it was removed again:
   $ERR" \

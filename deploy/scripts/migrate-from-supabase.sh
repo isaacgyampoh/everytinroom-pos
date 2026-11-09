@@ -217,7 +217,7 @@ DUMP="$WORK/$APP_DB-public.sql.gz"
 printf '  dumping ... '
 if src "pg_dump \"\$SRC_URL\" --schema=public --format=plain --no-owner --no-privileges \
         --quote-all-identifiers --serializable-deferrable" 2>"$WORK/dump.err" | gzip -9 > "$DUMP"; then
-  SZ="$(stat -c %s "$DUMP")"
+  SZ="$(stat -c %s "$DUMP" 2>/dev/null || echo 0)"
   if [ "$SZ" -lt 10240 ]; then
     printf 'FAILED\n'
     die "The dump is only $SZ bytes, which cannot be a database with $(awk '/^sales /{print $2}' "$BEFORE") sales in it." \

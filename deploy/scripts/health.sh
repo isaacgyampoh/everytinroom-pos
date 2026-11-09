@@ -29,6 +29,7 @@ done
 
 need_linux "checks the services on an Ubuntu server"
 BAD=0
+CHECKED=0
 pgq() { docker exec central-postgres psql -tAqX -U postgres -d postgres -c "$1" 2>/dev/null; }
 
 printf '\n%sService health%s\n\n' "$C_BLD" "$C_RESET"
@@ -55,6 +56,7 @@ fi
 while read -r name domain; do
   [ -z "$name" ] && continue
   printf '\n  %s%s%s  (%s)\n' "$C_BLD" "$name" "$C_RESET" "$domain"
+  CHECKED=$((CHECKED+1))
 
   # Container names use the hyphenated form of the application name, because
   # an underscore is not valid in a hostname and these are DNS labels. The
@@ -98,7 +100,14 @@ while read -r name domain; do
     cn="${dns}-${svc}"; [ "$svc" = "realtime" ] && cn="${dns}.realtime"
     st="$(docker inspect -f '{{.State.Status}}' "$cn" 2>/dev/null || echo absent)"
     [ "$st" = "absent" ] && continue
-    h="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cn" 2>/dev/null)"
+    # `|| echo none`, because common.sh sets -e and this is an assignment from
+    # a command substitution: a failing `docker inspect` here takes the whole
+    # script down mid-loop. It did. health.sh printed the shared checks and
+    # one application and then stopped -- never reaching its own summary -- and
+    # the staging run reported that as "health.sh reported problems", which
+    # was a guess. Every other inspect in this file already had a fallback;
+    # this one did not.
+    h="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cn" 2>/dev/null || echo none)"
     if [ "$st" = "running" ] && { [ "$h" = "healthy" ] || [ "$h" = "none" ]; }; then
       ok "  $svc running${h:+ ($h)}"
     else
@@ -124,6 +133,10 @@ $ROWS
 EOF
 
 printf '\n'
+# This line is the proof that health.sh ran to the end. Without it, a caller
+# cannot tell "found problems" from "died halfway", and those need different
+# responses: one is a sick service, the other is a bug in here.
+printf 'HEALTH-COMPLETE checked=%d problems=%d\n' "$CHECKED" "$BAD"
 [ "$BAD" = "0" ] && { ok "everything healthy"; exit 0; }
 printf '  %s%d problem(s).%s\n\n' "$C_RED" "$BAD" "$C_RESET"
 exit 1

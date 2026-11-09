@@ -130,7 +130,7 @@ done
 # --- retention ------------------------------------------------------------
 # Deletes only files this script's own naming produces, and only ones older
 # than the window. It never touches anything else in the directory.
-OLD="$(find "$OUT" -maxdepth 1 -name '*.sql.gz' -type f -mtime "+$KEEP_DAYS" 2>/dev/null | wc -l | tr -d ' ')"
+OLD="$(find "$OUT" -maxdepth 1 -name '*.sql.gz' -type f -mtime "+$KEEP_DAYS" 2>/dev/null | wc -l | tr -d ' ' || echo 0)"
 if [ "${OLD:-0}" -gt 0 ]; then
   # Refuse to prune when the newest backup failed: that is exactly when the
   # old ones are the only copies that exist.

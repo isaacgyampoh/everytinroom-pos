@@ -94,7 +94,7 @@ fi
 CPUS="$(nproc 2>/dev/null || echo 1)"
 LOAD1="$(awk '{print $1}' /proc/loadavg 2>/dev/null || echo 0)"
 # Integer percent of total capacity: load 4.0 on 8 cores is 50%.
-LOAD_PCT="$(awk -v l="$LOAD1" -v c="$CPUS" 'BEGIN{ if (c<1) c=1; printf "%d", (l/c)*100 }')"
+LOAD_PCT="$(awk -v l="$LOAD1" -v c="$CPUS" 'BEGIN{ if (c<1) c=1; printf "%d", (l/c)*100 }' || echo 0)"
 S="$(classify "$LOAD_PCT" "$CAP_LOAD_WARN" "$CAP_LOAD_CRIT")"; note "$S"
 row "$S" "cpu load (1 min)" "${LOAD_PCT}% of $CPUS cores" "load average $LOAD1"
 jadd "\"cpu_pct\":$LOAD_PCT,\"cpus\":$CPUS,\"cpu_state\":\"$S\""
@@ -193,8 +193,8 @@ fi
 # Cumulative counters since boot. Contabo's plans include a monthly traffic
 # allowance, and this is enough to see whether it is anywhere near it.
 if [ -r /proc/net/dev ]; then
-  NET_RX_GB=$(awk -F'[: ]+' '/^ *(eth|ens|enp|eno)/{rx+=$3} END{printf "%d", rx/1024/1024/1024}' /proc/net/dev)
-  NET_TX_GB=$(awk -F'[: ]+' '/^ *(eth|ens|enp|eno)/{for(i=1;i<=NF;i++) if(i==11) tx+=$i} END{printf "%d", tx/1024/1024/1024}' /proc/net/dev)
+  NET_RX_GB=$(awk -F'[: ]+' '/^ *(eth|ens|enp|eno)/{rx+=$3} END{printf "%d", rx/1024/1024/1024}' /proc/net/dev || echo 0)
+  NET_TX_GB=$(awk -F'[: ]+' '/^ *(eth|ens|enp|eno)/{for(i=1;i<=NF;i++) if(i==11) tx+=$i} END{printf "%d", tx/1024/1024/1024}' /proc/net/dev || echo 0)
   UP_DAYS=$(( $(awk '{print int($1)}' /proc/uptime 2>/dev/null || echo 0) / 86400 ))
   row OK "network since boot" "${NET_RX_GB} GB in / ${NET_TX_GB} GB out" "${UP_DAYS} days up — vnstat gives monthly totals"
   jadd "\"net_rx_gb\":$NET_RX_GB,\"net_tx_gb\":$NET_TX_GB,\"uptime_days\":$UP_DAYS"

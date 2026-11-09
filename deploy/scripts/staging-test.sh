@@ -1492,14 +1492,23 @@ grep -q "room for more applications" /tmp/capacity.log \
   && { pass "capacity.sh produced a headroom estimate"; detail grep -A3 "room for more applications" /tmp/capacity.log; } \
   || fail "no headroom estimate in the capacity output"
 
-if "$ROOT_DIR/scripts/health.sh" >/tmp/health.log 2>&1; then
-  pass "health.sh reported every service healthy"
+"$ROOT_DIR/scripts/health.sh" >/tmp/health.log 2>&1; HRC=$?
+# Did it RUN TO THE END, or die partway? Those need different responses -- one
+# is a sick service, the other is a bug in health.sh -- and they were
+# indistinguishable: it crashed mid-loop on an unguarded command substitution
+# under set -e, and the run reported "health.sh reported problems", which was
+# a guess about a script that never reached its own summary.
+if ! grep -q '^HEALTH-COMPLETE' /tmp/health.log; then
+  fail "health.sh did not run to completion (exit $HRC) — it stopped partway, so its verdict means nothing"
+  DETAIL_LINES=45 detail tail -45 /tmp/health.log
+elif [ "$HRC" = "0" ]; then
+  pass "health.sh ran to completion and reported every service healthy: $(grep -o 'HEALTH-COMPLETE.*' /tmp/health.log)"
 else
   # A note, not a fail, was the wrong call: health.sh exiting non-zero means a
   # service on this machine is not healthy, which is a failure of the thing
   # under test. Recording it as a remark kept the run's own score green while
   # the report said nothing either way.
-  fail "health.sh reported problems across the provisioned applications"
+  fail "health.sh ran to completion and found problems: $(grep -o 'HEALTH-COMPLETE.*' /tmp/health.log)"
   # The whole tail, not a grep for FAIL|WARN. Run 19 matched neither and the
   # report said "(the command produced no output)" beside a failure, which is
   # the least useful thing a diagnostic can do.

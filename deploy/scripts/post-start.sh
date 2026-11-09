@@ -52,9 +52,9 @@ done
 APP_DNS="$(printf '%s' "$APP" | tr '_' '-')"
 APP_ENV="$ROOT_DIR/apps/$APP/.env"
 [ -f "$APP_ENV" ] || { echo "$APP is not provisioned on this server ($APP_ENV is missing)." >&2; exit 2; }
-APP_DB="$(sed -n 's/^APP_DB=//p' "$APP_ENV" | tail -1)"
+APP_DB="$(sed -n 's/^APP_DB=//p' "$APP_ENV" 2>/dev/null | tail -1 || true)"
 [ -n "$APP_DB" ] || { echo "could not read APP_DB from $APP_ENV" >&2; exit 2; }
-PROFILES="$(sed -n 's/^COMPOSE_PROFILES=//p' "$APP_ENV" | tail -1)"
+PROFILES="$(sed -n 's/^COMPOSE_PROFILES=//p' "$APP_ENV" 2>/dev/null | tail -1 || true)"
 
 pg() { docker exec central-postgres psql -tAqX -U postgres -d "$1" -c "$2" 2>/dev/null; }
 
@@ -103,8 +103,8 @@ case ",$PROFILES," in
       # is the other way to do it. It is not taken: the membership grants on
       # this image are the operation that crashed the server twice already.
       # The owner granting on its own objects needs no new privilege at all.
-      ST_USER="$(sed -n 's/^APP_STORAGE_USER=//p' "$APP_ENV" | tail -1)"
-      PGPASSWORD="$(sed -n 's/^APP_STORAGE_PASSWORD=//p' "$APP_ENV" | tail -1)"
+      ST_USER="$(sed -n 's/^APP_STORAGE_USER=//p' "$APP_ENV" 2>/dev/null | tail -1 || true)"
+      PGPASSWORD="$(sed -n 's/^APP_STORAGE_PASSWORD=//p' "$APP_ENV" 2>/dev/null | tail -1 || true)"
       export PGPASSWORD
       if [ -z "$ST_USER" ] || [ -z "$PGPASSWORD" ]; then
         warn "could not read the storage role's credentials from $APP_ENV"
@@ -219,14 +219,50 @@ case ",$PROFILES," in
           # Supabase's own platform roles. Nothing here uses them. What decides
           # whether live updates work is migration 20260326120000, which
           # replaces list_changes() with the version this Realtime calls.
+          # The last eight do the same kind of thing migration 40 does, and
+          # Realtime STOPS THE TENANT when any migration fails:
+          #   error_code=MigrationsFailedToRun ... :insufficient_privilege,
+          #   routine: "ExecAlterDefaultPrivilegesStmt"
+          # With 83 of 91 applied the websocket still accepted subscriptions
+          # and the change-data-capture extension never started, so nothing
+          # was delivered. I had documented those eight as skippable; the run
+          # disproved it. They are applied the same way, as the image's
+          # superuser, from statements extracted verbatim from Realtime's own
+          # files.
+          if [ "${NEWMIG:-0}" -lt 91 ] \
+             && [ "$(pg "$APP_DB" "select count(*) from realtime.schema_migrations where version = 20240401105812" | tr -d ' ')" = "1" ]; then
+            warn "Realtime stopped again at a migration needing a reserved role."
+            warn "Applying the remaining ones as the image's superuser."
+            if OUT2="$(docker exec -i central-postgres psql -X -v ON_ERROR_STOP=1 \
+                        -U supabase_admin -d "$APP_DB" -f - \
+                        < "$DEPLOY/sql/migrate/realtime-migrations-84-91.sql" 2>&1)"; then
+              ok "applied migrations 84-91; restarting Realtime"
+              docker restart "${APP_DNS}.realtime" >/dev/null 2>&1 || true
+              for _ in $(seq 1 24); do
+                NEWMIG="$(pg "$APP_DB" "select count(*) from realtime.schema_migrations" | tr -d ' ')"
+                case "$NEWMIG" in ''|*[!0-9]*) NEWMIG=0 ;; esac
+                [ "$NEWMIG" -ge 91 ] && break
+                sleep 5
+              done
+              printf '      realtime.schema_migrations: %s of 91 row(s)\n' "${NEWMIG:-0}"
+            else
+              warn "could not apply migrations 84-91 even as supabase_admin:"
+              printf '%s\n' "$OUT2" | tail -10 | sed 's/^/      /'
+              RC=1; RC_REALTIME=1
+            fi
+          fi
           POLLERFN="$(pg "$APP_DB" "select count(*) from realtime.schema_migrations where version = 20260326120000" | tr -d ' ')"
           if [ "${NEWMIG:-0}" -ge 91 ]; then
             ok "every tenant migration applied"
           elif [ "${POLLERFN:-0}" = "1" ]; then
-            ok "migration 20260326120000 applied, so list_changes() is the version this Realtime calls"
-            printf '      %s\n' "${NEWMIG} of 91 applied. The remainder delegate Realtime's message"
-            printf '      %s\n' "tables to Supabase's own platform roles -- an application's role"
-            printf '      %s\n' "cannot perform those and nothing here uses them."
+            # Not a pass. Realtime stops the tenant when any migration fails,
+            # so a correct list_changes() with migrations still outstanding
+            # delivers nothing -- which is exactly what run 27 showed.
+            warn "${NEWMIG} of 91 applied and list_changes() is the right version,"
+            warn "but Realtime stops its change-data-capture extension while any"
+            warn "migration is failing, so nothing will be delivered. The"
+            warn "outstanding ones need a superuser; see the log above."
+            RC=1; RC_REALTIME=1
           else
             warn "only ${NEWMIG:-0} of 91, and migration 20260326120000 is not among them."
             warn "list_changes() is the older version and the poller will fail on"
