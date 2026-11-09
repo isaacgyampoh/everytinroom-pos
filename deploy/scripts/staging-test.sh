@@ -637,33 +637,14 @@ if command -v node >/dev/null 2>&1; then
   # version was the cause -- it would only establish that something changed.
   # So both are run against the same table, the same insert and the same
   # conditions, and the pair of results is the evidence.
-  RT_OLD=2.47.10
-  RT_NEW=2.118.0
-  for V in "$RT_OLD" "$RT_NEW"; do
-    D="/tmp/rtclient-$V"
-    mkdir -p "$D"
-    ( cd "$D" && npm init -y >/dev/null 2>&1 \
-      && npm install "@supabase/supabase-js@$V" >"/tmp/npm-$V.log" 2>&1 ) \
-      && cp rt.mjs "$D/rt.mjs" \
-      && note "client $V installed" \
-      || note "client $V could NOT be installed; see /tmp/npm-$V.log"
-  done
-  # One helper, so the two runs cannot accidentally differ.
-  rt_run() {   # rt_run <version> <extra env assignments...>
-    local v="$1"; shift
-    if [ ! -f "/tmp/rtclient-$v/rt.mjs" ]; then echo "CLIENT_MISSING"; return 1; fi
-    ( cd "/tmp/rtclient-$v" && env RT_CLIENT_VERSION="$v" "$@" timeout 90 node rt.mjs 2>&1 )
-  }
-  if [ -f "/tmp/rtclient-$RT_NEW/rt.mjs" ]; then
-    detail bash -c "npm ls @supabase/supabase-js --depth=0 2>/dev/null | tail -2"
-    # A real supabase-js client. Parameterised, because one subscription on
-    # one tenant is not enough: delivery is checked on two independent
-    # tenants, a change in one must NOT appear on the other's channel, and
-    # the whole thing is checked again after the service is restarted.
-    #
-    #   RT_EXPECT=event     a change must arrive
-    #   RT_EXPECT=no-event  a change must NOT arrive (cross-tenant isolation)
-    cat > rt.mjs <<'JS'
+  # rt.mjs FIRST, then the installs that copy it.
+  #
+  # The install loop ran before this heredoc, so `cp rt.mjs` had nothing to
+  # copy, the && chain reported "client could not be installed", and the gate
+  # below skipped every delivery test. The run then said "0 failed" -- a green
+  # report produced by not running the tests, which is the one outcome this
+  # whole suite exists to prevent.
+  cat > rt.mjs <<'JS'
 import { createClient } from '@supabase/supabase-js'
 
 const url = process.env.RT_URL
@@ -691,28 +672,28 @@ const seen = []
 
 const client = createClient(url, key, {
   realtime: {
-    params: { eventsPerSecond: 10 },
-    logger: (kind, msg, data) => {
-      frames++
-      let d = ''
-      try { d = data ? scrub(JSON.stringify(data)).slice(0, 220) : '' } catch { d = '<unserialisable>' }
-      const line = `WS| ${kind} ${scrub(msg)} ${d}`
-      if (seen.length < 60) seen.push(line)
-      if (/phx_reply/.test(String(msg)) || /phx_reply/.test(d)) joinReplies++
-      if (/postgres_changes/.test(d)) pgFrames++
-      if (/error|timeout/i.test(String(msg))) errors++
-    },
+  params: { eventsPerSecond: 10 },
+  logger: (kind, msg, data) => {
+    frames++
+    let d = ''
+    try { d = data ? scrub(JSON.stringify(data)).slice(0, 220) : '' } catch { d = '<unserialisable>' }
+    const line = `WS| ${kind} ${scrub(msg)} ${d}`
+    if (seen.length < 60) seen.push(line)
+    if (/phx_reply/.test(String(msg)) || /phx_reply/.test(d)) joinReplies++
+    if (/postgres_changes/.test(d)) pgFrames++
+    if (/error|timeout/i.test(String(msg))) errors++
+  },
   },
 })
 
 const ch = client.channel(chanName)
   .on('postgres_changes', { event: evt, schema: 'public', table },
-      (p) => { if (!got) got = p.new ?? p.old ?? p })
+    (p) => { if (!got) got = p.new ?? p.old ?? p })
 
 const status = await new Promise((res) => {
   ch.subscribe((s, err) => {
-    if (err) { errors++ }
-    if (s === 'SUBSCRIBED' || s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') res(s)
+  if (err) { errors++ }
+  if (s === 'SUBSCRIBED' || s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') res(s)
   })
   setTimeout(() => res('NO_STATUS'), 25000)
 })
@@ -727,7 +708,7 @@ console.log('SUBSCRIBED')
 const r = await fetch(`${insertUrl}/rest/v1/${table}`, {
   method: 'POST',
   headers: { apikey: insertKey, Authorization: `Bearer ${insertKey}`,
-             'Content-Type': 'application/json', Prefer: 'return=representation' },
+           'Content-Type': 'application/json', Prefer: 'return=representation' },
   body: JSON.stringify({ label }),
 })
 if (!r.ok) {
@@ -740,7 +721,7 @@ for (let i = 0; i < 100 && !got; i++) await new Promise((r) => setTimeout(r, 200
 
 // The stage-by-stage picture, whichever way it went.
 console.log(`STAGES socket_frames=${frames} join_replies=${joinReplies} ` +
-            `postgres_changes_frames=${pgFrames} callback_fired=${got ? 1 : 0} errors=${errors}`)
+          `postgres_changes_frames=${pgFrames} callback_fired=${got ? 1 : 0} errors=${errors}`)
 for (const l of seen) console.log(l)
 
 if (expect === 'no-event') {
@@ -750,6 +731,39 @@ if (expect === 'no-event') {
 if (got) { console.log('EVENT_RECEIVED:' + scrub(JSON.stringify(got))); process.exit(0) }
 console.log('NO_EVENT'); process.exit(5)
 JS
+
+  RT_OLD=2.47.10
+  RT_NEW=2.118.0
+  for V in "$RT_OLD" "$RT_NEW"; do
+    D="/tmp/rtclient-$V"
+    mkdir -p "$D"
+    ( cd "$D" && npm init -y >/dev/null 2>&1 \
+      && npm install "@supabase/supabase-js@$V" >"/tmp/npm-$V.log" 2>&1 ) \
+      && cp rt.mjs "$D/rt.mjs" \
+      && note "client $V installed" \
+      || note "client $V could NOT be installed; see /tmp/npm-$V.log"
+  done
+  # One helper, so the two runs cannot accidentally differ.
+  rt_run() {   # rt_run <version> <extra env assignments...>
+    local v="$1"; shift
+    if [ ! -f "/tmp/rtclient-$v/rt.mjs" ]; then echo "CLIENT_MISSING"; return 1; fi
+    ( cd "/tmp/rtclient-$v" && env RT_CLIENT_VERSION="$v" "$@" timeout 90 node rt.mjs 2>&1 )
+  }
+  if [ ! -f "/tmp/rtclient-$RT_NEW/rt.mjs" ]; then
+    # Not a skip. A required test that did not run is a failure, or a broken
+    # harness reads as a clean platform.
+    fail "the Realtime client could not be prepared, so NO delivery test ran"
+    DETAIL_LINES=14 detail bash -c "tail -8 /tmp/npm-$RT_NEW.log 2>/dev/null || echo '(no npm log)'"
+  fi
+  if [ -f "/tmp/rtclient-$RT_NEW/rt.mjs" ]; then
+    detail bash -c "npm ls @supabase/supabase-js --depth=0 2>/dev/null | tail -2"
+    # A real supabase-js client. Parameterised, because one subscription on
+    # one tenant is not enough: delivery is checked on two independent
+    # tenants, a change in one must NOT appear on the other's channel, and
+    # the whole thing is checked again after the service is restarted.
+    #
+    #   RT_EXPECT=event     a change must arrive
+    #   RT_EXPECT=no-event  a change must NOT arrive (cross-tenant isolation)
     # Finish Realtime off BEFORE asking a client to subscribe. Its tenant
     # migrations stop at the first one the application's role cannot run, and
     # post-start applies that one as the image's superuser and waits for
@@ -924,7 +938,13 @@ EOL
       # `region`, which told me the filter was wrong rather than that the
       # settings were empty -- publication and slot_name are simply not stored,
       # so Realtime uses its own defaults for both.
-      DETAIL_LINES=20 detail pgq "select key || '=' || case when key like '%password%' or key like '%secret%' then '<redacted>' else value end from (select (jsonb_each_text(settings)).* from _realtime.extensions limit 1) t order by key" "$APP"
+      # The `limit 1` in the previous version applied to the EXPANDED key/value
+      # rows, not to the extensions table -- so it printed one arbitrary
+      # setting, `region`, and I read that as "publication is not stored".
+      # Realtime takes the publication name straight from these settings
+      # (`publication: extension["publication"]`), so getting this listing
+      # wrong sent the whole investigation down a wrong path.
+      DETAIL_LINES=24 detail pgq "select kv.key || '=' || case when kv.key ilike '%password%' or kv.key ilike '%secret%' or kv.key ilike '%key%' then '<redacted>' else kv.value end from _realtime.extensions e, jsonb_each_text(e.settings) kv order by kv.key" "$APP"
       detail pgq "select 'tenant rows: ' || count(*) from _realtime.tenants" "$APP"
       detail pgq "select 'extension rows: ' || count(*) || ', type ' || coalesce(string_agg(distinct type, ','), '-') from _realtime.extensions" "$APP"
 
