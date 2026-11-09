@@ -816,7 +816,13 @@ EOL
       # with, so a role-permission difference cannot hide.
       # ---------------------------------------------------------------
       note "----- the tenant's own CDC settings -----"
-      DETAIL_LINES=14 detail pgq "select key, case when key in ('db_password') then '<redacted>' else value end from (select (jsonb_each_text(settings)).* from _realtime.extensions limit 1) t where key in ('publication','slot_name','poll_interval_ms','poll_max_changes','poll_max_record_bytes','db_name','db_user','region') order by key" "$APP"
+      # EVERY key, not a guessed list. The filtered version returned only
+      # `region`, which told me the filter was wrong rather than that the
+      # settings were empty -- publication and slot_name are simply not stored,
+      # so Realtime uses its own defaults for both.
+      DETAIL_LINES=20 detail pgq "select key || '=' || case when key like '%password%' or key like '%secret%' then '<redacted>' else value end from (select (jsonb_each_text(settings)).* from _realtime.extensions limit 1) t order by key" "$APP"
+      detail pgq "select 'tenant rows: ' || count(*) from _realtime.tenants" "$APP"
+      detail pgq "select 'extension rows: ' || count(*) || ', type ' || coalesce(string_agg(distinct type, ','), '-') from _realtime.extensions" "$APP"
 
       RT_PUB="$(pgq "select coalesce(settings->>'publication','supabase_realtime') from _realtime.extensions limit 1" "$APP")"
       RT_SLOT="$(pgq "select slot_name from pg_replication_slots where database='$APP' and plugin='wal2json' limit 1")"
@@ -824,18 +830,44 @@ EOL
       RT_MAXB="$(pgq "select coalesce(settings->>'poll_max_record_bytes','1048576') from _realtime.extensions limit 1" "$APP")"
       note "publication='${RT_PUB:-?}' slot='${RT_SLOT:-?}' max_changes=${RT_MAXC:-?} max_bytes=${RT_MAXB:-?}"
 
-      note "----- freeing the slot, then calling list_changes() as the poller's role -----"
-      docker stop "${APP_DNS}.realtime" >/dev/null 2>&1 || true
-      sleep 4
-      pgq "insert into public.tick (label) values ('direct-probe')" "$APP" >/dev/null
-      note "inserted: $(pgq "select id || ' / ' || label from public.tick where label='direct-probe' order by id desc limit 1" "$APP")"
-      sleep 2
+      # ---------------------------------------------------------------
+      # ASK THE QUESTION WITHOUT TOUCHING THE POLLER.
+      #
+      # The previous attempt stopped Realtime to free the slot, and the slot
+      # VANISHED:
+      #   ERROR: replication slot "..._alpha_shop" does not exist
+      # Realtime's slot is TEMPORARY -- it exists only for the life of the
+      # connection that created it -- so it cannot be borrowed, and stopping
+      # the container also broke the slot-count check further down. That is
+      # not a finding about delivery; it is a finding about the diagnostic.
+      #
+      # So this creates its OWN permanent wal2json slot as the role Realtime
+      # uses, inserts a row after it, and calls list_changes() against that
+      # slot with the publication Realtime uses. The poller is untouched.
+      #
+      # Three outcomes, each telling us something different:
+      #   rows 0            -> wal2json or the publication is not producing the
+      #                        change at all
+      #   rows >0, subs 0   -> the change is produced but matches no
+      #                        subscription: apply_rls or the entity
+      #   rows >0, subs >0  -> the database side is correct and the fault is
+      #                        inside Realtime's delivery, not in SQL
+      # ---------------------------------------------------------------
+      note "----- a private wal2json slot, so the poller is left alone -----"
+      PROBE_SLOT="probe_w2j_$(date +%s)"
       RT_PW_LOCAL="$(sed -n 's/^APP_REALTIME_PASSWORD=//p' "$ENV" | tail -1)"
       export PGPASSWORD="$RT_PW_LOCAL"
-      DETAIL_LINES=16 detail bash -c "docker exec -i -e PGPASSWORD central-postgres psql -X -U '${APP}_realtime' -h 127.0.0.1 -d '$APP' -c \"select count(*) as rows_returned, coalesce(string_agg(distinct (wal->>'table'), ','), '(none)') as tables, coalesce(max(coalesce(array_length(subscription_ids,1),0)),0) as max_matched_subs, coalesce(string_agg(distinct coalesce(array_to_string(errors,';'),''), ' | '), '') as errs from realtime.list_changes('${RT_PUB}', '${RT_SLOT}', ${RT_MAXC}, ${RT_MAXB})\" 2>&1"
+      rtq() { docker exec -i -e PGPASSWORD central-postgres psql -tAqX \
+                -U "${APP}_realtime" -h 127.0.0.1 -d "$APP" -c "$1" 2>&1; }
+      detail bash -c "echo \"slot created: \$(docker exec -i -e PGPASSWORD central-postgres psql -tAqX -U '${APP}_realtime' -h 127.0.0.1 -d '$APP' -c \\\"select pg_create_logical_replication_slot('${PROBE_SLOT}','wal2json') is not null\\\" 2>&1)\""
+      pgq "insert into public.tick (label) values ('slot-probe')" "$APP" >/dev/null
+      note "inserted: $(pgq "select id || ' / ' || label from public.tick where label='slot-probe' order by id desc limit 1" "$APP")"
+      sleep 2
+      note "what list_changes() returns from that slot:"
+      DETAIL_LINES=16 detail rtq "select count(*) as rows_returned, coalesce(string_agg(distinct (wal->>'table'),','),'(none)') as tables, coalesce(sum(coalesce(array_length(subscription_ids,1),0)),0) as total_matched_subs, coalesce(string_agg(distinct coalesce(array_to_string(errors,';'),''),' | '),'') as errs from realtime.list_changes('${RT_PUB:-supabase_realtime}', '${PROBE_SLOT}', 100, 1048576)"
+      detail rtq "select coalesce(left(wal::text, 300), '(no wal)') from realtime.list_changes('${RT_PUB:-supabase_realtime}', '${PROBE_SLOT}', 100, 1048576) limit 1"
+      rtq "select pg_drop_replication_slot('${PROBE_SLOT}')" >/dev/null 2>&1 || true
       unset PGPASSWORD
-      docker start "${APP_DNS}.realtime" >/dev/null 2>&1 || true
-      wait_realtime_ready "${APP_DNS}.realtime" "${APP_DNS}.realtime after the diagnostic" || true
     fi
 
     # -------------------------------------------------------------------
