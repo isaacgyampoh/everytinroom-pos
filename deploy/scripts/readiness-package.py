@@ -60,7 +60,7 @@ TESTS = [
     ("Separate JWT secret per application", True, [r"different JWT secrets"]),
     ("GoTrue runs for the application that needs it", True,
      [r"GoTrue is running for the application"],
-     [r"GoTrue never became healthy"]),
+     [r"GoTrue (never|did not) become?.? healthy"]),
     ("GoTrue answers through the proxy", True,
      [r"GoTrue answers /auth/v1/health"],
      [r"GoTrue health returned HTTP"]),

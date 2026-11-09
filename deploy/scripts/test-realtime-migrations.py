@@ -212,6 +212,12 @@ def extract(path):
     return sqls, uses_dsl
 
 
+def _holds_parameter():
+    """Does the owner hold SET on log_min_messages? Read back, not assumed."""
+    return q(f"select has_parameter_privilege('{OWNER}','log_min_messages','SET')::text",
+             db="postgres") == "true"
+
+
 def replay(migrations, upto, all_, grant_parameter, pre_create_admin, label):
     """Set up a fresh database and replay. Returns (applied, stopped_at)."""
     psql([], sql=f'DROP DATABASE IF EXISTS "{DB}" WITH (FORCE)', stop=False)
@@ -239,8 +245,30 @@ def replay(migrations, upto, all_, grant_parameter, pre_create_admin, label):
                 "CREATE SCHEMA IF NOT EXISTS extensions"):
         psql([], sql=sql, db=DB, stop=False)
     if grant_parameter:
+        # Privileges on parameters are themselves granted, and initially only a
+        # superuser holds them -- so inside the real image this has to be made
+        # as supabase_admin, exactly as provision-app.sh does. Run as
+        # `postgres` it fails with "permission denied for parameter", and the
+        # first version ignored that: phase two then behaved identically to
+        # phase one and reported the grant as making no difference.
+        #
+        # And it is VERIFIED rather than assumed, because that was the mistake.
         psql([], sql=f'GRANT SET ON PARAMETER log_min_messages TO "{OWNER}"', stop=False)
+        if VIA_DOCKER and not _holds_parameter():
+            subprocess.run(["docker", "exec", "-i", VIA_DOCKER, "psql", "-q",
+                            "-U", "supabase_admin", "-d", "postgres", "-c",
+                            f'GRANT SET ON PARAMETER log_min_messages TO "{OWNER}"'],
+                           capture_output=True, text=True)
+        if not _holds_parameter():
+            print("  setup: SET ON PARAMETER log_min_messages is NOT HELD — "
+                  "phase two cannot mean anything, so it is not claimed to")
     if pre_create_admin:
+        if VIA_DOCKER:
+            for stmt in ('CREATE ROLE supabase_realtime_admin NOINHERIT NOLOGIN NOREPLICATION',
+                         f'GRANT supabase_realtime_admin TO "{OWNER}" WITH ADMIN OPTION'):
+                subprocess.run(["docker", "exec", "-i", VIA_DOCKER, "psql", "-q",
+                                "-U", "supabase_admin", "-d", "postgres", "-c", stmt],
+                               capture_output=True, text=True)
         psql([], sql='CREATE ROLE supabase_realtime_admin NOINHERIT NOLOGIN NOREPLICATION',
              stop=False)
         psql([], sql=f'GRANT supabase_realtime_admin TO "{OWNER}" WITH ADMIN OPTION', stop=False)

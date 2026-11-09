@@ -1086,8 +1086,12 @@ B_DNS="$(printf '%s' "$B_APP" | tr '_' '-')"
 B_ENV="$ROOT_DIR/apps/$B_APP/.env"
 if [ -f "$B_ENV" ]; then
   ( cd "$ROOT_DIR/apps/$B_APP" && ./compose.sh up -d >/tmp/beta-up.log 2>&1 ) || true
+  # Long enough to cover a first-time image pull. The previous 120s expired
+  # while compose was still extracting supabase/gotrue, so the run reported
+  # "never became healthy" for a container that had not finished being
+  # created -- and the real failure, a crash loop, was a minute behind that.
   bok=0
-  for _ in $(seq 1 24); do
+  for _ in $(seq 1 48); do
     st="$(docker inspect -f '{{.State.Status}}' "${B_DNS}-auth" 2>/dev/null || echo absent)"
     h="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${B_DNS}-auth" 2>/dev/null)"
     [ "$st" = "running" ] && { [ "$h" = "healthy" ] || [ "$h" = "none" ]; } && { bok=1; break; }
@@ -1096,7 +1100,10 @@ if [ -f "$B_ENV" ]; then
   if [ "$bok" = "1" ]; then
     pass "GoTrue is running for the application that asked for auth"
   else
-    fail "GoTrue never became healthy for $B_APP"
+    # Say WHICH of the three it is: absent, restarting, or up but unhealthy.
+    BSTAT="$(docker inspect -f '{{.State.Status}}' "${B_DNS}-auth" 2>/dev/null || echo absent)"
+    BRESTARTS="$(docker inspect -f '{{.RestartCount}}' "${B_DNS}-auth" 2>/dev/null || echo 0)"
+    fail "GoTrue did not become healthy for $B_APP (state: $BSTAT, restarts: $BRESTARTS)"
     # Why it is not there at all is in compose's own output, which the first
     # version captured and never printed -- the report said only
     # "No such container: beta-shop-auth".

@@ -201,7 +201,15 @@ services:
       # for a real deployment that must verify an address.
       GOTRUE_MAILER_AUTOCONFIRM: ${AUTH_MAILER_AUTOCONFIRM:-true}
       GOTRUE_SMTP_HOST: ${SMTP_HOST:-}
-      GOTRUE_SMTP_PORT: ${SMTP_PORT:-}
+      # 587, not empty. GoTrue parses this as an integer during configuration
+      # load, so an empty value is FATAL and the container crash-loops with
+      #   Failed to load configuration: assigning GOTRUE_SMTP_PORT to Port:
+      #   converting '' to type int
+      # Every application with auth and no SMTP configured hit that, which is
+      # all of them until someone sets up mail. The value is unused while
+      # GOTRUE_SMTP_HOST is empty and GOTRUE_MAILER_AUTOCONFIRM is true, so a
+      # valid default costs nothing and the service starts.
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-587}
       GOTRUE_SMTP_USER: ${SMTP_USER:-}
       GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
       GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-}
