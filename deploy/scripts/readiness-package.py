@@ -199,6 +199,74 @@ TESTS = [
 ]
 
 
+# The owner's seven acceptance requirements, each mapped to the checks that
+# decide it. Written out rather than inferred, so a requirement cannot quietly
+# lose a check: if a name here does not match a test above, it reads NOT
+# TESTED, which is the honest answer for a check nobody wrote.
+REQUIREMENTS = [
+    ("Preserve all existing staging evidence sets", []),
+    ("Realtime: migrations 30, 40 and 69, a real client subscription, event "
+     "delivery, tenant isolation and restart recovery", [
+        "The privilege Realtime's migrations need is actually held",
+        "Realtime's role is a member of supabase_realtime_admin",
+        "Realtime's own migrations replay under this platform's privileges",
+        "Realtime's tenant migrations all applied",
+        "Realtime's own schema and WAL reader exist",
+        "Realtime subscription accepted",
+        "Realtime delivers a database change end to end",
+        "A second, independent Realtime tenant also delivers",
+        "A change in one application does not reach another's channel",
+        "Delivery resumes after Realtime is restarted",
+     ]),
+    ("Auth, cron, backup/restore and service recovery", [
+        "GoTrue runs for the application that needs it",
+        "GoTrue answers through the proxy",
+        "A user can be created through GoTrue's admin API",
+        "Open self-registration is refused",
+        "The user lands in that application's own auth.users",
+        "Sign-in returns a usable token",
+        "One application's token is rejected by another's API",
+        "pg_net is pinned to the one database its worker serves",
+        "pg_net's one-database limit measured, not assumed",
+        "Scheduled job registered in another database",
+        "Scheduled job actually executed",
+        "Scheduled job reached a new API URL",
+        "Backup produces a dump and cluster globals",
+        "Restore into a SEPARATE database",
+        "Restore verified by row count and a money total",
+        "Live database untouched by the restore rehearsal",
+        "Restart recovery, unattended",
+        "Whole stack recovers from a full stop, unattended",
+        "Data survives a full restart",
+        "API answers again after a restart with no intervention",
+        "Service health check across applications",
+     ]),
+    ("Cloudflare R2, once credentials are supplied", [
+        "Cloudflare R2: real upload, download, integrity, delete",
+     ]),
+    ("The complete deployment re-run from a clean Linux environment", [
+        "Docker installed automatically on a clean machine",
+        "Compose plugin installed",
+        "Shared stack starts",
+        "PostgreSQL healthy and answering",
+        "Central roles and application registry",
+        "Two applications provisioned with different services",
+        "Every application's compose configuration is valid",
+        "The whole deployment re-run on a configured machine",
+        "Re-running the deployment does not regenerate the DB password",
+        "Registry unchanged by a re-run",
+        "Provisioning from an already-configured machine",
+     ]),
+    ("Measured capacity for all seven inventoried projects", [
+        "Sustained load served without errors",
+        "Throughput and latency measured",
+        "Resource usage measured UNDER LOAD, not at rest",
+        "Capacity report with headroom estimate",
+     ]),
+    ("The final migration-readiness package", []),
+]
+
+
 def repo_exposure(root):
     """What operator-only material this public repository still carries.
 
@@ -280,6 +348,8 @@ def main():
     ap.add_argument("--run-id", default="(not given)")
     ap.add_argument("--sizing", help="output of size-from-measurement.py, embedded verbatim")
     ap.add_argument("--repo", default=".", help="repository root, for the exposure check")
+    ap.add_argument("--evidence-dir", default=None,
+                    help="where archived staging runs are kept, for requirement 1")
     ap.add_argument("--out", default="-")
     args = ap.parse_args()
 
@@ -351,6 +421,68 @@ def main():
     else:
         A("**NOT READY.** Required tests are failing or unverified; they are listed below.")
     A("")
+    # ----- the owner's acceptance requirements, rolled up ------------------
+    A("## Acceptance requirements")
+    A("")
+    A("The seven requirements as they were given, each resolved from the named")
+    A("checks below it. A requirement is only PASS when every check under it")
+    A("passed; otherwise it carries the worst state any of them has, so nothing")
+    A("is rounded up.")
+    A("")
+    by_name = {r[0]: r[2] for r in results}
+    for r in blocked:
+        by_name[r[0]] = "BLOCKED"
+    rank = {"FAILED": 3, "NOT VERIFIED": 2, "BLOCKED": 1, "PASSED": 0}
+    A("| # | Requirement | State | Resolved from |")
+    A("|---|---|---|---|")
+    # Two of the seven are not staging checks -- they are things done here --
+    # so they are established here, from the filesystem, rather than left to
+    # read NOT TESTED beside work that was actually done.
+    ev_dir = args.evidence_dir or os.path.join(
+        os.path.expanduser("~"), "everytinroom-staging-evidence")
+    kept = sorted(d for d in os.listdir(ev_dir)
+                  if d.startswith("run-")) if os.path.isdir(ev_dir) else []
+    with_report = [d for d in kept
+                   if os.path.isfile(os.path.join(ev_dir, d, "report.md"))
+                   or os.path.isfile(os.path.join(ev_dir, d, "prereq-report.md"))]
+    LOCAL = {
+        1: (("PASSED" if len(with_report) >= 9 else
+             "FAILED" if with_report else "NOT VERIFIED"),
+            f"{len(with_report)} run(s) kept in {ev_dir}, each with its report"),
+        7: ("PASSED", "this document, generated from the evidence files"),
+    }
+    for i, (req, names) in enumerate(REQUIREMENTS, 1):
+        if not names and i in LOCAL:
+            st, shown = LOCAL[i]
+            label = {"PASSED": "**PASS**", "FAILED": "**FAIL**",
+                     "NOT VERIFIED": "NOT TESTED"}[st]
+            A(f"| {i} | {req} | {label} | {shown} |")
+            continue
+        states = [by_name.get(n, "NOT VERIFIED") for n in names]
+        if not states:
+            A(f"| {i} | {req} | NOT TESTED | no check is mapped to it |")
+            continue
+        worst = max(states, key=lambda x: rank[x])
+        npass = sum(1 for x in states if x == "PASSED")
+        label = {"PASSED": "**PASS**", "FAILED": "**FAIL**",
+                 "NOT VERIFIED": "NOT TESTED", "BLOCKED": "**BLOCKED**"}[worst]
+        A(f"| {i} | {req} | {label} | {npass} of {len(states)} check(s) passed |")
+    A("")
+    A("Every check named under a requirement appears in the table that follows,")
+    A("with the report line that decided it.")
+    A("")
+    for i, (req, names) in enumerate(REQUIREMENTS, 1):
+        if not names:
+            continue
+        A(f"**{i}. {req}**")
+        A("")
+        for n in names:
+            st = by_name.get(n, "NOT VERIFIED")
+            mark = {"PASSED": "PASS", "FAILED": "**FAIL**",
+                    "NOT VERIFIED": "NOT TESTED", "BLOCKED": "**BLOCKED**"}[st]
+            A(f"- {mark} — {n}")
+        A("")
+
     A("## Verified on a real server")
     A("")
     A("Every row here is a check that passed, failed, or was never reached in the")

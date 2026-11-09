@@ -109,6 +109,7 @@ python3 "$DEPLOY/scripts/readiness-package.py" \
   --full "$WORK/report.md" \
   --repo "$REPO" \
   --run-id "$RUN_ID" \
+  --evidence-dir "${STAGING_EVIDENCE:-$HOME/everytinroom-staging-evidence}" \
   "${SIZING_ARG[@]}" \
   --out "$OUT"
 rc=$?
