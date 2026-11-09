@@ -802,11 +802,40 @@ EOL
       detail pgq "select 'anon may select tick: ' || has_table_privilege('anon','public.tick','SELECT')::text" "$APP"
       detail pgq "select 'rls enabled on tick: ' || relrowsecurity::text from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='tick'" "$APP"
       detail pgq "select 'policies on tick: ' || count(*) from pg_policies where schemaname='public' and tablename='tick'" "$APP"
-      note "----- what list_changes() returns, called directly -----"
-      SLOTSUF="$(sed -n 's/^REALTIME_SLOT_SUFFIX=//p' "$ENV" | tail -1)"
+      # ---------------------------------------------------------------
+      # CALL list_changes() AS THE POLLER DOES.
+      #
+      # The previous attempt was refused with "replication slot ... is active
+      # for PID", which is itself useful -- it proves the poller holds the slot
+      # and is polling. But it means the only way to ask the question is to
+      # free the slot first, so Realtime is stopped for the duration and
+      # started again afterwards.
+      #
+      # The parameters come from the tenant's OWN extension settings rather
+      # than from guesses, and the call is made as the role Realtime connects
+      # with, so a role-permission difference cannot hide.
+      # ---------------------------------------------------------------
+      note "----- the tenant's own CDC settings -----"
+      DETAIL_LINES=14 detail pgq "select key, case when key in ('db_password') then '<redacted>' else value end from (select (jsonb_each_text(settings)).* from _realtime.extensions limit 1) t where key in ('publication','slot_name','poll_interval_ms','poll_max_changes','poll_max_record_bytes','db_name','db_user','region') order by key" "$APP"
+
+      RT_PUB="$(pgq "select coalesce(settings->>'publication','supabase_realtime') from _realtime.extensions limit 1" "$APP")"
+      RT_SLOT="$(pgq "select slot_name from pg_replication_slots where database='$APP' and plugin='wal2json' limit 1")"
+      RT_MAXC="$(pgq "select coalesce(settings->>'poll_max_changes','100') from _realtime.extensions limit 1" "$APP")"
+      RT_MAXB="$(pgq "select coalesce(settings->>'poll_max_record_bytes','1048576') from _realtime.extensions limit 1" "$APP")"
+      note "publication='${RT_PUB:-?}' slot='${RT_SLOT:-?}' max_changes=${RT_MAXC:-?} max_bytes=${RT_MAXB:-?}"
+
+      note "----- freeing the slot, then calling list_changes() as the poller's role -----"
+      docker stop "${APP_DNS}.realtime" >/dev/null 2>&1 || true
+      sleep 4
       pgq "insert into public.tick (label) values ('direct-probe')" "$APP" >/dev/null
+      note "inserted: $(pgq "select id || ' / ' || label from public.tick where label='direct-probe' order by id desc limit 1" "$APP")"
       sleep 2
-      DETAIL_LINES=12 detail bash -c "docker exec -i central-postgres psql -tAqX -U supabase_admin -d '$APP' -c \"select count(*) as rows_returned, coalesce(string_agg(distinct (wal->>'table'), ','), '-') as tables, coalesce(max(array_length(subscription_ids,1)),0) as matched_subs from realtime.list_changes('supabase_realtime', 'supabase_realtime_replication_slot_${SLOTSUF}', 100, 1048576)\" 2>&1"
+      RT_PW_LOCAL="$(sed -n 's/^APP_REALTIME_PASSWORD=//p' "$ENV" | tail -1)"
+      export PGPASSWORD="$RT_PW_LOCAL"
+      DETAIL_LINES=16 detail bash -c "docker exec -i -e PGPASSWORD central-postgres psql -X -U '${APP}_realtime' -h 127.0.0.1 -d '$APP' -c \"select count(*) as rows_returned, coalesce(string_agg(distinct (wal->>'table'), ','), '(none)') as tables, coalesce(max(coalesce(array_length(subscription_ids,1),0)),0) as max_matched_subs, coalesce(string_agg(distinct coalesce(array_to_string(errors,';'),''), ' | '), '') as errs from realtime.list_changes('${RT_PUB}', '${RT_SLOT}', ${RT_MAXC}, ${RT_MAXB})\" 2>&1"
+      unset PGPASSWORD
+      docker start "${APP_DNS}.realtime" >/dev/null 2>&1 || true
+      wait_realtime_ready "${APP_DNS}.realtime" "${APP_DNS}.realtime after the diagnostic" || true
     fi
 
     # -------------------------------------------------------------------
