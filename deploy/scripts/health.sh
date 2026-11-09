@@ -36,7 +36,8 @@ printf '\n%sService health%s\n\n' "$C_BLD" "$C_RESET"
 
 # --- shared ---------------------------------------------------------------
 for c in central-postgres central-caddy; do
-  st="$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo missing)"
+  st="$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null | tr -d '[:space:]' || true)"
+  [ -n "$st" ] || st=missing
   if [ "$st" = "running" ]; then ok "$c running"
   else printf '  %sFAIL%s %s is %s\n' "$C_RED" "$C_RESET" "$c" "$st"; BAD=$((BAD+1)); fi
 done
@@ -98,8 +99,14 @@ while read -r name domain; do
   # auth as the thing that matters most: without it nobody can sign in.
   for svc in realtime storage functions imgproxy auth; do
     cn="${dns}-${svc}"; [ "$svc" = "realtime" ] && cn="${dns}.realtime"
-    st="$(docker inspect -f '{{.State.Status}}' "$cn" 2>/dev/null || echo absent)"
-    [ "$st" = "absent" ] && continue
+    # Whitespace-stripped, and emptiness treated as absent. Docker 29 prints a
+    # blank line to stdout when `inspect -f` fails, so this came back as a
+    # newline followed by "absent" -- the comparison below missed, and
+    # health.sh reported ten "problems" that were simply services those
+    # applications had never asked for. The run's verdict was wrong in the
+    # safe direction, which is still wrong.
+    st="$(docker inspect -f '{{.State.Status}}' "$cn" 2>/dev/null | tr -d '[:space:]' || true)"
+    [ -z "$st" ] && continue
     # `|| echo none`, because common.sh sets -e and this is an assignment from
     # a command substitution: a failing `docker inspect` here takes the whole
     # script down mid-loop. It did. health.sh printed the shared checks and
@@ -107,7 +114,8 @@ while read -r name domain; do
     # the staging run reported that as "health.sh reported problems", which
     # was a guess. Every other inspect in this file already had a fallback;
     # this one did not.
-    h="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cn" 2>/dev/null || echo none)"
+    h="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cn" 2>/dev/null | tr -d '[:space:]' || true)"
+    [ -n "$h" ] || h=none
     if [ "$st" = "running" ] && { [ "$h" = "healthy" ] || [ "$h" = "none" ]; }; then
       ok "  $svc running${h:+ ($h)}"
     else

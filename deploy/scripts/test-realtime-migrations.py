@@ -44,6 +44,8 @@ DB = f"{PFX}_db"
 OWNER = f"{PFX}_realtime"
 
 PASS = FAIL = 0
+# Files where extract() saw more execute( calls than it could read.
+UNREAD = []
 
 
 def ok(m):
@@ -189,8 +191,20 @@ DSL_PREFIX = {
     ],
 }
 
-HEREDOC = re.compile(r'execute\(\s*"""(.*?)"""\s*\)', re.S)
-PLAIN = re.compile(r'execute\(\s*"((?:[^"\\]|\\.)*)"\s*\)', re.S)
+# `~S"""` as well as `"""`. Elixir's sigil form is used by four of the
+# ninety-one migrations, and the first version of this regex did not match it
+# -- so those files' function definitions were silently skipped while their
+# trailing ALTER FUNCTION statements were extracted. The generated SQL then
+# failed with `function realtime.settled_changes(...) does not exist`, because
+# the statement that creates it had been dropped on the floor.
+#
+# A regex that silently matches less than it should is the worst kind, so
+# extract() now also REPORTS how many execute( calls it found versus how many
+# it could read, and the caller fails if those differ.
+HEREDOC = re.compile(r'execute\(\s*(?:~[sS])?"""(.*?)"""\s*\)', re.S)
+PLAIN = re.compile(r'execute\(\s*(?:~[sS])?"((?:[^"\\]|\\.)*)"\s*\)', re.S)
+# Every execute( call, however its argument is written, for the count check.
+ANY_EXECUTE = re.compile(r'execute\(', re.S)
 
 
 def extract(path):
@@ -206,6 +220,12 @@ def extract(path):
         found.append((m.start(), m.group(1).replace('\\"', '"').replace("\\\\", "\\")))
     found.sort(key=lambda x: x[0])
     sqls = prefix + [s.strip() for _, s in found if s.strip()]
+    # Did we read every execute( in the file? A mismatch means the argument is
+    # written in a form these patterns do not cover, and skipping it silently
+    # is how a generated file came to reference a function nothing created.
+    n_calls = len(ANY_EXECUTE.findall(text))
+    if n_calls != len(found):
+        UNREAD.append((os.path.basename(path), n_calls, len(found)))
     # Did the file do anything this cannot see?
     uses_dsl = bool(re.search(r'^\s*(create table|alter table|create index|drop |rename )',
                               text, re.M | re.I))
