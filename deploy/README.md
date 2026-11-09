@@ -227,13 +227,14 @@ those roles hold `CONNECT` on their own database and no other, and that is the
 boundary. Membership in a shared role creates no path into a database the role
 cannot open.
 
-### Why 83 of 91 migrations is the right answer, not a shortfall
+### All 91 migrations are required, and this section used to say otherwise
 
-With both privileges in place Realtime applies 83 of its 91 tenant
-migrations. The remaining eight are not skipped to make a number look better;
-they cannot be performed by an application's role and nothing here uses them.
+**This previously documented 83 of 91 as the correct outcome. That was wrong,
+and it is left on the record here because the reasoning was plausible and the
+consequence was not obvious.**
 
-Migration 84 is representative:
+The argument was that migrations 84 to 91 do work an application's role
+cannot do. Migration 84 is representative:
 
 ```sql
 ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin
@@ -245,8 +246,21 @@ That is the same "act as another role" this platform bans in its own SQL — a
 role may change its own default privileges, not another's. Migrations 84 to 91
 all do work of that kind: delegating Realtime's `messages` tables and schema
 usage between `supabase_admin` and `postgres`, then revoking grant options
-again. They exist so that Supabase's own platform tooling can reach those
-tables. There is no such tooling here.
+again. They exist so Supabase's own platform tooling can reach those tables,
+and there is no such tooling here. All of that is still true.
+
+What it missed is that **Realtime does not care whether a migration is
+relevant to this deployment.** It applies the list in order, and a failure
+anywhere raises `MigrationsFailedToRun` and stops the tenant. A tenant that
+has stopped delivers nothing, so eight migrations nothing here uses were
+nonetheless the difference between a working shop and a silent one. "Not
+needed" and "may be left unapplied" are not the same claim, and reading the
+first as the second cost several staging runs.
+
+They are therefore applied, by the one role that may: `post-start.sh` runs
+migrations 84 to 91 as `supabase_admin`, from statements extracted verbatim
+upstream, and records their version rows. A run now reports 91 of 91, and the
+suite fails if it reports fewer.
 
 **What is required is checked directly, by number and by effect:**
 

@@ -217,22 +217,27 @@ case ",$PROFILES," in
           done
           HASLC2="$(pg "$APP_DB" "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='realtime' and p.proname='list_changes'" | tr -d ' ')"
           printf '      realtime.schema_migrations: %s of 91 row(s) after the restart\n' "${NEWMIG:-0}"
-          # 83 of 91 is the expected landing place, not a failure. Migrations
-          # 84 onwards do things like
+          # ALL 91 ARE REQUIRED. 83 is not a landing place, it is a stopped
+          # tenant.
+          #
+          # Migrations 84 onwards do things like
           #   ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin ...
           # which is the same "act as another role" an application's role
           # cannot do, and they exist to delegate Realtime's message tables to
-          # Supabase's own platform roles. Nothing here uses them. What decides
-          # whether live updates work is migration 20260326120000, which
-          # replaces list_changes() with the version this Realtime calls.
-          # The last eight do the same kind of thing migration 40 does, and
-          # Realtime STOPS THE TENANT when any migration fails:
+          # Supabase's own platform roles. Nothing here uses them, and I
+          # documented them as skippable on exactly that reasoning.
+          #
+          # The run disproved it. Realtime does not ask whether a migration is
+          # relevant: a failure anywhere raises
           #   error_code=MigrationsFailedToRun ... :insufficient_privilege,
           #   routine: "ExecAlterDefaultPrivilegesStmt"
-          # With 83 of 91 applied the websocket still accepted subscriptions
-          # and the change-data-capture extension never started, so nothing
-          # was delivered. I had documented those eight as skippable; the run
-          # disproved it. They are applied the same way, as the image's
+          # and STOPS THE TENANT. With 83 applied, the websocket still
+          # accepted subscriptions -- so it looked healthy -- while the
+          # change-data-capture extension never started and nothing was ever
+          # delivered. "Not needed by us" and "may be left unapplied" are
+          # different claims.
+          #
+          # So they are applied, the same way migration 40 is: as the image's
           # superuser, from statements extracted verbatim from Realtime's own
           # files.
           if [ "${NEWMIG:-0}" -lt 91 ] \
