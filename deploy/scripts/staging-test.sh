@@ -1599,7 +1599,13 @@ fi
 # requests, the websocket events, which it indents by four -- were captured
 # and then silently dropped here. Run 40 printed "console errors: 45" and not
 # one of them, which is the difference between a diagnosis and another run.
-DETAIL_LINES=70 detail bash -c "grep -E '^ {2,8}(PASS|FAIL|BLOCKED|UI_LATENCY|[a-z])' /tmp/appreal.log | head -70"
+# Any indented, non-empty line. The previous filter listed the shapes it
+# expected -- PASS, FAIL, BLOCKED, lowercase prose -- which drops exactly the
+# lines worth having: a console error reads "TypeError: ..." and a failed
+# request "GET http://... — net::ERR_...", neither of which is any of those.
+# Everything this harness prints is indented by two spaces or four, so that is
+# the only thing worth matching on.
+DETAIL_LINES=70 detail bash -c "grep -E '^ {2,8}[^ ]' /tmp/appreal.log | head -70"
 
 # ===========================================================================
 gate_section 9
