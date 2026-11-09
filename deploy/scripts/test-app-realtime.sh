@@ -185,6 +185,11 @@ RC=$?
 # 5. Clean up what was inserted.
 # ---------------------------------------------------------------------------
 pg "delete from sales where customer like 'STAGING-PROBE%'" >/dev/null 2>&1 || true
+# The product and website-order probes, which the products and whatsapp_orders
+# subscription checks insert. Left behind they would accumulate one row per
+# run in a database the next run then reports on.
+pg "delete from products where name like 'STAGING-PROBE%'" >/dev/null 2>&1 || true
+pg "delete from whatsapp_orders where order_no like 'STAGING-PROBE%'" >/dev/null 2>&1 || true
 pg "delete from staff where name = 'Staging Probe'" >/dev/null 2>&1 || true
 say "staging rows removed"
 exit "$RC"

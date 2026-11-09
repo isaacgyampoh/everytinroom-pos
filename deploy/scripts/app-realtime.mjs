@@ -135,6 +135,112 @@ try {
     }
   }
 
+  // 4a. THE OTHER TWO SUBSCRIBED TABLES.
+  //
+  // App.jsx subscribes to three tables and only one of them had ever been
+  // exercised through the interface. The sales handler is the conspicuous one
+  // because it raises a popup; products and whatsapp_orders just call a
+  // refresher, so the only way to see them work is to be on the page that
+  // shows the data and watch it change.
+  //
+  // The hash is set rather than navigated, so the application routes itself
+  // through its own hashchange listener without reloading -- a reload would
+  // tear down the very subscription under test and re-establish it, which
+  // would prove nothing about delivery to a running till.
+  async function liveOnPage(hash, needle, label, insert) {
+    try {
+      await page.evaluate((h) => { window.location.hash = h }, hash)
+      await page.waitForTimeout(2500)      // let the page mount and re-read
+      // Armed before the insert, for the same reason as the popup above.
+      const seenIt = page.locator(`text=${needle}`).first()
+        .waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
+      const r = await insert()
+      if (!r.ok) {
+        bad(`could not insert the ${label} probe (HTTP ${r.status}): ${r.body}`)
+        return
+      }
+      const t = Date.now()
+      if (await seenIt) good(`a ${label} change appeared in the interface without a refresh (${Date.now() - t}ms)`)
+      else bad(`a ${label} change did NOT appear in the interface — that subscription delivers nothing`)
+    } catch (e) {
+      bad(`the ${label} check could not run: ${scrub(String(e)).slice(0, 160)}`)
+    }
+  }
+
+  const postRow = async (table, row) => {
+    const r = await fetch(`${APP_BASE}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: { apikey: APP_ANON, Authorization: `Bearer ${APP_ANON}`,
+                 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(row),
+    })
+    return { ok: r.ok, status: r.status, body: scrub((await r.text()).slice(0, 200)) }
+  }
+
+  await liveOnPage('#/products', `${tag}-PRODUCT`, 'product',
+    () => postRow('products', { name: `${tag}-PRODUCT`, price: 13.37, quantity: 5 }))
+  await liveOnPage('#/whatsapp', `${tag}-WAORDER`, 'website order',
+    () => postRow('whatsapp_orders', {
+      order_no: `${tag}-WAORDER`, customer_name: `${tag}-WAORDER`,
+      total: 55.5, status: 'Pending',
+    }))
+  // Back to the till, so the workstation check below starts where a cashier
+  // would be.
+  await page.evaluate(() => { window.location.hash = '#/pos' })
+  await page.waitForTimeout(1500)
+
+  // 4b. TWO WORKSTATIONS. A shop has more than one till, and the thing that
+  // matters is that a sale rung up at one appears at the other. A second
+  // browser CONTEXT, not a second tab: separate storage and a separate
+  // session, which is what a second machine actually is.
+  //
+  // Both waits are armed BEFORE the insert. The sale popup dismisses itself
+  // after four seconds, so checking one till and then the other could miss
+  // the second one's window and report a working platform as broken --
+  // whereas armed first, each till is watched from before the event exists.
+  let page2 = null
+  try {
+    const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 860 } })
+    page2 = await ctx2.newPage()
+    const errs2 = []
+    page2.on('console', (m) => { if (m.type() === 'error') errs2.push(scrub(m.text()).slice(0, 160)) })
+    await page2.goto(APP_URL, { waitUntil: 'domcontentloaded', timeout: 45000 })
+    const pin2 = page2.locator('input[inputmode="numeric"], input[type="password"], input[maxlength="1"]')
+    await pin2.first().waitFor({ timeout: 25000 })
+    const n2 = await pin2.count()
+    const d2 = String(APP_PIN).split('')
+    if (n2 >= 4) { for (let i = 0; i < 4; i++) await pin2.nth(i).fill(d2[i]) }
+    else { await pin2.first().fill(String(APP_PIN)); await page2.keyboard.press('Enter') }
+    const in2 = await page2.locator('text=/Staging Probe|Checkout|Products|Sales/i')
+      .first().waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
+    if (!in2) {
+      block('a second workstation could not sign in, so multi-till delivery was not tested')
+    } else {
+      good('a second workstation signed in independently')
+      await page2.waitForTimeout(6000)   // let its channel finish joining
+      const w1 = page.locator('text=/77\\.25/').first()
+        .waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
+      const w2 = page2.locator('text=/77\\.25/').first()
+        .waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
+      const ins2 = await insertSale(APP_BASE, APP_ANON, `${tag}-multi`, 77.25)
+      if (!ins2.ok) {
+        bad(`could not insert the multi-workstation sale (HTTP ${ins2.status}): ${ins2.body}`)
+      } else {
+        const t2 = Date.now()
+        const [s1, s2] = await Promise.all([w1, w2])
+        if (s1 && s2) {
+          good(`BOTH workstations showed the same sale without a refresh (${Date.now() - t2}ms)`)
+        } else {
+          bad(`only ${(s1 ? 1 : 0) + (s2 ? 1 : 0)} of 2 workstations showed the sale ` +
+              `(first till ${s1 ? 'yes' : 'no'}, second till ${s2 ? 'yes' : 'no'})`)
+          if (errs2.length) say(`second workstation console errors: ${errs2.slice(0, 3).join(' | ')}`)
+        }
+      }
+    }
+  } catch (e) {
+    block(`the second workstation could not be opened: ${scrub(String(e)).slice(0, 160)}`)
+  }
+
   // 5. Cross-tenant: a sale in ANOTHER application must not appear here.
   if (OTHER_DB) {
     const otherBase = `http://${OTHER_DB.replace(/_/g, '-')}.staging.test`

@@ -196,6 +196,25 @@ TESTS = [
      [r"RECEIVED THE LIVE EVENT AND SHOWED IT IN THE INTERFACE"],
      [r"did not show the sale: its pos-live subscription delivered nothing",
       r"the real application did not show the live event"]),
+    # A shop has more than one till, and the whole point of live updates is
+    # that a sale rung up at one appears at the other. One browser proves a
+    # subscription works; it does not prove that.
+    # App.jsx subscribes to three tables. Only the one with a popup had ever
+    # been exercised through the interface; the other two just call a
+    # refresher, so the only way to see them work is to be on the page that
+    # shows the data and watch it change.
+    ("A product change appears in the interface", True,
+     [r"a product change appeared in the interface without a refresh"],
+     [r"a product change did NOT appear", r"could not insert the product probe"]),
+    ("A website order change appears in the interface", True,
+     [r"a website order change appeared in the interface without a refresh"],
+     [r"a website order change did NOT appear", r"could not insert the website order probe"]),
+    ("Two workstations both receive the same sale", True,
+     [r"BOTH workstations showed the same sale without a refresh"],
+     [r"of 2 workstations showed the sale",
+      r"could not insert the multi-workstation sale",
+      r"a second workstation could not sign in",
+      r"the second workstation could not be opened"]),
     ("Another application's sale does not appear in this one's interface", True,
      [r"did not appear in this application's interface"],
      [r"APPEARED in \w+'s interface"]),
@@ -347,6 +366,9 @@ REQUIREMENTS = [
         "The real application's Login screen renders",
         "verify_pin accepts a staging PIN and the till opens",
         "The real application receives a live event and SHOWS it",
+        "A product change appears in the interface",
+        "A website order change appears in the interface",
+        "Two workstations both receive the same sale",
         "Another application's sale does not appear in this one's interface",
         "A second, independent Realtime tenant also delivers",
         "Each Realtime tenant has its own replication slot",
