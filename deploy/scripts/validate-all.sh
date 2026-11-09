@@ -281,6 +281,20 @@ else
   ok "$(printf '%s' "$SUBOUT" | sed -n 's/^CHECKED //p')"
 fi
 
+hdr "JavaScript inside a heredoc actually parses"
+# staging-test.sh carries a real supabase-js client in a quoted heredoc, and
+# `bash -n` does not look inside one -- to the shell it is text. So a syntax
+# error there costs a twenty-minute staging run and then surfaces as a
+# delivery failure rather than as a broken test. That file has already
+# produced two misleading runs on its own account.
+JSOUT="$(python3 "$DEPLOY/scripts/check-heredoc-js.py" --deploy "$DEPLOY" 2>&1 || true)"
+if printf '%s' "$JSOUT" | grep -q 'do not parse'; then
+  bad "embedded JavaScript does not parse"
+  printf '%s\n' "$JSOUT" | awk 'NR <= 6'
+else
+  ok "$(printf '%s' "$JSOUT" | sed -n 's/^ *\([0-9].*parse\)$/\1/p;s/^ *\(skipped.*\)$/\1/p' | head -1)"
+fi
+
 hdr "No pipeline closes a pipe early under set -e"
 # The same class of trap as above, in a different shape, and it has now cost
 # three scripts.

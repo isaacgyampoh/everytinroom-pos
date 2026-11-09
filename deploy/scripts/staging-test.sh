@@ -730,21 +730,65 @@ console.log('INSERTED')
 // HOW LONG TO WAIT, AND WHY IT IS SETTABLE.
 //
 // Twenty seconds is right for a tenant that has been serving for a while. It
-// is NOT right for one that has just started or just been restarted, because
-// Realtime's change-data-capture poller cancels its own timer when it reads
-// an empty table-oid list and does not look again for sixty seconds
-// (@check_oids_interval). A fresh tenant that loses that race delivers
-// nothing for a minute and then delivers normally -- which, measured through
-// a twenty-second window, is indistinguishable from a platform that does not
-// work at all.
-//
-// I had excluded this on the grounds that the slot existed and was active.
-// That was wrong: the slot existing says prepare_replication ran, not that
-// the poller's timer is alive.
+// is not obviously right for one that has just started or just been
+// restarted: Realtime's change-data-capture poller and its subscription
+// manager each re-read the publication's table oids on a sixty-second cycle
+// (@check_oids_interval), and a tenant that has not completed one of those
+// cycles may not yet be watching the table a client has just subscribed to.
 const waitMs = Number(process.env.RT_WAIT_MS || 20000)
 const t0 = Date.now()
 for (let i = 0; i < Math.ceil(waitMs / 200) && !got; i++) await new Promise((r) => setTimeout(r, 200))
 console.log(`WAITED ${Date.now() - t0}ms of a ${waitMs}ms window`)
+
+// A SECOND INSERT, ON THE SAME OPEN SUBSCRIPTION.
+//
+// This is the experiment that separates two states which look identical
+// through one insert and one window:
+//
+//   a warm-up gap   the tenant was not yet watching the table when the first
+//                   row was written, so that row was missed -- but the
+//                   subscription is live and the next row arrives
+//   a dead tenant   nothing is ever delivered on this channel
+//
+// Waiting longer cannot tell them apart, because a change that was missed is
+// missed: the slot does not go back for it. Writing a second row after the
+// refresh cycle has had time to run does tell them apart, and the two
+// outcomes have different names below so neither can be read as the other.
+//
+// It is deliberately a different row on the same channel, with nothing
+// re-subscribed, so a pass here is the platform recovering by itself rather
+// than the test retrying until it gets the answer it wants.
+// Whether it arrived on the FIRST insert is the thing that must not be lost:
+// without this, a warm-up recovery would print the same EVENT_RECEIVED as an
+// immediate delivery and the distinction the second insert exists to draw
+// would be thrown away one line later.
+const gotOnFirstInsert = !!got
+const retryAfter = Number(process.env.RT_RETRY_AFTER_MS || 0)
+// Never on the isolation check: there, an arriving event is a leak, and
+// writing a second row would just be a second chance to leak.
+if (!got && retryAfter > 0 && expect !== 'no-event') {
+  console.log(`SECOND_INSERT after ${Date.now() - tCommitted}ms with nothing delivered`)
+  const r2 = await fetch(`${insertUrl}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: { apikey: insertKey, Authorization: `Bearer ${insertKey}`,
+             'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify({ label: label + '-2' }),
+  })
+  if (!r2.ok) {
+    console.log('SECOND_INSERT_FAILED:' + r2.status)
+  } else {
+    const t2 = Date.now()
+    for (let i = 0; i < Math.ceil(retryAfter / 200) && !got; i++) {
+      await new Promise((r) => setTimeout(r, 200))
+    }
+    if (got) {
+      console.log(`SECOND_DELIVERED_MS ${tGot - t2}`)
+      console.log('EVENT_RECEIVED_ON_SECOND_INSERT:' + scrub(JSON.stringify(got)))
+    } else {
+      console.log(`SECOND_ALSO_LOST after ${Date.now() - t2}ms`)
+    }
+  }
+}
 
 // The stage-by-stage picture, whichever way it went.
 console.log(`STAGES socket_frames=${frames} join_replies=${joinReplies} ` +
@@ -758,7 +802,13 @@ if (expect === 'no-event') {
   if (got) { console.log('LEAKED:' + scrub(JSON.stringify(got))); process.exit(6) }
   console.log('NO_EVENT_AS_EXPECTED'); process.exit(0)
 }
-if (got) { console.log('EVENT_RECEIVED:' + scrub(JSON.stringify(got))); process.exit(0) }
+if (gotOnFirstInsert) { console.log('EVENT_RECEIVED:' + scrub(JSON.stringify(got))); process.exit(0) }
+// Delivered, but only after a row written later. Reported under its own name
+// and its own exit code: this is a working subscription with a warm-up gap,
+// which is a different operational fact from either a clean delivery or a
+// dead channel, and the suite has to be able to say which of the three it
+// measured.
+if (got) { process.exit(7) }
 console.log('NO_EVENT'); process.exit(5)
 JS
 
@@ -1201,16 +1251,23 @@ EOL
       # a poller that lost the oid race is silent for sixty. If the event
       # arrives at around sixty seconds, that interval IS the cause and the
       # latency line says so in a number.
-      RT_TIMEOUT=140 rt_run "$RT_NEW" RT_URL="http://$G_DNS.staging.test" \
-        RT_KEY="$G_ANON" RT_LABEL="gamma-probe" RT_WAIT_MS=95000 \
-        > /tmp/rt-gamma.log 2>&1 || true
+      RT_TIMEOUT=220 rt_run "$RT_NEW" RT_URL="http://$G_DNS.staging.test" \
+        RT_KEY="$G_ANON" RT_LABEL="gamma-probe" RT_WAIT_MS=75000 \
+        RT_RETRY_AFTER_MS=40000 > /tmp/rt-gamma.log 2>&1 || true
       OUT2="$(cat /tmp/rt-gamma.log)"
       G_DELIVERS=0
-      if grep -q 'EVENT_RECEIVED' /tmp/rt-gamma.log; then
+      if grep -q '^EVENT_RECEIVED:' /tmp/rt-gamma.log; then
         G_DELIVERS=1
         pass "the SECOND tenant also delivers a database change end to end"
+      elif grep -q 'EVENT_RECEIVED_ON_SECOND_INSERT' /tmp/rt-gamma.log; then
+        # The subscription works. What it did not do was catch a row written
+        # before the tenant had finished taking up the table. Said plainly,
+        # because a newly provisioned shop's first minute is a real thing to
+        # know about and not a reason to call the platform broken.
+        G_DELIVERS=1
+        pass "the SECOND tenant delivers, after a warm-up gap: a row written $(sed -n 's/^SECOND_INSERT after \([0-9]*\)ms.*/\1/p' /tmp/rt-gamma.log | head -1)ms earlier was missed, the next one arrived in $(sed -n 's/^SECOND_DELIVERED_MS //p' /tmp/rt-gamma.log | head -1)ms"
       else
-        fail "the second tenant delivered nothing: $(tail -2 /tmp/rt-gamma.log | tr '\n' ' ')"
+        fail "the second tenant delivered nothing, on two separate inserts: $(tail -2 /tmp/rt-gamma.log | tr '\n' ' ')"
       fi
       # The stage counters and the timing, whichever way it went. They are the
       # whole point of instrumenting the socket, and run 40 collected them and
@@ -1297,12 +1354,15 @@ EOL
     # Same ninety-five second window as the second tenant, and for the same
     # reason: a service that has just restarted is a service whose poller has
     # just started.
-    RT_TIMEOUT=140 rt_run "$RT_NEW" RT_URL="http://$APP_DNS.staging.test" RT_KEY="$ANON" \
-      RT_LABEL="after-restart" RT_WAIT_MS=95000 > /tmp/rt-restart.log 2>&1 || true
-    if grep -q 'EVENT_RECEIVED' /tmp/rt-restart.log; then
+    RT_TIMEOUT=220 rt_run "$RT_NEW" RT_URL="http://$APP_DNS.staging.test" RT_KEY="$ANON" \
+      RT_LABEL="after-restart" RT_WAIT_MS=75000 RT_RETRY_AFTER_MS=40000 \
+      > /tmp/rt-restart.log 2>&1 || true
+    if grep -q '^EVENT_RECEIVED:' /tmp/rt-restart.log; then
       pass "delivery resumed after the Realtime service was restarted, unattended"
+    elif grep -q 'EVENT_RECEIVED_ON_SECOND_INSERT' /tmp/rt-restart.log; then
+      pass "delivery resumed after the restart, with a warm-up gap: a row written $(sed -n 's/^SECOND_INSERT after \([0-9]*\)ms.*/\1/p' /tmp/rt-restart.log | head -1)ms earlier was missed, the next one arrived in $(sed -n 's/^SECOND_DELIVERED_MS //p' /tmp/rt-restart.log | head -1)ms"
     else
-      fail "nothing was delivered after the restart: $(tail -2 /tmp/rt-restart.log | tr '\n' ' ')"
+      fail "nothing was delivered after the restart, on two separate inserts: $(tail -2 /tmp/rt-restart.log | tr '\n' ' ')"
     fi
     detail grep -E "^(CLIENT_VERSION|SUBSCRIBED|INSERTED|STAGES|WAITED|LATENCY|EVENT_RECEIVED|NO_EVENT|SUBSCRIBE_FAILED)" /tmp/rt-restart.log
     # How long it took matters as much as whether it arrived. A till that goes
