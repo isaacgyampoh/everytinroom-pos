@@ -35,15 +35,56 @@ const scrub = (s) => String(s)
 
 const tag = `STAGING-PROBE-${Date.now().toString(36)}`
 
+// sales.receipt_no is NOT NULL UNIQUE and has no default, so it has to be
+// supplied. Omitting it made every insert in this file fail with 23502 and
+// the run reported "the real application did not show the live event" -- a
+// delivery failure, for a row that was never written. A counter keeps it
+// unique across the several sales this run inserts.
+let receiptN = 0
 async function insertSale(base, key, customer, total) {
+  receiptN += 1
   const r = await fetch(`${base}/rest/v1/sales`, {
     method: 'POST',
     headers: { apikey: key, Authorization: `Bearer ${key}`,
                'Content-Type': 'application/json', Prefer: 'return=representation' },
-    body: JSON.stringify({ customer, total, payment: 'Cash', cashier: 'Staging Probe' }),
+    body: JSON.stringify({
+      receipt_no: `${tag}-R${receiptN}`,
+      customer, total, payment: 'Cash', cashier: 'Staging Probe',
+    }),
   })
   return { ok: r.ok, status: r.status, body: scrub((await r.text()).slice(0, 200)) }
 }
+
+// TYPED, NOT FILLED, AND THIS IS NOT COSMETIC.
+//
+// Login.jsx auto-submits on the fourth digit:
+//
+//   const p = [...pins]; p[i] = val.slice(-1); setPins(p)
+//   if (i === 3 && val) tryLogin(p.join(''))
+//
+// `pins` comes from React state, so each handler sees whatever had been
+// rendered when it was created. Filling four inputs in a tight loop outruns
+// React's batching: the fourth handler can still be holding an array whose
+// first three entries are empty, and it submits a one-digit PIN. verify_pin
+// refuses it, correctly, and the test reads as "the application did not reach
+// its logged-in interface" -- blaming the application for the harness typing
+// faster than any person could.
+//
+// Typing with a delay also needs no focus management: the component moves
+// focus itself after each digit, which is the behaviour being exercised.
+async function enterPin(p, pin) {
+  const fields = p.locator('input[inputmode="numeric"], input[type="tel"], input[type="password"], input[maxlength="1"]')
+  await fields.first().waitFor({ timeout: 25000 })
+  const count = await fields.count()
+  await fields.first().click()
+  await p.keyboard.type(String(pin), { delay: 140 })
+  // Single-field variants need an explicit submit; the four-box form does not.
+  if (count < 4) await p.keyboard.press('Enter')
+  return { count }
+}
+
+const loggedIn = (p) => p.locator('text=/Staging Probe|Checkout|Products|Sales/i')
+  .first().waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
 
 const browser = await chromium.launch({ args: ['--no-sandbox'] })
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 } })
@@ -74,25 +115,28 @@ try {
   await page.goto(APP_URL, { waitUntil: 'domcontentloaded', timeout: 45000 })
 
   // 1. The real Login screen.
-  const pinInputs = page.locator('input[inputmode="numeric"], input[type="password"], input[maxlength="1"]')
+  const pinInputs = page.locator('input[inputmode="numeric"], input[type="tel"], input[type="password"], input[maxlength="1"]')
   await pinInputs.first().waitFor({ timeout: 25000 }).catch(() => {})
   const n = await pinInputs.count()
   if (n === 0) {
     block('the application rendered no PIN entry, so its real login could not be driven')
   } else {
     good(`the application's own Login screen rendered (${n} PIN field(s))`)
-    const digits = String(APP_PIN).split('')
-    if (n >= 4) {
-      for (let i = 0; i < 4; i++) await pinInputs.nth(i).fill(digits[i])
-    } else {
-      await pinInputs.first().fill(String(APP_PIN))
-      await page.keyboard.press('Enter')
-    }
+    await enterPin(page, APP_PIN)
     // 2. Did verify_pin accept it and the till open?
-    const loggedIn = await page.locator('text=/Staging Probe|Checkout|Products|Sales/i')
-      .first().waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
-    if (loggedIn) good('verify_pin() accepted the PIN and the till opened')
-    else bad('the application did not reach its logged-in interface')
+    if (await loggedIn(page)) {
+      good('verify_pin() accepted the PIN and the till opened')
+    } else {
+      bad('the application did not reach its logged-in interface')
+      // What was actually on screen, because "it did not log in" is not a
+      // diagnosis and a second run spent guessing is a wasted run.
+      try {
+        const visible = (await page.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 300)
+        say(`what was on screen instead: ${scrub(visible)}`)
+        await page.screenshot({ path: '/tmp/app-login-failed.png' })
+        say('screenshot: /tmp/app-login-failed.png')
+      } catch {}
+    }
   }
 
   // 3. The subscriptions the application actually makes.
@@ -150,7 +194,10 @@ try {
   async function liveOnPage(hash, needle, label, insert) {
     try {
       await page.evaluate((h) => { window.location.hash = h }, hash)
-      await page.waitForTimeout(2500)      // let the page mount and re-read
+      // Long enough that the page's own mount-time read has finished before
+      // the probe row exists. Otherwise that read could pick the row up and
+      // the test would credit the subscription for it.
+      await page.waitForTimeout(4000)
       // Armed before the insert, for the same reason as the popup above.
       const seenIt = page.locator(`text=${needle}`).first()
         .waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
@@ -205,14 +252,8 @@ try {
     const errs2 = []
     page2.on('console', (m) => { if (m.type() === 'error') errs2.push(scrub(m.text()).slice(0, 160)) })
     await page2.goto(APP_URL, { waitUntil: 'domcontentloaded', timeout: 45000 })
-    const pin2 = page2.locator('input[inputmode="numeric"], input[type="password"], input[maxlength="1"]')
-    await pin2.first().waitFor({ timeout: 25000 })
-    const n2 = await pin2.count()
-    const d2 = String(APP_PIN).split('')
-    if (n2 >= 4) { for (let i = 0; i < 4; i++) await pin2.nth(i).fill(d2[i]) }
-    else { await pin2.first().fill(String(APP_PIN)); await page2.keyboard.press('Enter') }
-    const in2 = await page2.locator('text=/Staging Probe|Checkout|Products|Sales/i')
-      .first().waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
+    await enterPin(page2, APP_PIN)
+    const in2 = await loggedIn(page2)
     if (!in2) {
       block('a second workstation could not sign in, so multi-till delivery was not tested')
     } else {
@@ -252,19 +293,6 @@ try {
     else good(`a sale written to ${OTHER_DB} did not appear in this application's interface`)
   }
 
-  // Signing in is needed twice more below, so it is one function. It asserts
-  // nothing: the assertions belong to the tests that call it.
-  async function signIn(p) {
-    const f = p.locator('input[inputmode="numeric"], input[type="password"], input[maxlength="1"]')
-    await f.first().waitFor({ timeout: 25000 })
-    const c = await f.count()
-    const d = String(APP_PIN).split('')
-    if (c >= 4) { for (let i = 0; i < 4; i++) await f.nth(i).fill(d[i]) }
-    else { await f.first().fill(String(APP_PIN)); await p.keyboard.press('Enter') }
-    return p.locator('text=/Staging Probe|Checkout|Products|Sales/i')
-      .first().waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
-  }
-
   // 6. A NETWORK INTERRUPTION, which is the normal condition of a shop in
   // Accra rather than an edge case.
   //
@@ -301,7 +329,8 @@ try {
   // live updates, which is a separate question from the service restarting.
   try {
     await page.reload({ waitUntil: 'domcontentloaded', timeout: 45000 })
-    const back = await signIn(page)
+    await enterPin(page, APP_PIN)
+    const back = await loggedIn(page)
     if (!back) {
       bad('the application did not reach its interface again after a restart')
     } else {

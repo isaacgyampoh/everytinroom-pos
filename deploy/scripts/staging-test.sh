@@ -727,7 +727,24 @@ if (!r.ok) {
 const tCommitted = Date.now()
 console.log('INSERTED')
 
-for (let i = 0; i < 100 && !got; i++) await new Promise((r) => setTimeout(r, 200))
+// HOW LONG TO WAIT, AND WHY IT IS SETTABLE.
+//
+// Twenty seconds is right for a tenant that has been serving for a while. It
+// is NOT right for one that has just started or just been restarted, because
+// Realtime's change-data-capture poller cancels its own timer when it reads
+// an empty table-oid list and does not look again for sixty seconds
+// (@check_oids_interval). A fresh tenant that loses that race delivers
+// nothing for a minute and then delivers normally -- which, measured through
+// a twenty-second window, is indistinguishable from a platform that does not
+// work at all.
+//
+// I had excluded this on the grounds that the slot existed and was active.
+// That was wrong: the slot existing says prepare_replication ran, not that
+// the poller's timer is alive.
+const waitMs = Number(process.env.RT_WAIT_MS || 20000)
+const t0 = Date.now()
+for (let i = 0; i < Math.ceil(waitMs / 200) && !got; i++) await new Promise((r) => setTimeout(r, 200))
+console.log(`WAITED ${Date.now() - t0}ms of a ${waitMs}ms window`)
 
 // The stage-by-stage picture, whichever way it went.
 console.log(`STAGES socket_frames=${frames} join_replies=${joinReplies} ` +
@@ -794,7 +811,11 @@ PY
   rt_run() {   # rt_run <version> <extra env assignments...>
     local v="$1"; shift
     if [ ! -f "/tmp/rtclient-$v/rt.mjs" ]; then echo "CLIENT_MISSING"; return 1; fi
-    ( cd "/tmp/rtclient-$v" && env RT_CLIENT_VERSION="$v" "$@" timeout 90 node rt.mjs 2>&1 )
+    # The hard timeout has to exceed the client's own wait window, or a test
+    # that legitimately waits ninety seconds is killed at ninety and reads as
+    # a delivery failure.
+    local hard="${RT_TIMEOUT:-90}"
+    ( cd "/tmp/rtclient-$v" && env RT_CLIENT_VERSION="$v" "$@" timeout "$hard" node rt.mjs 2>&1 )
   }
   if [ ! -f "/tmp/rtclient-$RT_NEW/rt.mjs" ]; then
     # Not a skip. A required test that did not run is a failure, or a broken
@@ -1172,13 +1193,31 @@ EOL
       # delivered nothing". It had not delivered nothing; it had never been
       # asked. Three separate acceptance tests read as platform failures
       # because of it.
-      OUT2=$(rt_run "$RT_NEW" RT_URL="http://$G_DNS.staging.test" RT_KEY="$G_ANON" \
-             RT_LABEL="gamma-probe" || true)
-      if echo "$OUT2" | grep -q 'EVENT_RECEIVED'; then
+      # Ninety-five seconds, not twenty: this tenant started moments ago, and
+      # a poller that lost the oid race is silent for sixty. If the event
+      # arrives at around sixty seconds, that interval IS the cause and the
+      # latency line says so in a number.
+      # Ninety-five seconds, not twenty: this tenant started moments ago, and
+      # a poller that lost the oid race is silent for sixty. If the event
+      # arrives at around sixty seconds, that interval IS the cause and the
+      # latency line says so in a number.
+      RT_TIMEOUT=140 rt_run "$RT_NEW" RT_URL="http://$G_DNS.staging.test" \
+        RT_KEY="$G_ANON" RT_LABEL="gamma-probe" RT_WAIT_MS=95000 \
+        > /tmp/rt-gamma.log 2>&1 || true
+      OUT2="$(cat /tmp/rt-gamma.log)"
+      G_DELIVERS=0
+      if grep -q 'EVENT_RECEIVED' /tmp/rt-gamma.log; then
+        G_DELIVERS=1
         pass "the SECOND tenant also delivers a database change end to end"
       else
-        fail "the second tenant delivered nothing: $(echo "$OUT2" | tail -2 | tr '\n' ' ')"
-        detail docker logs "$G_DNS.realtime" --tail=20
+        fail "the second tenant delivered nothing: $(tail -2 /tmp/rt-gamma.log | tr '\n' ' ')"
+      fi
+      # The stage counters and the timing, whichever way it went. They are the
+      # whole point of instrumenting the socket, and run 40 collected them and
+      # then printed a blind tail of the container log instead.
+      detail grep -E "^(CLIENT_VERSION|SUBSCRIBED|INSERTED|STAGES|WAITED|LATENCY|EVENT_RECEIVED|NO_EVENT|SUBSCRIBE_FAILED)" /tmp/rt-gamma.log
+      if [ "$G_DELIVERS" = "0" ]; then
+        DETAIL_LINES=20 detail bash -c "docker logs '$G_DNS.realtime' 2>&1 | grep -iE 'cdc|poller|oids|list_changes|subscri|slot|error' | tail -20"
       fi
 
       # -----------------------------------------------------------------
@@ -1221,7 +1260,17 @@ EOL
              RT_INSERT_URL="http://$APP_DNS.staging.test" RT_INSERT_KEY="$ANON" \
              RT_LABEL="cross-tenant-probe" RT_EXPECT=no-event || true)
       if echo "$OUT3" | grep -q 'NO_EVENT_AS_EXPECTED'; then
-        pass "a change in alpha_shop did NOT reach $G_APP's channel — the tenants are separate"
+        # NOT a pass on its own. A tenant that delivers NOTHING also delivers
+        # nothing belonging to another tenant, so "no leak" on a channel that
+        # has never produced an event is a vacuous result -- and run 40
+        # recorded exactly that: gamma delivered nothing of its own, and this
+        # check passed beside it. The isolation claim only means something
+        # once that channel has been shown to work.
+        if [ "${G_DELIVERS:-0}" = "1" ]; then
+          pass "a change in alpha_shop did NOT reach $G_APP's channel — the tenants are separate"
+        else
+          fail "isolation is UNPROVEN: $G_APP's channel received nothing of its own, so receiving nothing of alpha_shop's says nothing"
+        fi
       elif echo "$OUT3" | grep -q 'LEAKED'; then
         fail "a change in alpha_shop WAS delivered to $G_APP — one application can see another's data"
         note "$(echo "$OUT3" | grep LEAKED | cut -c1-140)"
@@ -1245,13 +1294,31 @@ EOL
     else
       fail "${APP_DNS}.realtime did not become ready after a restart"
     fi
-    OUT4=$(rt_run "$RT_NEW" RT_URL="http://$APP_DNS.staging.test" RT_KEY="$ANON" \
-           RT_LABEL="after-restart" || true)
-    if echo "$OUT4" | grep -q 'EVENT_RECEIVED'; then
+    # Same ninety-five second window as the second tenant, and for the same
+    # reason: a service that has just restarted is a service whose poller has
+    # just started.
+    RT_TIMEOUT=140 rt_run "$RT_NEW" RT_URL="http://$APP_DNS.staging.test" RT_KEY="$ANON" \
+      RT_LABEL="after-restart" RT_WAIT_MS=95000 > /tmp/rt-restart.log 2>&1 || true
+    if grep -q 'EVENT_RECEIVED' /tmp/rt-restart.log; then
       pass "delivery resumed after the Realtime service was restarted, unattended"
     else
-      fail "nothing was delivered after the restart: $(echo "$OUT4" | tail -2 | tr '\n' ' ')"
-      detail docker logs "${APP_DNS}.realtime" --tail=25
+      fail "nothing was delivered after the restart: $(tail -2 /tmp/rt-restart.log | tr '\n' ' ')"
+    fi
+    detail grep -E "^(CLIENT_VERSION|SUBSCRIBED|INSERTED|STAGES|WAITED|LATENCY|EVENT_RECEIVED|NO_EVENT|SUBSCRIBE_FAILED)" /tmp/rt-restart.log
+    # How long it took matters as much as whether it arrived. A till that goes
+    # quiet for a minute after a service restart is a different operational
+    # fact from one that never recovers, and the suite has to be able to say
+    # which -- so the figure is reported next to the verdict either way.
+    R_MS="$(sed -n 's/^LATENCY .*deliver_ms=\(-\{0,1\}[0-9]\{1,\}\).*/\1/p' /tmp/rt-restart.log | head -1 || true)"
+    if [ -n "${R_MS:-}" ] && [ "$R_MS" -ge 0 ]; then
+      if [ "$R_MS" -gt 30000 ]; then
+        note "it took ${R_MS}ms after the restart -- around the poller's 60s oid re-check, not a hang"
+      else
+        note "it took ${R_MS}ms after the restart"
+      fi
+    fi
+    if ! grep -q 'EVENT_RECEIVED' /tmp/rt-restart.log; then
+      DETAIL_LINES=20 detail bash -c "docker logs '${APP_DNS}.realtime' 2>&1 | grep -iE 'cdc|poller|oids|list_changes|subscri|slot|error' | tail -20"
     fi
   else
     skip "could not install @supabase/supabase-js, so Realtime was not tested end to end"
@@ -1527,7 +1594,12 @@ else
     fail "the real application did not show the live event"
   fi
 fi
-DETAIL_LINES=40 detail bash -c "grep -E '^  (PASS|FAIL|BLOCKED|[a-z])' /tmp/appreal.log | head -40"
+# The indented lines too. This used to require EXACTLY two leading spaces, so
+# the browser harness's own diagnostics -- the console errors, the failed
+# requests, the websocket events, which it indents by four -- were captured
+# and then silently dropped here. Run 40 printed "console errors: 45" and not
+# one of them, which is the difference between a diagnosis and another run.
+DETAIL_LINES=70 detail bash -c "grep -E '^ {2,8}(PASS|FAIL|BLOCKED|UI_LATENCY|[a-z])' /tmp/appreal.log | head -70"
 
 # ===========================================================================
 gate_section 9

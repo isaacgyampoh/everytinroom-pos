@@ -117,7 +117,10 @@ TESTS = [
     ("A change in one application does not reach another's channel", True,
      [r"did NOT reach \w+'s channel"],
      [r"WAS delivered to \w+ — one application can see",
-      r"cross-tenant check did not complete"]),
+      r"cross-tenant check did not complete",
+      # A channel that delivers nothing at all also delivers nothing
+      # belonging to anyone else, so "no leak" there proves nothing.
+      r"isolation is UNPROVEN"]),
     ("Realtime becomes ready again after a restart", True,
      [r"came back and became ready after a restart"],
      [r"did not become ready after a restart"]),
