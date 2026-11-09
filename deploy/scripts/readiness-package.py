@@ -284,8 +284,14 @@ def main():
         name, required, pats = t[0], t[1], t[2]
         fails = t[3] if len(t) > 3 else ()
         st, ev = state_of(pats, texts, fails)
-        results.append((name, required, st, ev))
+        results.append((name, required, st, ev, pats))
 
+    # A test whose pattern is the never-matching sentinel cannot be run from
+    # here at all. It is blocked, not unverified, and saying so is the
+    # difference between "nobody looked" and "nobody could".
+    blocked = [r for r in results if r[2] == "NOT VERIFIED" and
+               any("__never_matches__" in p for p in r[4])]
+    results = [r for r in results if r not in blocked]
     passed = [r for r in results if r[2] == "PASSED"]
     failed = [r for r in results if r[2] == "FAILED"]
     unver = [r for r in results if r[2] == "NOT VERIFIED"]
@@ -309,33 +315,54 @@ def main():
     A("")
     A("## Verdict")
     A("")
-    A(f"- Passed: **{len(passed)}**")
-    A(f"- Failed: **{len(failed)}**")
-    A(f"- Not verified: **{len(unver)}**")
+    A("Four categories, kept apart on purpose. A thing proved on a real server")
+    A("and a thing proved on a laptop are not the same claim, and neither is")
+    A("the same as a thing nobody could test yet.")
+    A("")
+    A("| | Count | What it means |")
+    A("|---|---|---|")
+    A(f"| **Verified on a real server** | {len(passed)} | a named check in the "
+      f"staging run's report passed. The staging machine is a disposable Ubuntu "
+      f"server that installs Docker from scratch and runs the whole platform. |")
+    A(f"| **Failed** | {len(failed)} | a named check in that report failed. "
+      f"Listed below with the line that failed. |")
+    A(f"| **Not verified** | {len(unver)} | no check for it was found in the "
+      f"report. Not a soft pass: it means nobody looked, or the run did not "
+      f"reach it. |")
+    A(f"| **Blocked by missing credentials** | {len(blocked)} | cannot be run "
+      f"from here at all. Listed under \"What still requires an account "
+      f"action\". |")
+    A("")
+    A("Separately, and NOT counted above, there is evidence that comes only from")
+    A("local and CI tests -- the section \"Verified only in local tests\" says")
+    A("what each of those proves and, more to the point, what it does not.")
     A("")
     if ready:
-        A("**Every required acceptance test has passing evidence.**")
+        A("**Every required acceptance test has passing evidence from a real server.**")
     else:
         A("**NOT READY.** Required tests are failing or unverified; they are listed below.")
     A("")
-    A("## Acceptance tests")
+    A("## Verified on a real server")
+    A("")
+    A("Every row here is a check that passed, failed, or was never reached in the")
+    A("staging run named above. Nothing in this table comes from a local test.")
     A("")
     A("| Test | State | Evidence |")
     A("|---|---|---|")
-    for name, required, st, ev in results:
+    for name, required, st, ev, _pats in results:
         mark = {"PASSED": "PASSED", "FAILED": "**FAILED**", "NOT VERIFIED": "NOT VERIFIED"}[st]
         A(f"| {name} | {mark} | {ev.replace('|', '/')[:90] if ev else '—'} |")
     A("")
     if failed:
         A("### Failing")
         A("")
-        for name, _, _, ev in failed:
+        for name, _, _, ev, _p in failed:
             A(f"- **{name}** — {ev}")
         A("")
     if unver:
         A("### Not verified")
         A("")
-        for name, _, _, _ in unver:
+        for name, _, _, _, _p in unver:
             A(f"- {name}")
         A("")
         A("Each of these either did not run or has no matching check. Nothing")
@@ -552,6 +579,41 @@ def main():
         A("not finish the job.")
         A("")
 
+    A("## Verified only in local tests")
+    A("")
+    A("These run on a laptop or in CI, against a real PostgreSQL but not against")
+    A("the platform. They are listed separately because they are a weaker claim,")
+    A("and because the difference has already mattered: a local run has a")
+    A("superuser where the real server does not, and a tool that passed locally")
+    A("gave a confidently wrong answer on the server for exactly that reason.")
+    A("")
+    A("| Suite | What it proves | What it cannot |")
+    A("|---|---|---|")
+    A("| `validate-all.sh` | the SQL parses, no file takes ownership or acts as "
+      "another role, no secret or operator-only file is committed, every path "
+      "the scripts reach for exists, templates have no stray placeholders | "
+      "nothing about running containers |")
+    A("| `test-provision-sql.sh` | the provisioning SQL runs against a real "
+      "PostgreSQL; cross-application credentials are refused; PostgREST's role "
+      "switching behaves; the storage grants land as effective privileges | it "
+      "connects as a superuser, so permission walls that only appear for a "
+      "non-superuser do not reproduce — it says so in its own output |")
+    A("| `test-realtime-migrations.py` | Realtime's own tenant migrations "
+      "replay as a non-superuser, and that the one grant this platform adds is "
+      "what makes the difference, in both directions | that Ecto drives them "
+      "identically, and anything about a real subscribed client |")
+    A("| `test-cron-placement.py` | every scheduled job the inventory found is "
+      "re-registered in the database where it can run, schedule and command "
+      "preserved exactly | that the jobs themselves do the right thing, which "
+      "would mean running production's work |")
+    A("| `test-bootstrap-local.sh` | secret handling, config generation and the "
+      "memory arithmetic across machine sizes | anything needing Docker |")
+    A("")
+    A("The staging run includes the first four of those as well, so where a row")
+    A("above also appears in the real-server table, the real-server result is")
+    A("the one that counts.")
+    A("")
+
     A("## What still requires an account action")
     A("")
     A("These cannot be completed from here. Each is named, with what it unblocks.")
@@ -564,6 +626,15 @@ def main():
     A("| The payment-provider credential | server-side payment verification and stock deduction | see the local operator note |")
     A("| A VPS | any real deployment | not purchased, by instruction |")
     A("")
+    if blocked:
+        A("### Blocked by missing credentials, specifically")
+        A("")
+        for name, _, _, _, _p in blocked:
+            A(f"- **{name}** — cannot be attempted from here. It is not counted as")
+            A("  passed or failed, because neither would be true.")
+        A("")
+        A("Until these run, nothing in this package describes them as working.")
+        A("")
     A("## Backups, retention and off-server recovery")
     A("")
     A("Three things have to be true for a backup to be one, and they are")
@@ -631,13 +702,13 @@ def main():
     A("")
     A("| Risk | Why it is open | What closes it |")
     A("|---|---|---|")
-    for name, _, st, ev in results:
+    for name, _, st, ev, _p in results:
         if st == "FAILED":
             A(f"| {name} is FAILING | the run recorded a failure: "
               f"{ev.replace('|', '/')[:70]} | fix the cause and re-run; the "
               f"verdict is computed from the report, so it cannot be signed off "
               f"while this stands |")
-    for name, _, st, _ in results:
+    for name, _, st, _, _p in results:
         if st == "NOT VERIFIED":
             A(f"| {name} is unproven | no check for it was found in any report "
               f"| run the check; until then this capability is not claimed |")
