@@ -281,6 +281,30 @@ else
   ok "$(printf '%s' "$SUBOUT" | sed -n 's/^CHECKED //p')"
 fi
 
+hdr "No pipeline closes a pipe early under set -e"
+# The same class of trap as above, in a different shape, and it has now cost
+# three scripts.
+#
+#   grep ERROR "$log" | head -10 | sed 's/^/    /'
+#
+# With ten error lines this works. With eleven, head closes the pipe, grep is
+# killed by SIGPIPE, pipefail makes the status 141, and set -e aborts the
+# script on that line with no message at all.
+#
+# restore.sh did exactly this, immediately BEFORE printing the row counts and
+# money totals that prove whether a restore was good. Nineteen staging runs
+# passed because each had ten errors or fewer. The twentieth had 135 harmless
+# ones and reported a restore that had in fact succeeded as a failure. The
+# real migration script carried two more copies of it, in the two places that
+# summarise what went wrong while migrating a live shop.
+SIGOUT="$(python3 "$DEPLOY/scripts/check-sigpipe.py" --deploy "$DEPLOY" 2>&1 || true)"
+if printf '%s' "$SIGOUT" | grep -q 'can be killed by SIGPIPE'; then
+  bad "a pipeline can be killed by SIGPIPE and abort its script under set -e"
+  printf '%s\n' "$SIGOUT" | awk 'NR <= 10'
+else
+  ok "$(printf '%s' "$SIGOUT" | sed -n 's/^ *no pipeline/no pipeline/p')"
+fi
+
 hdr "No operator-only material is tracked"
 # This repository is public. A `git add -A` once committed five files of local
 # operator material to it: two privilege snapshots of the live database, the

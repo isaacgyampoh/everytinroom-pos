@@ -150,13 +150,22 @@ good "the real application built against the staging platform"
 # ---------------------------------------------------------------------------
 # 4. Playwright with Chromium, installed here rather than asked for.
 # ---------------------------------------------------------------------------
-if ! npx --yes playwright@1.56.1 --version >/tmp/pw.log 2>&1; then
-  blocked "playwright could not be fetched"; tail -4 /tmp/pw.log; exit 2
+# `npm install`, not `npx`. npx fetches playwright into its own cache, which
+# is enough to run its CLI and NOT enough for `import { chromium } from
+# 'playwright'` to resolve -- the run got as far as launching the script and
+# died with ERR_MODULE_NOT_FOUND. --no-save so the application's own
+# package.json is left exactly as it is.
+if ! npm install --no-save playwright@1.56.1 >/tmp/pw.log 2>&1; then
+  blocked "playwright could not be installed"; tail -6 /tmp/pw.log; exit 2
 fi
-if ! npx --yes playwright@1.56.1 install --with-deps chromium >>/tmp/pw.log 2>&1; then
-  blocked "chromium could not be installed"; tail -6 /tmp/pw.log; exit 2
+if ! npx playwright install --with-deps chromium >>/tmp/pw.log 2>&1; then
+  blocked "chromium could not be installed"; tail -8 /tmp/pw.log; exit 2
 fi
-good "Playwright and Chromium installed in this disposable environment"
+# Prove it resolves BEFORE building anything on the assumption that it does.
+if ! node -e "import('playwright').then(m => { if (!m.chromium) { process.exit(1) } })" >>/tmp/pw.log 2>&1; then
+  blocked "playwright installed but 'playwright' does not import"; tail -6 /tmp/pw.log; exit 2
+fi
+good "Playwright installed and importable, Chromium present"
 
 PORT=5599
 ( cd dist && python3 -m http.server "$PORT" --bind 127.0.0.1 >/tmp/app-serve.log 2>&1 ) &

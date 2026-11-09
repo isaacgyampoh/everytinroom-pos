@@ -187,7 +187,14 @@ if srcq "select 1 from pg_extension where extname='pg_cron'" | grep -q 1; then
     printf '\n'
     warn "The job bodies contain the OLD Supabase URL, hardcoded inside the SQL."
     warn "Left as they are, after cutover these jobs keep calling the old project:"
-    grep -o "https://[a-z0-9.]*supabase\.co[^']*" "$JOBS" | sort -u | sed 's/^/      /' | head -5
+    # awk, not `| head -5`: head closes the pipe after five lines, sort dies of
+    # SIGPIPE, pipefail turns that into 141 and set -e aborts this script --
+    # in the middle of migrating a live shop, with no further output. awk reads
+    # its input to the end and truncates on the way out. The same trap killed
+    # restore.sh; it is the kind of bug that only appears once there is a lot
+    # to print, which is exactly when the operator needs to see it.
+    grep -o "https://[a-z0-9.]*supabase\.co[^']*" "$JOBS" | sort -u \
+      | awk 'NR <= 5 { print "      " $0 } END { if (NR > 5) printf "      ... and %d more\n", NR - 5 }'
     warn "Edit $JOBS and replace that host with this server's API domain before applying it."
   fi
   warn "Apply them AFTER you have checked the URLs. Both kinds go in through the"
@@ -258,7 +265,11 @@ if gzip -dc "$DUMP" | docker exec -i central-postgres psql -U postgres -d "$APP_
   printf 'done\n'
   if [ "${ERRS:-0}" -gt 0 ]; then
     warn "$ERRS error line(s) during the restore:"
-    grep -i '^ERROR' "$WORK/restore.log" | sort | uniq -c | sort -rn | head -8 | sed 's/^/      /'
+    # awk rather than `| head -8 | sed` -- see the note on the job-URL listing
+    # above. A restore with more than eight distinct error messages is common,
+    # and it used to abort this script here.
+    grep -i '^ERROR' "$WORK/restore.log" | sort | uniq -c | sort -rn \
+      | awk 'NR <= 8 { print "      " $0 } END { if (NR > 8) printf "      ... and %d more kind(s)\n", NR - 8 }'
     warn "full log: $WORK/restore.log"
     warn "Errors naming 'extension already exists' or a Supabase role are expected."
     warn "Errors about a missing function or type are not — read them."

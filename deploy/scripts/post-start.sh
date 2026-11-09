@@ -116,7 +116,13 @@ case ",$PROFILES," in
                    -d "$APP_DB" -f - < "$DEPLOY/sql/24-storage-grants.sql" 2>&1)"; then
         if printf '%s' "$OUT" | grep -q "no privileges were granted"; then
           warn "some objects were not granted even as their owner:"
-          printf '%s\n' "$OUT" | grep "no privileges were granted" | head -10 | sed 's/^/      /'
+          # awk, not `| head -10 | sed`: with more than ten ungranted objects
+          # head closes the pipe, grep dies of SIGPIPE, pipefail reports 141
+          # and set -e aborts post-start.sh here -- during provisioning, right
+          # after announcing that something went wrong and before saying what.
+          printf '%s\n' "$OUT" \
+            | awk '/no privileges were granted/ { n++; if (n <= 10) print "      " $0 }
+                   END { if (n > 10) printf "      ... and %d more\n", n - 10 }'
           RC=1; RC_STORAGE=1
         else
           ok "grants applied to the storage schema, by the role that owns it"

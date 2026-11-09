@@ -734,7 +734,41 @@ JS
 
   RT_OLD=2.47.10
   RT_NEW=2.118.0
-  for V in "$RT_OLD" "$RT_NEW"; do
+  # THE VERSION THE TILL ACTUALLY SHIPS, read from its own lockfile.
+  #
+  # Run 39 compared 2.47.10 against 2.118.0 and proved the old one drops the
+  # event while the new one delivers it. That was worth knowing and it was
+  # not the question. The application's package.json says "^2.45.0", which
+  # npm resolves to 2.97.0 -- a version NEITHER arm tested. A comparison that
+  # does not include the version in the shipping bundle cannot say whether
+  # the till works, and reading it as though it could is how run 36 reached
+  # the wrong conclusion in the first place.
+  #
+  # So the arm is derived, not typed: it comes from package-lock.json, and if
+  # the lockfile moves, this moves with it.
+  RT_APP="$(python3 - "$DEPLOY/../package-lock.json" <<'PY' 2>/dev/null || true
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(1)
+p = d.get("packages", {}).get("node_modules/@supabase/supabase-js", {})
+v = p.get("version") or ""
+# Older lockfile layout.
+if not v:
+    v = d.get("dependencies", {}).get("@supabase/supabase-js", {}).get("version", "")
+sys.stdout.write(v)
+PY
+)"
+  if [ -z "${RT_APP:-}" ]; then
+    fail "could not read the application's own supabase-js version from package-lock.json"
+    RT_APP="$RT_NEW"
+  else
+    note "the application's lockfile pins supabase-js $RT_APP — that version is tested too"
+  fi
+  RT_VERSIONS="$RT_OLD $RT_NEW"
+  case " $RT_VERSIONS " in *" $RT_APP "*) ;; *) RT_VERSIONS="$RT_VERSIONS $RT_APP" ;; esac
+  for V in $RT_VERSIONS; do
     D="/tmp/rtclient-$V"
     mkdir -p "$D"
     ( cd "$D" && npm init -y >/dev/null 2>&1 \
@@ -845,6 +879,34 @@ JS
         fail "BOTH client versions fail to receive the event — it is not the client library" ;;
       *)
         fail "inconclusive comparison: $RT_OLD gave '${AB_OLD_RESULT:-none}', $RT_NEW gave '${AB_NEW_RESULT:-none}'" ;;
+    esac
+
+    # ---------------------------------------------------------------
+    # THE ARM THAT DECIDES ANYTHING: the version in the shipping bundle.
+    #
+    # The two arms above establish that the client library matters. This one
+    # answers the only question that affects the shop -- whether the client
+    # the till is built with receives the event. A green A/B on a version the
+    # application does not use would be another green result that proves
+    # nothing.
+    # ---------------------------------------------------------------
+    case "$RT_APP" in
+      "$RT_OLD") AB_APP_RESULT="$AB_OLD_RESULT"; note "the application ships $RT_APP, already measured above" ;;
+      "$RT_NEW") AB_APP_RESULT="$AB_NEW_RESULT"; note "the application ships $RT_APP, already measured above" ;;
+      *)
+        rt_run "$RT_APP" RT_URL="http://$APP_DNS.staging.test" RT_KEY="$ANON" RT_LABEL=ab-app \
+          > /tmp/ab-app.log 2>&1 || true
+        note "--- client $RT_APP (the version package-lock.json pins) ---"
+        detail grep -E "^(CLIENT_VERSION|SUBSCRIBED|INSERTED|STAGES|EVENT_RECEIVED|NO_EVENT|SUBSCRIBE_FAILED)" /tmp/ab-app.log
+        AB_APP_RESULT="$(grep -oE 'EVENT_RECEIVED|NO_EVENT|SUBSCRIBE_FAILED:[A-Z_]*|INSERT_FAILED|CLIENT_MISSING' /tmp/ab-app.log | head -1 || true)"
+        note "client $RT_APP -> ${AB_APP_RESULT:-no result}"
+        ;;
+    esac
+    case "${AB_APP_RESULT:-none}" in
+      EVENT_RECEIVED)
+        pass "the supabase-js version the application actually ships ($RT_APP) receives the event" ;;
+      *)
+        fail "the application ships supabase-js $RT_APP, which does NOT receive the event (got '${AB_APP_RESULT:-none}'); $RT_NEW does, so the application's dependency has to move" ;;
     esac
     echo "$OUT" | grep -q '^SUBSCRIBED' && pass "a Realtime subscription was accepted through the proxy" \
                                         || fail "the subscription was not accepted: $(echo "$OUT" | head -2 | tr '\n' ' ')"
@@ -1060,8 +1122,16 @@ EOL
       wait_realtime_ready "$G_DNS.realtime" "$G_DNS.realtime" \
         && pass "the second tenant's Realtime is ready after its migrations completed" \
         || fail "the second tenant's Realtime did not become ready"
-      OUT2=$(RT_URL="http://$G_DNS.staging.test" RT_KEY="$G_ANON" RT_LABEL="gamma-probe" \
-             timeout 90 node rt.mjs 2>&1)
+      # Through rt_run, like the A/B arms. This used to be a bare
+      # `node rt.mjs`, which stopped working the moment the A/B refactor moved
+      # the client installs into /tmp/rtclient-<version>/: there is no rt.mjs
+      # and no node_modules in the working directory any more, so node aborted
+      # with ERR_MODULE_NOT_FOUND and the test reported "the second tenant
+      # delivered nothing". It had not delivered nothing; it had never been
+      # asked. Three separate acceptance tests read as platform failures
+      # because of it.
+      OUT2=$(rt_run "$RT_NEW" RT_URL="http://$G_DNS.staging.test" RT_KEY="$G_ANON" \
+             RT_LABEL="gamma-probe" || true)
       if echo "$OUT2" | grep -q 'EVENT_RECEIVED'; then
         pass "the SECOND tenant also delivers a database change end to end"
       else
@@ -1105,10 +1175,9 @@ EOL
       # A leak here would mean one shop seeing another's sales in real
       # time, and it would look like everything was working.
       # -----------------------------------------------------------------
-      OUT3=$(RT_URL="http://$G_DNS.staging.test" RT_KEY="$G_ANON" \
+      OUT3=$(rt_run "$RT_NEW" RT_URL="http://$G_DNS.staging.test" RT_KEY="$G_ANON" \
              RT_INSERT_URL="http://$APP_DNS.staging.test" RT_INSERT_KEY="$ANON" \
-             RT_LABEL="cross-tenant-probe" RT_EXPECT=no-event \
-             timeout 90 node rt.mjs 2>&1)
+             RT_LABEL="cross-tenant-probe" RT_EXPECT=no-event || true)
       if echo "$OUT3" | grep -q 'NO_EVENT_AS_EXPECTED'; then
         pass "a change in alpha_shop did NOT reach $G_APP's channel — the tenants are separate"
       elif echo "$OUT3" | grep -q 'LEAKED'; then
@@ -1134,8 +1203,8 @@ EOL
     else
       fail "${APP_DNS}.realtime did not become ready after a restart"
     fi
-    OUT4=$(RT_URL="http://$APP_DNS.staging.test" RT_KEY="$ANON" RT_LABEL="after-restart" \
-           timeout 90 node rt.mjs 2>&1)
+    OUT4=$(rt_run "$RT_NEW" RT_URL="http://$APP_DNS.staging.test" RT_KEY="$ANON" \
+           RT_LABEL="after-restart" || true)
     if echo "$OUT4" | grep -q 'EVENT_RECEIVED'; then
       pass "delivery resumed after the Realtime service was restarted, unattended"
     else
@@ -1592,6 +1661,42 @@ if [ -n "$BK" ]; then
   L_ROWS="$(pgq 'select count(*) from public.money' "$APP")"
   [ "$L_ROWS" = "$BEFORE_ROWS" ] && pass "the live database was left alone ($L_ROWS rows)" \
                                  || fail "the live database changed during the rehearsal"
+
+  # THE SCHEMAS OUTSIDE public, WHICH NOBODY WAS CHECKING.
+  #
+  # Run 39's restore printed 135 error lines, all of them "schema storage does
+  # not exist". They come from the DROP statements a --clean dump emits, which
+  # necessarily fail on a database that does not have the object yet, so they
+  # are expected when restoring into a fresh --into target. "Expected" was an
+  # inference though, and the only thing the test actually checked was
+  # public.money -- so a restore that genuinely lost every uploaded file's
+  # metadata would have passed it twice over, on row count and on money.
+  #
+  # So the claim is now measured. storage.objects is where a product photo's
+  # location lives; losing it loses the catalogue's pictures even though every
+  # byte is still in R2.
+  for SCH in storage auth; do
+    HAS_SCH="$(pgq "select count(*) from information_schema.schemata where schema_name='$SCH'" alpha_restore_probe)"
+    SRC_SCH="$(pgq "select count(*) from information_schema.schemata where schema_name='$SCH'" "$APP")"
+    if [ "${SRC_SCH:-0}" = "0" ]; then
+      note "alpha_shop has no $SCH schema, so there was none to restore"
+    elif [ "${HAS_SCH:-0}" -ge 1 ]; then
+      S_SRC="$(pgq "select count(*) from information_schema.tables where table_schema='$SCH'" "$APP")"
+      S_DST="$(pgq "select count(*) from information_schema.tables where table_schema='$SCH'" alpha_restore_probe)"
+      [ "${S_DST:-0}" = "${S_SRC:-x}" ] \
+        && pass "the $SCH schema survived the restore with all ${S_DST} of its tables" \
+        || fail "the $SCH schema restored ${S_DST:-0} of ${S_SRC:-?} tables — the DROP errors were NOT harmless"
+    else
+      fail "the $SCH schema did not survive the restore, so everything outside public was lost"
+    fi
+  done
+  # And the row that actually matters in it: an uploaded object's metadata.
+  if [ "$(pgq "select count(*) from information_schema.tables where table_schema='storage' and table_name='objects'" alpha_restore_probe)" = "1" ]; then
+    pass "storage.objects exists in the restored database, so uploaded files keep their metadata"
+  else
+    fail "storage.objects is missing from the restored database — uploaded files would be orphaned"
+  fi
+
   pgq "drop database if exists alpha_restore_probe with (force)" >/dev/null 2>&1
 fi
 

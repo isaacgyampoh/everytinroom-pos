@@ -163,9 +163,20 @@ TESTS = [
      [r"client version WAS the cause", r"both client versions deliver"],
      [r"BOTH client versions fail to receive the event",
       r"inconclusive comparison"]),
+    # The arm that decides anything. The comparison above establishes that the
+    # client library matters; this says whether the library IN THE SHIPPING
+    # BUNDLE receives the event. Without it the suite could go green on a
+    # version the till does not use, which is the mistake run 36 made.
+    ("The supabase-js version the application ships delivers", True,
+     [r"version the application actually ships \([0-9.]+\) receives the event"],
+     [r"does NOT receive the event"]),
     # The real application, in a browser. Separate from the synthetic client,
     # because a synthetic client proving delivery does not prove the
     # application's own subscription and render path do.
+    ("The browser harness itself ran", True,
+     [r"Playwright installed and importable"],
+     [r"playwright could not be installed",
+      r"does not import", r"chromium could not be installed"]),
     ("The real application's Login screen renders", True,
      [r"application's own Login screen rendered"],
      [r"rendered no PIN entry"]),
@@ -218,6 +229,16 @@ TESTS = [
      [r"restored row count is", r"restored total is"]),
     ("Live database untouched by the restore rehearsal", True,
      [r"live database was left alone"]),
+    # Row counts and a money total only ever looked at public. A restore that
+    # dropped everything OUTSIDE public passed both, and storage.objects is
+    # where a product photo's location lives -- lose it and the catalogue has
+    # no pictures even though every byte is still in R2.
+    ("Schemas outside public survive the restore", True,
+     [r"schema survived the restore with all",
+      r"storage\.objects exists in the restored database"],
+     [r"DROP errors were NOT harmless",
+      r"did not survive the restore",
+      r"storage\.objects is missing from the restored database"]),
     ("Scheduled job registered in another database", True,
      [r"job was registered for alpha_shop"]),
     ("Scheduled job actually executed", True, [r"actually executed in the other database"],
@@ -310,7 +331,9 @@ REQUIREMENTS = [
         "Realtime subscription accepted",
         "The Realtime client harness actually ran",
         "Both client versions tested under identical conditions",
+        "The supabase-js version the application ships delivers",
         "Realtime delivers a database change end to end",
+        "The browser harness itself ran",
         "The real application's Login screen renders",
         "verify_pin accepts a staging PIN and the till opens",
         "The real application receives a live event and SHOWS it",
@@ -340,6 +363,7 @@ REQUIREMENTS = [
         "Restore into a SEPARATE database",
         "Restore verified by row count and a money total",
         "Live database untouched by the restore rehearsal",
+        "Schemas outside public survive the restore",
         "Restart recovery, unattended",
         "Whole stack recovers from a full stop, unattended",
         "Data survives a full restart",

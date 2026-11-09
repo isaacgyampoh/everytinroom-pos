@@ -117,10 +117,35 @@ if gzip -dc "$FILE" | docker exec -i central-postgres psql -U postgres -d "$TARG
   ERRS="$(grep -ci '^ERROR' "$LOG" 2>/dev/null || echo 0)"
   if [ "${ERRS:-0}" -gt 0 ]; then
     warn "the restore finished with $ERRS error line(s)"
-    grep -i '^ERROR' "$LOG" | head -10 | sed 's/^/      /'
+    # NOT `grep ... | head -10`.
+    #
+    # That is what was here, and it killed this script at the worst possible
+    # moment. With more than ten error lines, head closes the pipe, grep dies
+    # of SIGPIPE, pipefail makes the pipeline's status 141 and set -e aborts
+    # the script -- immediately BEFORE the part that prints the row counts and
+    # the money totals. So a restore with many harmless errors looked like a
+    # failed restore, and the operator lost the only output that would have
+    # told them otherwise. It went unnoticed for nineteen staging runs because
+    # every one of them had ten errors or fewer.
+    #
+    # awk reads the whole file and never has a pipe closed on it.
+    awk '/^ERROR/ { n++; if (n <= 10) print "      " $0 }' "$LOG"
+    # Grouped by kind, because 135 copies of one message is one problem, not
+    # 135, and the operator needs to know which.
+    printf '    %serrors by kind%s\n' "$C_DIM" "$C_RESET"
+    awk '/^ERROR/ {
+           line = $0
+           gsub(/"[^"]*"/, "\"...\"", line)        # one line per message shape
+           c[line]++
+         }
+         END { for (l in c) printf "      %4d  %s\n", c[l], substr(l, 1, 90) }' "$LOG" \
+      | sort -rn | awk 'NR <= 8'
     warn "full log: $LOG"
-    warn "A dump made with --clean reports errors for objects that did not exist"
-    warn "yet, which are harmless. Anything else is not. Read them before trusting this."
+    warn "A dump made with --clean emits DROP statements first, and every one of"
+    warn "them fails on a database that does not have the object yet -- which is"
+    warn "ALWAYS the case when restoring into a fresh --into target. Those are"
+    warn "harmless. Anything else is not. The row counts printed below are what"
+    warn "actually proves the restore, not this number."
   else
     ok "restored with no errors"
     rm -f "$LOG"
