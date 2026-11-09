@@ -286,7 +286,67 @@ else
       warn "will not exist, and Realtime will accept subscriptions and deliver"
       warn "NOTHING with no error a client can see. Live updates will not work."
       warn "A superuser on this server can fix it with one statement:"
-      warn "  GRANT SET ON PARAMETER log_min_messages TO \"$APP_RT_USER\";"
+      warn "  GRANT SET ON PARAMETER log_min_messages TO $APP_RT_USER;"
+    fi
+
+    # -------------------------------------------------------------------
+    # supabase_realtime_admin, the second thing Realtime's migrations need.
+    #
+    # Migration 40 of 91 creates that role and moves ownership of Realtime's
+    # channels, broadcasts and presences tables to it. On this image the role
+    # does not exist, it is one of supautils' reserved roles, and an
+    # application's realtime role cannot create roles -- so the migration
+    # fails and NOTHING AFTER IT RUNS.
+    #
+    # That is not only about broadcast and presence. Migration 69 replaces
+    # realtime.list_changes() with the version Realtime v2.148 actually calls,
+    # the one returning slot_changes_count. Stopping at 40 leaves the 2023
+    # version in place, and the poller fails every cycle with
+    #   column "slot_changes_count" does not exist
+    # while the client sits there reporting SUBSCRIBED. So live updates need
+    # this, not just the features the role is named after.
+    #
+    # On Supabase's own platform these migrations are run by a superuser,
+    # which is why none of this appears there. Here the role is created and
+    # granted by the image's superuser -- administration of a server whose
+    # operator already controls it -- and then Realtime runs its own
+    # migrations, so the schema is whatever Realtime says it should be rather
+    # than something this script reconstructed.
+    #
+    # WHAT IT DOES NOT CHANGE: isolation. supabase_realtime_admin is a
+    # cluster-level role, so several applications' realtime roles may each be
+    # members of it -- but an application's roles have CONNECT on their own
+    # database and no other, and that is the boundary. Membership in a shared
+    # role does not create a path between databases it cannot open.
+    sa() { docker exec -i central-postgres psql -q -U supabase_admin -d postgres "$@" 2>&1; }
+    if [ "$(psqlq -d postgres -c "select count(*) from pg_roles where rolname='supabase_realtime_admin'")" = "0" ]; then
+      OUT="$(sa -c "CREATE ROLE supabase_realtime_admin WITH NOINHERIT NOLOGIN NOREPLICATION")"
+      case "$OUT" in
+        *ERROR*|*error*) warn "could not create supabase_realtime_admin: $(printf '%s' "$OUT" | head -1)" ;;
+        *) ok "created the supabase_realtime_admin role" ;;
+      esac
+    fi
+    if [ "$(psqlq -d postgres -c "select count(*) from pg_roles where rolname='supabase_realtime_admin'")" = "1" ]; then
+      # WITH ADMIN OPTION because the migration itself then grants that role
+      # on to postgres, which needs admin rights over it.
+      OUT="$(sa -c "GRANT supabase_realtime_admin TO \"$APP_RT_USER\" WITH ADMIN OPTION")"
+      # A membership grant on reserved roles is the operation that has taken
+      # this server down before, so check it is still answering at all before
+      # reporting anything about the grant.
+      if [ "$(psqlq -d postgres -c 'select 1' 2>/dev/null)" != "1" ]; then
+        die "PostgreSQL stopped answering immediately after granting supabase_realtime_admin." \
+            "That grant has crashed this image before. Do not retry it; report it." \
+            "  docker logs central-postgres --tail=60"
+      fi
+      if [ "$(psqlq -d postgres -c "select pg_has_role('$APP_RT_USER','supabase_realtime_admin','MEMBER')::text")" = "true" ]; then
+        ok "Realtime's role is a member of supabase_realtime_admin, so its migrations can complete"
+      else
+        warn "$APP_RT_USER is NOT a member of supabase_realtime_admin: $(printf '%s' "$OUT" | head -1)"
+        warn "Realtime's migration 20240401105812 will fail and everything after"
+        warn "it will not run -- including the migration that replaces"
+        warn "realtime.list_changes() with the version this Realtime calls. Live"
+        warn "updates will not work, and a client will see no error."
+      fi
     fi
 
     set_env_var "$APP_ENV" APP_REALTIME_USER "$APP_RT_USER"
