@@ -674,6 +674,30 @@ JS
                           || fail "Realtime migration $v is NOT applied"
     done
 
+    # And migration 69's ACTUAL EFFECT, not just its version row. A recorded
+    # version says someone wrote a number into a table; what the poller needs
+    # is a function whose result carries slot_changes_count. Migration 69
+    # drops the old four-column list_changes and recreates it as
+    #   RETURNS TABLE(wal jsonb, is_rls_enabled boolean, subscription_ids
+    #                 uuid[], errors text[], slot_changes_count bigint)
+    # so the definition is read back out of the catalogue and checked.
+    RT_SIG="$(pgq "select pg_get_function_result(p.oid) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'realtime' and p.proname = 'list_changes'" "$APP")"
+    note "realtime.list_changes returns: ${RT_SIG:-(no such function)}"
+    case "$RT_SIG" in
+      *slot_changes_count*)
+        pass "realtime.list_changes() returns slot_changes_count, which is the definition migration 20260326120000 installs" ;;
+      "")
+        fail "realtime.list_changes() does not exist at all" ;;
+      *)
+        fail "realtime.list_changes() exists but has the OLD definition, with no slot_changes_count — the poller will fail on every cycle" ;;
+    esac
+    # It must also be callable by the role Realtime connects as. A function
+    # that exists and cannot be executed fails the same way from a client's
+    # point of view.
+    RT_EXEC="$(pgq "select bool_and(has_function_privilege('${APP}_realtime', p.oid, 'EXECUTE')) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'realtime' and p.proname = 'list_changes'" "$APP")"
+    [ "$RT_EXEC" = "t" ] && pass "Realtime's own role may execute realtime.list_changes()" \
+                         || fail "Realtime's role may NOT execute realtime.list_changes() (got '${RT_EXEC:-none}')"
+
     OUT=$(RT_URL="http://$APP_DNS.staging.test" RT_KEY="$ANON" timeout 90 node rt.mjs 2>&1)
     echo "$OUT" | grep -q '^SUBSCRIBED' && pass "a Realtime subscription was accepted through the proxy" \
                                         || fail "the subscription was not accepted: $(echo "$OUT" | head -2 | tr '\n' ' ')"

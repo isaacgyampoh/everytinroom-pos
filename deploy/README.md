@@ -227,6 +227,42 @@ those roles hold `CONNECT` on their own database and no other, and that is the
 boundary. Membership in a shared role creates no path into a database the role
 cannot open.
 
+### Why 83 of 91 migrations is the right answer, not a shortfall
+
+With both privileges in place Realtime applies 83 of its 91 tenant
+migrations. The remaining eight are not skipped to make a number look better;
+they cannot be performed by an application's role and nothing here uses them.
+
+Migration 84 is representative:
+
+```sql
+ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin
+  IN SCHEMA realtime
+  GRANT SELECT, INSERT ON TABLES TO postgres WITH GRANT OPTION
+```
+
+That is the same "act as another role" this platform bans in its own SQL — a
+role may change its own default privileges, not another's. Migrations 84 to 91
+all do work of that kind: delegating Realtime's `messages` tables and schema
+usage between `supabase_admin` and `postgres`, then revoking grant options
+again. They exist so that Supabase's own platform tooling can reach those
+tables. There is no such tooling here.
+
+**What is required is checked directly, by number and by effect:**
+
+| Migration | What it does | How it is verified |
+|---|---|---|
+| `20230328144023` | creates `realtime.list_changes()` | version row present |
+| `20240401105812` | creates `supabase_realtime_admin` and moves ownership; blocks everything after it | version row present |
+| `20260326120000` | replaces `list_changes()` with the five-column version this Realtime calls | version row present **and** `pg_get_function_result()` read back and checked for `slot_changes_count` |
+
+Then the behaviour itself: a real `@supabase/supabase-js` client subscribes
+through Caddy, a row is inserted through PostgREST, and the event must arrive.
+That is done on two independent tenants, a change in one must **not** reach the
+other's channel, and the service is restarted and has to resume delivering
+unattended. A version row says someone wrote a number into a table; those
+checks say the thing works.
+
 ### Checking it without a server
 
 `deploy/scripts/test-realtime-migrations.py` replays those migrations against
