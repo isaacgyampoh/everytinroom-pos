@@ -170,6 +170,15 @@ TESTS = [
     ("The supabase-js version the application ships delivers", True,
      [r"version the application actually ships \([0-9.]+\) receives the event"],
      [r"does NOT receive the event"]),
+    # "Live" is a claim about time, and nothing measured it until now. The
+    # figure runs from the API confirming the insert -- the row is committed
+    # by then -- to the client's callback, so it covers WAL decode, the
+    # poller, the broadcast and the socket.
+    ("Delivery latency measured, not assumed", True,
+     [r"reached the subscribed client in \d+ms"],
+     [r"no delivery latency was recorded",
+      r"past the 3000ms bound",
+      r"there is no latency to report"]),
     # The real application, in a browser. Separate from the synthetic client,
     # because a synthetic client proving delivery does not prove the
     # application's own subscription and render path do.
@@ -332,6 +341,7 @@ REQUIREMENTS = [
         "The Realtime client harness actually ran",
         "Both client versions tested under identical conditions",
         "The supabase-js version the application ships delivers",
+        "Delivery latency measured, not assumed",
         "Realtime delivers a database change end to end",
         "The browser harness itself ran",
         "The real application's Login screen renders",

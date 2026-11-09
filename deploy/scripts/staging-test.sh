@@ -668,6 +668,10 @@ const scrub = (s) => String(s)
 // WHERE DOES THE EVENT STOP? Counters for each stage, so the answer is a
 // number rather than an impression.
 let frames = 0, pgFrames = 0, joinReplies = 0, errors = 0, got = null
+// Stamped in the callback, not in the polling loop below: that loop wakes
+// every 200ms, so timing from it would quantise a 30ms delivery to 200ms and
+// report a made-up number as a measurement.
+let tGot = 0
 const seen = []
 
 const client = createClient(url, key, {
@@ -688,7 +692,7 @@ const client = createClient(url, key, {
 
 const ch = client.channel(chanName)
   .on('postgres_changes', { event: evt, schema: 'public', table },
-    (p) => { if (!got) got = p.new ?? p.old ?? p })
+    (p) => { if (!got) { got = p.new ?? p.old ?? p; tGot = Date.now() } })
 
 const status = await new Promise((res) => {
   ch.subscribe((s, err) => {
@@ -705,6 +709,7 @@ if (status !== 'SUBSCRIBED') {
 }
 console.log('SUBSCRIBED')
 
+const tSend = Date.now()
 const r = await fetch(`${insertUrl}/rest/v1/${table}`, {
   method: 'POST',
   headers: { apikey: insertKey, Authorization: `Bearer ${insertKey}`,
@@ -715,6 +720,11 @@ if (!r.ok) {
   console.log('INSERT_FAILED:' + r.status + ':' + scrub((await r.text()).slice(0, 200)))
   process.exit(4)
 }
+// The row is committed by the time PostgREST answers, so this is the instant
+// from which delivery can be measured. Reported separately from the round
+// trip to PostgREST, because one is the platform's latency and the other is
+// the test's own.
+const tCommitted = Date.now()
 console.log('INSERTED')
 
 for (let i = 0; i < 100 && !got; i++) await new Promise((r) => setTimeout(r, 200))
@@ -722,6 +732,9 @@ for (let i = 0; i < 100 && !got; i++) await new Promise((r) => setTimeout(r, 200
 // The stage-by-stage picture, whichever way it went.
 console.log(`STAGES socket_frames=${frames} join_replies=${joinReplies} ` +
           `postgres_changes_frames=${pgFrames} callback_fired=${got ? 1 : 0} errors=${errors}`)
+// How long a till would actually wait. -1 means it never arrived, which is
+// not a latency of zero and must not be averaged with anything.
+console.log(`LATENCY insert_ms=${tCommitted - tSend} deliver_ms=${tGot ? tGot - tCommitted : -1}`)
 for (const l of seen) console.log(l)
 
 if (expect === 'no-event') {
@@ -851,7 +864,7 @@ PY
     rt_run "$RT_OLD" RT_URL="http://$APP_DNS.staging.test" RT_KEY="$ANON" RT_LABEL=ab-old \
       > /tmp/ab-old.log 2>&1 || true
     note "--- client $RT_OLD (released 2024-12-19) ---"
-    detail grep -E "^(CLIENT_VERSION|SUBSCRIBED|INSERTED|STAGES|EVENT_RECEIVED|NO_EVENT|SUBSCRIBE_FAILED)" /tmp/ab-old.log
+    detail grep -E "^(CLIENT_VERSION|SUBSCRIBED|INSERTED|STAGES|LATENCY|EVENT_RECEIVED|NO_EVENT|SUBSCRIBE_FAILED)" /tmp/ab-old.log
     AB_OLD_RESULT="$(grep -oE 'EVENT_RECEIVED|NO_EVENT|SUBSCRIBE_FAILED:[A-Z_]*|INSERT_FAILED' /tmp/ab-old.log | head -1 || true)"
     AB_OLD_STAGES="$(grep -oE '^STAGES .*' /tmp/ab-old.log | head -1 || true)"
     note "client $RT_OLD -> ${AB_OLD_RESULT:-no result}"
@@ -897,7 +910,7 @@ PY
         rt_run "$RT_APP" RT_URL="http://$APP_DNS.staging.test" RT_KEY="$ANON" RT_LABEL=ab-app \
           > /tmp/ab-app.log 2>&1 || true
         note "--- client $RT_APP (the version package-lock.json pins) ---"
-        detail grep -E "^(CLIENT_VERSION|SUBSCRIBED|INSERTED|STAGES|EVENT_RECEIVED|NO_EVENT|SUBSCRIBE_FAILED)" /tmp/ab-app.log
+        detail grep -E "^(CLIENT_VERSION|SUBSCRIBED|INSERTED|STAGES|LATENCY|EVENT_RECEIVED|NO_EVENT|SUBSCRIBE_FAILED)" /tmp/ab-app.log
         AB_APP_RESULT="$(grep -oE 'EVENT_RECEIVED|NO_EVENT|SUBSCRIBE_FAILED:[A-Z_]*|INSERT_FAILED|CLIENT_MISSING' /tmp/ab-app.log | head -1 || true)"
         note "client $RT_APP -> ${AB_APP_RESULT:-no result}"
         ;;
@@ -908,6 +921,35 @@ PY
       *)
         fail "the application ships supabase-js $RT_APP, which does NOT receive the event (got '${AB_APP_RESULT:-none}'); $RT_NEW does, so the application's dependency has to move" ;;
     esac
+
+    # ---------------------------------------------------------------
+    # HOW LONG A CASHIER WAITS.
+    #
+    # "Live" is a claim about time, and nothing in this suite had ever
+    # measured it. The figure is taken from the instant PostgREST confirms
+    # the insert -- the row is committed by then -- to the instant the
+    # client's callback runs, so it covers WAL decode, the poller, the
+    # broadcast and the socket, and excludes the test's own round trip to
+    # the API.
+    #
+    # The bound is 3000ms. That is not a service level, it is the point past
+    # which a second cashier would notice the till was stale and ask. It is
+    # deliberately loose: a tighter one measured on a shared CI runner would
+    # fail for reasons that have nothing to do with the platform.
+    # ---------------------------------------------------------------
+    LAT_FILE=/tmp/ab-new.log
+    case "$RT_APP" in "$RT_OLD") LAT_FILE=/tmp/ab-old.log ;; "$RT_NEW") LAT_FILE=/tmp/ab-new.log ;; *) LAT_FILE=/tmp/ab-app.log ;; esac
+    DELIVER_MS="$(sed -n 's/^LATENCY .*deliver_ms=\(-\{0,1\}[0-9]\{1,\}\).*/\1/p' "$LAT_FILE" 2>/dev/null | head -1 || true)"
+    INSERT_MS="$(sed -n 's/^LATENCY insert_ms=\([0-9]\{1,\}\).*/\1/p' "$LAT_FILE" 2>/dev/null | head -1 || true)"
+    if [ -z "${DELIVER_MS:-}" ]; then
+      fail "no delivery latency was recorded, so the suite cannot say how live 'live' is"
+    elif [ "$DELIVER_MS" -lt 0 ]; then
+      fail "the event never arrived, so there is no latency to report (not a latency of zero)"
+    elif [ "$DELIVER_MS" -le 3000 ]; then
+      pass "a change reached the subscribed client in ${DELIVER_MS}ms (insert round trip ${INSERT_MS:-?}ms), within the 3000ms bound"
+    else
+      fail "a change took ${DELIVER_MS}ms to reach the client, past the 3000ms bound"
+    fi
     echo "$OUT" | grep -q '^SUBSCRIBED' && pass "a Realtime subscription was accepted through the proxy" \
                                         || fail "the subscription was not accepted: $(echo "$OUT" | head -2 | tr '\n' ' ')"
     # Realtime's log, unconditionally. It reports healthy while delivering

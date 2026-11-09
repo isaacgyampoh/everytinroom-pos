@@ -114,10 +114,18 @@ try {
     bad(`could not insert a sale through the API (HTTP ${ins.status}): ${ins.body}`)
   } else {
     say('inserted a sale; waiting up to 30s for the application to show it')
+    // From the instant the API confirmed the insert to the instant the figure
+    // is on screen. This is the only latency figure in the suite that
+    // measures what a cashier experiences: it includes the websocket, the
+    // application's own handler, its re-read of the sale through the API and
+    // React's render. The synthetic client's number stops at the callback.
+    const tCommitted = Date.now()
     const shown = await page.locator('text=/42\\.50/').first()
       .waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
+    const uiMs = Date.now() - tCommitted
     if (shown) {
       good('THE APPLICATION RECEIVED THE LIVE EVENT AND SHOWED IT IN THE INTERFACE')
+      say(`UI_LATENCY_MS ${uiMs} — from the API confirming the insert to the figure being on screen`)
       try {
         await page.screenshot({ path: '/tmp/app-realtime-popup.png' })
         say('screenshot: /tmp/app-realtime-popup.png (taken after login; no PIN on screen)')
