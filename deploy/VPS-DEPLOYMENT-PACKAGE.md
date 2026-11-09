@@ -48,13 +48,16 @@ Machine total under that load: **2,095 MB of 15,983 MB**, and `capacity.sh`
 projected room for about four more applications with memory as the binding
 constraint — seven in total on a 16 GB machine.
 
-The arithmetic for seven on 24 GB, worst case, every application running every
-service:
+The arithmetic for seven on 24 GB (24,576 MB), worst case — every application
+running every service the till's own stack uses:
 
 ```
 shared postgres + caddy                              276 MB
-7 × (postgrest 31 + realtime 200 + storage 77
-     + imgproxy 15 + gotrue 14) = 7 × 337          2,359 MB
+7 × (postgrest 31 + storage 77
+     + imgproxy 15 + gotrue 14) = 7 × 137            959 MB
+  (realtime, 200 MB each, is no longer deployed for
+   the till; add 200 MB per project whose inventory
+   shows it genuinely needs it)
 PostgreSQL shared_buffers (lib/tuning.sh: 33% of
   the 75% it is given = ~25% of RAM)              6,082 MB
 work_mem worst case (200 connections × 2 sorts
@@ -63,12 +66,14 @@ maintenance_work_mem (3 autovacuum workers
   × 1,536 MB)                                     4,608 MB
 OS and Docker                                       ~800 MB
                                                  ----------
-                                                 18,525 MB
+                                                 17,125 MB
 ```
 
-That leaves about **5.5 GB spare on 24 GB**, and the worst case above is
-genuinely worst: it assumes every connection sorting simultaneously and every
-application running services most of them do not need. `lib/tuning.sh`
+That leaves about **7.3 GB spare** (24,576 - 17,125 = 7,451 MB), and the worst
+case above is genuinely worst: it assumes all 200 connections sorting
+simultaneously, three autovacuum workers each taking their full allowance, and
+every application running storage, image resizing and auth — services most of
+them do not need. `lib/tuning.sh`
 contains a check that refuses settings whose worst case does not leave the
 machine room to breathe.
 
@@ -206,8 +211,62 @@ For the projects that do use it, GoTrue runs per application, with its own
 open self-registration is refused and that one application's token is rejected
 by another's API.
 
-**Realtime** needs three things that are not obvious, all now enforced in
-provisioning:
+**Realtime is not used by the till, and is not deployed for it.**
+
+It was, and it worked in steady state — measured at 275 ms with the
+application's own client version. It was dropped because of how it fails.
+Restarting the Realtime container left it accepting subscriptions and
+answering `{"message":"Subscribed to PostgreSQL","status":"ok"}` while
+delivering nothing at all, with no error in its log and no recovery after
+ninety-five seconds. A newly provisioned tenant behaved the same way. In its
+own poller:
+
+```elixir
+# Stopping with a :shutdown reason means the :transient child is NOT restarted
+defp retry_or_stop(%{retry_count: retry_count} = state, reason)
+     when retry_count >= @max_retries do
+  log_error("ReplicationPollerMaxRetriesReached", reason)
+  {:stop, {:shutdown, :max_retries_reached}, state}
+end
+```
+
+The change-data-capture worker stops for good while the channel layer carries
+on acknowledging clients. A till that has silently stopped updating looks
+exactly like a quiet afternoon, and nobody finds out until two cashiers
+disagree about stock.
+
+The till now reads revision counters from `public.live_state` — three rows,
+one per watched table, bumped by a statement-level trigger — polled through
+the same authenticated API it already uses. Migration `034_live_state.sql`
+creates it. What that removes from this deployment:
+
+| No longer needed | Was |
+|---|---|
+| the Realtime container | ~200 MB per application |
+| 91 tenant migrations | a provisioning step that could stop the tenant |
+| `supabase_realtime_admin` | a reserved role, granted `WITH ADMIN OPTION` |
+| `GRANT SET ON PARAMETER log_min_messages` | a privilege grant with a superuser fallback |
+| `REALTIME_SLOT_SUFFIX` | one replication slot per tenant, cluster-wide |
+| the `post-start.sh --only realtime` step | migrations applied as the image's superuser |
+
+What it costs: updates arrive in about three seconds instead of 275 ms. At a
+till that is not a difference anyone notices, and the request is a
+primary-key read of three rows — about an eighth of a request per second
+across four workstations, the same whether the shop has sold ten things or
+ten million.
+
+What it gains, by construction rather than by testing: a reconnection, a
+service restart and a reboot all recover by themselves, because every poll is
+a fresh request and there is no long-lived connection to be silently dead. The
+client also degrades rather than failing if it reaches a backend where
+`live_state` has not been created yet — it falls back to refreshing everything
+on a slower cycle and says so in the console, instead of delivering nothing.
+
+**The platform still supports Realtime** for any of the other six projects
+whose inventory shows it is needed, and the defect above is theirs to inherit
+if so. It is recorded in the readiness report as a known defect in an optional
+component rather than quietly dropped. The three things it needs, all enforced
+in provisioning, are:
 
 1. A narrow `GRANT SET ON PARAMETER log_min_messages`, or tenant migrations
    stop at `20230328144023` and `realtime.list_changes()` is never created.
@@ -348,7 +407,11 @@ and that is step 6.
 2. Each application, Everytinroom first
    /srv/central/provision-app.sh \
      --name everytinroom --domain api.everytinroom.store \
-     --realtime --storage --functions
+     --storage --functions
+
+   No --realtime: the till polls revision counters instead of holding a
+   websocket (section 5). Add it only for a project whose inventory shows
+   it is needed, and read the defect in section 5 first.
 
    Ten steps: register, isolated database, credentials, PostgREST, Realtime,
    storage, application services, migrations, domain and HTTPS, backups and

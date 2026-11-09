@@ -13,6 +13,7 @@ import ReceiptPreview from './components/ReceiptPreview'
 import { startAutoFlush, pendingCount, onPendingChange, flush } from './lib/offlineQueue'
 import { getSettings } from './lib/hardware'
 import { watchForUpdates, onUpdateReady, applyUpdate } from './lib/appUpdate'
+import { startLiveUpdates } from './lib/liveUpdates'
 import { useDockedCart } from './hooks/useDockedCart'
 import { useDesktopUpdate } from './hooks/useDesktopUpdate'
 import toast from 'react-hot-toast'
@@ -157,17 +158,96 @@ export default function App() {
     return () => { off(); window.removeEventListener('online', up); window.removeEventListener('offline', down) }
   }, []) // eslint-disable-line
 
-  useEffect(() => { loadAll(); setupRealtime(); watchForUpdates() }, [])
+  useEffect(() => { loadAll(); watchForUpdates() }, [])
 
-  // Safety net. A websocket can sit in a half-open state that neither fires an
-  // 'offline' event nor delivers rows, which would leave website orders
-  // invisible until somebody navigated. Re-read them periodically while online.
+  // LIVE UPDATES, BY POLLING A THREE-ROW TABLE.
+  //
+  // This used to hold a websocket and subscribe to postgres_changes on the
+  // three tables. It was replaced because of how that failed rather than
+  // whether it worked: on the self-hosted stack, restarting the Realtime
+  // service left it accepting subscriptions and answering "Subscribed to
+  // PostgreSQL" while delivering nothing at all, with no error logged and no
+  // recovery. Its own poller stops permanently after six failed attempts to
+  // prepare replication, and the comment on that code says the child is not
+  // restarted. A till that has silently stopped updating looks exactly like a
+  // quiet afternoon.
+  //
+  // Polling cannot fail that way. Every interval is a fresh request through
+  // the same authenticated API the till already uses, so a reconnection, a
+  // service restart and a reboot all recover by themselves: there is no
+  // long-lived connection to break. See src/lib/liveUpdates.js for the cost,
+  // which is three rows every few seconds, and deploy/sql/30-live-state.sql
+  // for the revision counters it reads.
+  //
+  // The handlers here are the same ones the subscriptions called. They always
+  // re-read through the API rather than trusting a pushed row, which is why
+  // the change of mechanism does not change what the till shows.
+  // Which sale was at the top last time, so an UPDATE to an existing sale --
+  // a void, a correction -- does not raise the "sale!" popup as though
+  // somebody had just rung one up.
+  //
+  // It is seeded when the sales list first arrives rather than when polling
+  // starts. loadAll() is asynchronous, so at the moment the till signs in the
+  // list is usually still empty; seeding from that would leave the baseline
+  // null and suppress the popup for the first real sale of the session.
+  const lastSaleId = useRef(null)
+  const salesForSeed = useStore(s => s.sales)
+  useEffect(() => {
+    if (lastSaleId.current === null && salesForSeed.length > 0) {
+      lastSaleId.current = salesForSeed[0].id
+    }
+  }, [salesForSeed])
+
+  const onSalesChanged = async () => {
+    const store = useStore.getState()
+    const before = lastSaleId.current
+    await store.refreshSales()
+    const latest = useStore.getState().sales[0]
+    if (!latest) return
+    lastSaleId.current = latest.id
+    // On the first change after opening the till there is nothing to compare
+    // against, so the popup is not raised for a sale that was already there.
+    if (before === null || latest.id === before) return
+    playSaleSound()
+    setSalePopup({ total: latest.total, customer: latest.customer,
+                   payment: latest.payment, cashier: latest.cashier })
+    setTimeout(() => setSalePopup(null), 4000)
+    // show thank-you on the customer display
+    broadcastDisplay({ status: 'paid', total: latest.total,
+                       receiptNo: latest.receiptNo || null,
+                       items: [], count: 0, subtotal: 0 })
+  }
+
+  const onWAOrdersChanged = async () => {
+    await useStore.getState().refreshWAOrders()
+    const s = useStore.getState()
+    updateBadge(s.waOrders.filter(o => o.status === 'Pending' || o.status === 'Paid').length)
+  }
+
+  // Polling starts when somebody is signed in and stops when they are not.
+  // The old subscription was set up on mount regardless, which meant a
+  // customer opening the public shop or a payment link also opened a
+  // websocket. There is no reason for the storefront to watch the till's
+  // tables, and a request every few seconds is a thing to only do when it is
+  // being used.
   useEffect(() => {
     if (!user) return
-    const t = setInterval(() => {
-      if (navigator.onLine !== false) { try { useStore.getState().refreshWAOrders() } catch {} }
-    }, 120000)
-    return () => clearInterval(t)
+    const sb = getSupabase(); if (!sb) return
+    const stop = startLiveUpdates(sb, {
+      sales: onSalesChanged,
+      products: () => useStore.getState().refreshProducts(),
+      whatsapp_orders: onWAOrdersChanged,
+    }, {
+      intervalMs: Number(import.meta.env.VITE_LIVE_POLL_MS) || 3000,
+      onDegrade: () => {
+        // Said out loud rather than swallowed: this means live_state is not
+        // on this backend yet, the till has fallen back to refreshing
+        // everything on a slower cycle, and somebody should apply the
+        // migration. It still works; it is just twenty seconds behind.
+        console.warn('[live] live_state is unavailable; falling back to periodic refresh')
+      },
+    })
+    return stop
   }, [user])
 
   // A new version waits until the till is idle. Swapping the JavaScript under a
@@ -346,33 +426,6 @@ export default function App() {
     } catch {}
   }
 
-  const setupRealtime = () => {
-    const sb = getSupabase(); if (!sb) return
-    const store = useStore.getState()
-    sb.channel('pos-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_orders' }, () => {
-        store.refreshWAOrders()
-        // Update PWA badge with pending + paid (unprocessed) count
-        setTimeout(() => {
-          const s = useStore.getState()
-          const badge = s.waOrders.filter(o => o.status === 'Pending' || o.status === 'Paid').length
-          updateBadge(badge)
-        }, 1000)
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => store.refreshProducts())
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sales' }, (payload) => {
-        store.refreshSales()
-        const s = payload.new
-        if (s) {
-          playSaleSound()
-          setSalePopup({ total: s.total, customer: s.customer, payment: s.payment, cashier: s.cashier })
-          setTimeout(() => setSalePopup(null), 4000)
-          // show thank-you on the customer display
-          broadcastDisplay({ status: 'paid', total: s.total, receiptNo: s.receipt_no || s.receiptNo || null, items: [], count: 0, subtotal: 0 })
-        }
-      })
-      .subscribe()
-  }
 
   // Update PWA app icon badge (shows number on app icon)
   const updateBadge = (count) => {

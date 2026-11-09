@@ -107,26 +107,56 @@ if [ "$(pg "select count(*) from staff where name='Staging Probe'")" != "1" ]; t
 fi
 good "a staging staff member exists (PIN generated for this run, never printed)"
 
-# The three tables the application subscribes to must be published, with full
-# replica identity, or Realtime has nothing to send.
+# WHAT THE TILL NEEDS FOR LIVE UPDATES, NOW THAT IT POLLS.
+#
+# This used to publish the three tables for Realtime and restart it. The
+# application no longer holds a websocket: it reads revision counters from
+# public.live_state, which migration 034 creates along with a statement-level
+# trigger on each watched table. So what has to exist is that table, those
+# triggers, and a browser-facing role that may read it and may not write it.
+#
+# No publication, no replica identity, no replication slot, no Realtime
+# container. Those are checked elsewhere as an optional platform component;
+# nothing the till does depends on them any more.
 for t in whatsapp_orders products sales; do
-  pg "alter table public.$t replica identity full" >/dev/null
-  pg "alter publication supabase_realtime add table public.$t" >/dev/null 2>&1
   pg "grant select, insert, update on public.$t to anon, authenticated, service_role" >/dev/null
 done
 pg "grant usage, select on all sequences in schema public to anon, authenticated, service_role" >/dev/null
 pg "notify pgrst, 'reload schema'" >/dev/null
-PUBBED="$(pg "select count(*) from pg_publication_tables where pubname='supabase_realtime' and tablename in ('whatsapp_orders','products','sales')")"
-[ "${PUBBED:-0}" = "3" ] && good "all three subscribed tables are in the publication" \
-                         || bad "only ${PUBBED:-0} of 3 subscribed tables are published"
-# Realtime reads its published set at boot.
-docker restart "$DNS.realtime" >/dev/null 2>&1 || true
-for _ in $(seq 1 30); do
-  h="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$DNS.realtime" 2>/dev/null | tr -d '[:space:]' || true)"
-  [ "$h" = "healthy" ] || [ "$h" = "none" ] && break
-  sleep 5
-done
-sleep 8
+
+LS_ROWS="$(pg "select count(*) from public.live_state where source in ('sales','products','whatsapp_orders')" 2>/dev/null | tr -d ' ')"
+LS_TRG="$(pg "select count(*) from pg_trigger t join pg_class c on c.oid=t.tgrelid where t.tgname='trg_live_state' and not t.tgisinternal and c.relname in ('sales','products','whatsapp_orders')" 2>/dev/null | tr -d ' ')"
+if [ "${LS_ROWS:-0}" = "3" ] && [ "${LS_TRG:-0}" = "3" ]; then
+  good "live_state has a row and a trigger for each of the three watched tables"
+else
+  bad "live_state is incomplete: ${LS_ROWS:-0} of 3 rows, ${LS_TRG:-0} of 3 triggers — migration 034 did not apply here"
+fi
+# The grant the till depends on, and the one it must NOT have. A writable
+# live_state would let anything with the public key fake a change on every
+# workstation in the shop.
+LS_SEL="$(pg "select has_table_privilege('anon','public.live_state','SELECT')" | tr -d ' ')"
+LS_INS="$(pg "select has_table_privilege('anon','public.live_state','INSERT')" | tr -d ' ')"
+LS_UPD="$(pg "select has_table_privilege('anon','public.live_state','UPDATE')" | tr -d ' ')"
+if [ "$LS_SEL" = "t" ] && [ "$LS_INS" = "f" ] && [ "$LS_UPD" = "f" ]; then
+  good "the browser-facing role may READ live_state and may not write it"
+else
+  bad "live_state privileges are wrong for anon (select=$LS_SEL insert=$LS_INS update=$LS_UPD)"
+fi
+# And that the counter actually moves, before asking a browser to notice it.
+# A revision that never changes would make every browser check below fail
+# with no indication of why.
+LS_BEFORE="$(pg "select rev from public.live_state where source='sales'" | tr -d ' ')"
+pg "insert into public.sales (receipt_no, customer, total, payment, cashier) values ('LIVESTATE-PROBE','probe',1,'Cash','probe')" >/dev/null 2>&1 || true
+LS_AFTER="$(pg "select rev from public.live_state where source='sales'" | tr -d ' ')"
+pg "delete from public.sales where receipt_no='LIVESTATE-PROBE'" >/dev/null 2>&1 || true
+if [ -n "${LS_AFTER:-}" ] && [ "${LS_AFTER:-0}" -gt "${LS_BEFORE:-0}" ]; then
+  good "a write bumps live_state.rev ($LS_BEFORE to $LS_AFTER), so the till has something to poll"
+else
+  bad "a write did NOT bump live_state.rev (stayed at ${LS_BEFORE:-?}) — the trigger is not firing"
+fi
+# Deleting the probe bumps it again, which is correct and worth stating: the
+# browser checks below seed their own baseline on the first poll, so a
+# revision that has already moved does not disturb them.
 
 # ---------------------------------------------------------------------------
 # 3. Build the real application against this platform.
