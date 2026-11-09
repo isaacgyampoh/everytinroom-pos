@@ -125,8 +125,24 @@ hdr "No SQL takes ownership of an object for another role"
 # ownership of it.
 # Four forms of "act as another role" have now broken provisioning, each in a
 # different file. ALTER DEFAULT PRIVILEGES FOR ROLE is the fourth.
+# sql/migrate/ is scanned too. It was not, and a file there that transfers
+# ownership passed unnoticed -- a guard with a blind spot is worse than no
+# guard, because it is trusted.
+#
+# One file is exempt, and says so in itself: sql/migrate/realtime-migration-40.sql
+# is Realtime's own migration, run deliberately as the image's superuser
+# because the application's role may not. Exempt files are LISTED, so the
+# exemption cannot hide.
+EXEMPT_RE='^-- GUARD-EXEMPT: '
+for f in "$DEPLOY"/sql/*.sql "$DEPLOY"/sql/migrate/*.sql; do
+  [ -f "$f" ] || continue
+  grep -q "$EXEMPT_RE" "$f" && printf '       exempt (says so in the file): %s\n' "$(basename "$f")"
+done
 BADO=$(grep -rniE "(create +(schema|table|database)[^;]* authorization |alter +(schema|table|database|sequence|type|function)[^;]* owner +to |alter +default +privileges +for +role )" \
-  "$DEPLOY"/sql/*.sql 2>/dev/null \
+  $(for f in "$DEPLOY"/sql/*.sql "$DEPLOY"/sql/migrate/*.sql; do
+      [ -f "$f" ] || continue
+      grep -q "$EXEMPT_RE" "$f" || printf '%s ' "$f"
+    done) 2>/dev/null \
   | awk '{ line=$0; sub(/^[^:]*:[0-9]+:/, "", line);
            if (line ~ /^[[:space:]]*--/) next;
            if (tolower(line) ~ /raise +(exception|warning|notice)/) next;

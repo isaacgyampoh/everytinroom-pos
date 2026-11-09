@@ -174,6 +174,44 @@ case ",$PROFILES," in
       printf '      realtime.schema_migrations: %s of 91 row(s)\n' "$MIG"
       if [ "$MIG" -ge 91 ]; then
         ok "every tenant migration applied"
+      elif [ "$MIG" = "39" ] \
+           && [ "$(pg "$APP_DB" "select count(*) from realtime.schema_migrations where version = 20240401105812" | tr -d ' ')" = "0" ]; then
+        # Stuck at exactly the reserved-role migration. provision-app.sh
+        # grants the application's realtime role membership in
+        # supabase_realtime_admin so Realtime can run this itself; if that was
+        # refused, the migration is applied here as the image's superuser --
+        # the same statements, from the same file, run by a role that is
+        # allowed to. The alternative is leaving live updates broken, because
+        # the migration that replaces list_changes() is on the far side of it.
+        warn "Realtime is stuck at migration 20240401105812, which needs a reserved role."
+        warn "Applying that one migration as the image's superuser instead."
+        if OUT="$(docker exec -i central-postgres psql -X -v ON_ERROR_STOP=1 \
+                   -U supabase_admin -d "$APP_DB" -f - \
+                   < "$DEPLOY/sql/migrate/realtime-migration-40.sql" 2>&1)"; then
+          ok "applied migration 20240401105812; restarting Realtime so it continues from 41"
+          docker restart "${APP_DNS}.realtime" >/dev/null 2>&1 || true
+          # Wait for it to get further, rather than declaring victory.
+          for _ in $(seq 1 24); do
+            NEWMIG="$(pg "$APP_DB" "select count(*) from realtime.schema_migrations" | tr -d ' ')"
+            case "$NEWMIG" in ''|*[!0-9]*) NEWMIG=0 ;; esac
+            [ "$NEWMIG" -gt 40 ] && break
+            sleep 5
+          done
+          HASLC2="$(pg "$APP_DB" "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='realtime' and p.proname='list_changes'" | tr -d ' ')"
+          printf '      realtime.schema_migrations: %s of 91 row(s) after the restart\n' "${NEWMIG:-0}"
+          if [ "${NEWMIG:-0}" -ge 91 ]; then
+            ok "every tenant migration applied"
+          else
+            warn "still only ${NEWMIG:-0} of 91. Something after 40 is also refused;"
+            warn "  docker logs ${APP_DNS}.realtime 2>&1 | grep -iE 'migrat|error' | head -40"
+            RC=1; RC_REALTIME=1
+          fi
+          [ "${HASLC2:-0}" -gt 0 ] || { warn "realtime.list_changes() is still missing"; RC=1; RC_REALTIME=1; }
+        else
+          warn "could not apply migration 20240401105812 even as supabase_admin:"
+          printf '%s\n' "$OUT" | tail -8 | sed 's/^/      /'
+          RC=1; RC_REALTIME=1
+        fi
       else
         # Stopping short is NOT benign, and an earlier version of this said it
         # was. Migration 40 needs the reserved role supabase_realtime_admin,
