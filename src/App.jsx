@@ -182,21 +182,17 @@ export default function App() {
   // The handlers here are the same ones the subscriptions called. They always
   // re-read through the API rather than trusting a pushed row, which is why
   // the change of mechanism does not change what the till shows.
-  // Which sale was at the top last time, so an UPDATE to an existing sale --
-  // a void, a correction -- does not raise the "sale!" popup as though
+  // Which sale was at the top when polling began, so an UPDATE to an existing
+  // sale -- a void, a correction -- does not raise the "sale!" popup as though
   // somebody had just rung one up.
   //
-  // It is seeded when the sales list first arrives rather than when polling
-  // starts. loadAll() is asynchronous, so at the moment the till signs in the
-  // list is usually still empty; seeding from that would leave the baseline
-  // null and suppress the popup for the first real sale of the session.
-  const lastSaleId = useRef(null)
-  const salesForSeed = useStore(s => s.sales)
-  useEffect(() => {
-    if (lastSaleId.current === null && salesForSeed.length > 0) {
-      lastSaleId.current = salesForSeed[0].id
-    }
-  }, [salesForSeed])
+  // It is always a KNOWN value by the time a change can be detected: the
+  // effect below reads the sales once and records the top id (or '' for a
+  // shop with no sales yet) before it starts polling. Seeding it from
+  // whatever the store happened to hold was a race -- sales load in a
+  // background phase -- and treating "not loaded yet" the same as "no sales"
+  // would have suppressed the popup for a new shop's very first sale.
+  const lastSaleId = useRef('')
 
   const onSalesChanged = async () => {
     const store = useStore.getState()
@@ -205,9 +201,7 @@ export default function App() {
     const latest = useStore.getState().sales[0]
     if (!latest) return
     lastSaleId.current = latest.id
-    // On the first change after opening the till there is nothing to compare
-    // against, so the popup is not raised for a sale that was already there.
-    if (before === null || latest.id === before) return
+    if (latest.id === before) return
     playSaleSound()
     setSalePopup({ total: latest.total, customer: latest.customer,
                    payment: latest.payment, cashier: latest.cashier })
@@ -233,21 +227,30 @@ export default function App() {
   useEffect(() => {
     if (!user) return
     const sb = getSupabase(); if (!sb) return
-    const stop = startLiveUpdates(sb, {
-      sales: onSalesChanged,
-      products: () => useStore.getState().refreshProducts(),
-      whatsapp_orders: onWAOrdersChanged,
-    }, {
-      intervalMs: Number(import.meta.env.VITE_LIVE_POLL_MS) || 3000,
-      onDegrade: () => {
-        // Said out loud rather than swallowed: this means live_state is not
-        // on this backend yet, the till has fallen back to refreshing
-        // everything on a slower cycle, and somebody should apply the
-        // migration. It still works; it is just twenty seconds behind.
-        console.warn('[live] live_state is unavailable; falling back to periodic refresh')
-      },
-    })
-    return stop
+    let stop = () => {}
+    let cancelled = false
+    ;(async () => {
+      // The baseline first, then the polling -- in that order, so the first
+      // detected change is compared against something real.
+      try { await useStore.getState().refreshSales() } catch {}
+      if (cancelled) return
+      lastSaleId.current = useStore.getState().sales[0]?.id ?? ''
+      stop = startLiveUpdates(sb, {
+        sales: onSalesChanged,
+        products: () => useStore.getState().refreshProducts(),
+        whatsapp_orders: onWAOrdersChanged,
+      }, {
+        intervalMs: Number(import.meta.env.VITE_LIVE_POLL_MS) || 3000,
+        onDegrade: () => {
+          // Said out loud rather than swallowed: this means live_state is not
+          // on this backend yet, the till has fallen back to refreshing
+          // everything on a slower cycle, and somebody should apply the
+          // migration. It still works; it is just twenty seconds behind.
+          console.warn('[live] live_state is unavailable; falling back to periodic refresh')
+        },
+      })
+    })()
+    return () => { cancelled = true; stop() }
   }, [user])
 
   // A new version waits until the till is idle. Swapping the JavaScript under a
