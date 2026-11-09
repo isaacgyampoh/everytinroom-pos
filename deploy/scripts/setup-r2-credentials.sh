@@ -116,9 +116,34 @@ else
   exit 2
 fi
 
-printf '%sNext%s\n' "$C_B" "$C_0"
-printf '  deploy/scripts/test-r2.py --env-file %s\n\n' "$ENVF"
-printf '  That runs the real thing against Cloudflare: upload, download with a\n'
-printf '  byte-for-byte comparison, list, delete, and a confirmation that the\n'
-printf '  object is gone. It writes only under a probe prefix and removes what\n'
-printf '  it writes. Nothing else in the bucket is read or modified.\n\n'
+printf '%sThe test%s\n' "$C_B" "$C_0"
+printf '  Upload, download with a byte-for-byte comparison, list, delete, and a\n'
+printf '  confirmation that the object is gone -- against the real Cloudflare\n'
+printf '  service. Plus how R2 answers the AWS SDK default trailing checksum,\n'
+printf '  which no stand-in reproduces.\n\n'
+printf '  It writes only under a probe prefix and removes what it writes.\n'
+printf '  Nothing else in the bucket is read or modified, and no public access\n'
+printf '  is enabled.\n\n'
+REPORT="$HOME/everytinroom-staging-evidence/r2-verification-$(date -u '+%Y%m%d-%H%M%S').md"
+printf '  Run it now? [Y/n] '
+read -r ANSWER
+case "${ANSWER:-Y}" in
+  [Nn]*)
+    printf '\n  When you are ready:\n'
+    printf '    deploy/scripts/test-r2.py --env-file %s \\\n' "$ENVF"
+    printf '      --report %s\n\n' "$REPORT"
+    ;;
+  *)
+    mkdir -p "$(dirname "$REPORT")"
+    printf '\n'
+    python3 "$HERE/test-r2.py" --env-file "$ENVF" --report "$REPORT"
+    RC=$?
+    printf '  report: %s\n' "$REPORT"
+    if [ "$RC" = "0" ]; then
+      printf '%s  Every R2 check passed against the real service.%s\n\n' "$C_G" "$C_0"
+    else
+      printf '%s  Something failed. The report and the output above say which.%s\n\n' "$C_Y" "$C_0"
+    fi
+    exit "$RC"
+    ;;
+esac
