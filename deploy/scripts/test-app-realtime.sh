@@ -178,8 +178,16 @@ done
 
 export APP_URL="http://127.0.0.1:$PORT/" APP_PIN="$PIN" APP_BASE="$BASE" \
        APP_ANON="$ANON" APP_DB="$APP" OTHER_DB="${OTHER:-}"
-node "$HERE/app-realtime.mjs"
+# Bounded. The browser flow now covers two workstations, a network
+# interruption and a restart, so it legitimately takes minutes -- and an
+# unbounded hang in Chromium would quietly eat the job's whole 45-minute
+# budget and report nothing at all. Seven minutes is well clear of the
+# measured run; past that it is a hang, and a hang is a failure.
+timeout 420 node "$HERE/app-realtime.mjs"
 RC=$?
+if [ "$RC" = "124" ]; then
+  say "FAIL the browser run did not finish within 7 minutes; treating it as a failure"
+fi
 
 # ---------------------------------------------------------------------------
 # 5. Clean up what was inserted.

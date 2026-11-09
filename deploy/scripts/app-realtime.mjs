@@ -251,6 +251,76 @@ try {
     if (leaked) bad(`a sale written to ${OTHER_DB} APPEARED in ${process.env.APP_DB}'s interface`)
     else good(`a sale written to ${OTHER_DB} did not appear in this application's interface`)
   }
+
+  // Signing in is needed twice more below, so it is one function. It asserts
+  // nothing: the assertions belong to the tests that call it.
+  async function signIn(p) {
+    const f = p.locator('input[inputmode="numeric"], input[type="password"], input[maxlength="1"]')
+    await f.first().waitFor({ timeout: 25000 })
+    const c = await f.count()
+    const d = String(APP_PIN).split('')
+    if (c >= 4) { for (let i = 0; i < 4; i++) await f.nth(i).fill(d[i]) }
+    else { await f.first().fill(String(APP_PIN)); await p.keyboard.press('Enter') }
+    return p.locator('text=/Staging Probe|Checkout|Products|Sales/i')
+      .first().waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
+  }
+
+  // 6. A NETWORK INTERRUPTION, which is the normal condition of a shop in
+  // Accra rather than an edge case.
+  //
+  // The confound to avoid: this application already re-reads everything on
+  // the browser's `online` event, so a row inserted immediately after
+  // reconnecting would appear because of that refresh and the test would pass
+  // with a subscription that never recovered. So the row goes in only after
+  // the reconnect has settled and that refresh has been and gone. From then
+  // on, nothing but a live subscription can put a new sale on screen.
+  try {
+    await page.evaluate(() => { window.location.hash = '#/pos' })
+    await ctx.setOffline(true)
+    say('the first workstation is offline')
+    await page.waitForTimeout(5000)
+    await ctx.setOffline(false)
+    say('back online; waiting 15s for the reconnect and the application\'s own refresh to finish')
+    await page.waitForTimeout(15000)
+    const w = page.locator('text=/88\\.80/').first()
+      .waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
+    const r = await insertSale(APP_BASE, APP_ANON, `${tag}-reconnect`, 88.8)
+    if (!r.ok) {
+      bad(`could not insert the reconnection probe (HTTP ${r.status}): ${r.body}`)
+    } else {
+      const t = Date.now()
+      if (await w) good(`live updates resumed after a network interruption, unattended (${Date.now() - t}ms)`)
+      else bad('live updates did NOT resume after a network interruption — a till would go quietly stale')
+    }
+  } catch (e) {
+    bad(`the network interruption check could not run: ${scrub(String(e)).slice(0, 160)}`)
+  }
+
+  // 7. THE APPLICATION RESTARTED. A till gets closed and reopened, and a
+  // cashier re-enters their PIN. Nothing about that may leave it without
+  // live updates, which is a separate question from the service restarting.
+  try {
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 45000 })
+    const back = await signIn(page)
+    if (!back) {
+      bad('the application did not reach its interface again after a restart')
+    } else {
+      good('the application restarted and signed in again')
+      await page.waitForTimeout(6000)   // let the channel finish joining
+      const w = page.locator('text=/66\\.60/').first()
+        .waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
+      const r = await insertSale(APP_BASE, APP_ANON, `${tag}-restart`, 66.6)
+      if (!r.ok) {
+        bad(`could not insert the restart probe (HTTP ${r.status}): ${r.body}`)
+      } else {
+        const t = Date.now()
+        if (await w) good(`live updates work after the application was restarted (${Date.now() - t}ms)`)
+        else bad('live updates did NOT work after the application was restarted')
+      }
+    }
+  } catch (e) {
+    bad(`the application restart check could not run: ${scrub(String(e)).slice(0, 160)}`)
+  }
 } catch (e) {
   bad(`the browser run stopped: ${scrub(e && e.message ? e.message : e).slice(0, 220)}`)
 } finally {
