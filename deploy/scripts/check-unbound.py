@@ -31,6 +31,11 @@ HOW IT WORKS, AND WHAT IT CANNOT DO
 """
 
 import re
+
+# A quoted heredoc (<<'X') is passed through verbatim: the shell expands
+# nothing inside it. Scanning those bodies reported a JavaScript template
+# variable, ${kind}, as a shell variable read before assignment.
+QUOTED_HEREDOC = re.compile(r"<<-?'([A-Za-z_][A-Za-z0-9_]*)'")
 import sys
 
 # Things that look like variables but come from the shell or the environment.
@@ -143,6 +148,29 @@ def check(path):
         return [f"{path}: cannot read: {e}"]
 
     external = sourced_assignments(path, lines)
+
+    # Blank out quoted-heredoc bodies before scanning. The shell expands
+    # nothing inside <<'X' ... X, so a ${name} in one belongs to whatever
+    # language the heredoc contains. This file carries a JavaScript client in
+    # such a heredoc, and its ${kind} was reported as a shell variable read
+    # before assignment -- a false positive that would train someone to
+    # ignore the check.
+    lines = list(lines)
+    i = 0
+    blanked = 0
+    while i < len(lines):
+        m = QUOTED_HEREDOC.search(lines[i].split("#", 1)[0])
+        if m:
+            term = m.group(1)
+            j = i + 1
+            while j < len(lines) and lines[j].strip() != term:
+                lines[j] = ""
+                blanked += 1
+                j += 1
+            i = j + 1
+            continue
+        i += 1
+
     first_assign, problems = {}, []
     in_func, depth = False, 0
 

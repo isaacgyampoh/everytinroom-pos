@@ -628,16 +628,32 @@ if command -v node >/dev/null 2>&1; then
   note "a client two years older than the server is the kind of thing that should be visible"
   mkdir -p /tmp/rt && cd /tmp/rt
   npm init -y >/dev/null 2>&1
-  # 2.118.0, not 2.47.10.
+  # BOTH client versions, each in its own directory with its own
+  # node_modules, so the only difference between the two runs is the library.
   #
-  # The old pin was released 2024-12-19; the Realtime server this platform
-  # runs is v2.148.3 from 2026. Two years of protocol between a client and
-  # its server is not a reasonable thing to hold constant, and it is now the
-  # best remaining explanation for what the diagnostic found: list_changes()
-  # returns the row, for the right table, matching one subscription, with no
-  # errors -- so the database side is correct and the change is not reaching
-  # the client. 2.118.0 is the newest stable 2.x at least two weeks old.
-  if npm install @supabase/supabase-js@2.118.0 >/tmp/npm.log 2>&1; then
+  # 2.47.10 was released 2024-12-19; the Realtime server here is v2.148.3 from
+  # 2026. Swapping the pin and seeing green would not establish that the
+  # version was the cause -- it would only establish that something changed.
+  # So both are run against the same table, the same insert and the same
+  # conditions, and the pair of results is the evidence.
+  RT_OLD=2.47.10
+  RT_NEW=2.118.0
+  for V in "$RT_OLD" "$RT_NEW"; do
+    D="/tmp/rtclient-$V"
+    mkdir -p "$D"
+    ( cd "$D" && npm init -y >/dev/null 2>&1 \
+      && npm install "@supabase/supabase-js@$V" >"/tmp/npm-$V.log" 2>&1 ) \
+      && cp rt.mjs "$D/rt.mjs" \
+      && note "client $V installed" \
+      || note "client $V could NOT be installed; see /tmp/npm-$V.log"
+  done
+  # One helper, so the two runs cannot accidentally differ.
+  rt_run() {   # rt_run <version> <extra env assignments...>
+    local v="$1"; shift
+    if [ ! -f "/tmp/rtclient-$v/rt.mjs" ]; then echo "CLIENT_MISSING"; return 1; fi
+    ( cd "/tmp/rtclient-$v" && env RT_CLIENT_VERSION="$v" "$@" timeout 90 node rt.mjs 2>&1 )
+  }
+  if [ -f "/tmp/rtclient-$RT_NEW/rt.mjs" ]; then
     detail bash -c "npm ls @supabase/supabase-js --depth=0 2>/dev/null | tail -2"
     # A real supabase-js client. Parameterised, because one subscription on
     # one tenant is not enough: delivery is checked on two independent
@@ -648,48 +664,89 @@ if command -v node >/dev/null 2>&1; then
     #   RT_EXPECT=no-event  a change must NOT arrive (cross-tenant isolation)
     cat > rt.mjs <<'JS'
 import { createClient } from '@supabase/supabase-js'
+
 const url = process.env.RT_URL
 const key = process.env.RT_KEY
 const table = process.env.RT_TABLE || 'tick'
 const label = process.env.RT_LABEL || 'realtime-probe'
 const expect = process.env.RT_EXPECT || 'event'
-// Where the INSERT goes. For the cross-tenant check it is a DIFFERENT
-// application from the one being listened to, which is the whole point.
+const chanName = process.env.RT_CHANNEL || ('probe-' + Math.random().toString(36).slice(2))
+const evt = process.env.RT_EVENT || 'INSERT'
 const insertUrl = process.env.RT_INSERT_URL || url
 const insertKey = process.env.RT_INSERT_KEY || key
 
-const sb = createClient(url, key, { realtime: { params: { eventsPerSecond: 10 } } })
-let got = null
-const ch = sb.channel('probe-' + Math.random().toString(36).slice(2))
-  .on('postgres_changes', { event: 'INSERT', schema: 'public', table },
-      p => { if (!got) got = p.new })
-const sub = await new Promise(res => {
-  ch.subscribe(s => { if (s === 'SUBSCRIBED' || s === 'CHANNEL_ERROR' || s === 'TIMED_OUT') res(s) })
+// Every credential-shaped thing is scrubbed before anything is printed. The
+// socket's own logger carries the access token in the join payload, so this
+// is not optional.
+const scrub = (s) => String(s)
+  .replace(/eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]*/g, '<jwt>')
+  .replace(new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '<key>')
+  .replace(new RegExp(insertKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '<key>')
+
+// WHERE DOES THE EVENT STOP? Counters for each stage, so the answer is a
+// number rather than an impression.
+let frames = 0, pgFrames = 0, joinReplies = 0, errors = 0, got = null
+const seen = []
+
+const client = createClient(url, key, {
+  realtime: {
+    params: { eventsPerSecond: 10 },
+    logger: (kind, msg, data) => {
+      frames++
+      let d = ''
+      try { d = data ? scrub(JSON.stringify(data)).slice(0, 220) : '' } catch { d = '<unserialisable>' }
+      const line = `WS| ${kind} ${scrub(msg)} ${d}`
+      if (seen.length < 60) seen.push(line)
+      if (/phx_reply/.test(String(msg)) || /phx_reply/.test(d)) joinReplies++
+      if (/postgres_changes/.test(d)) pgFrames++
+      if (/error|timeout/i.test(String(msg))) errors++
+    },
+  },
+})
+
+const ch = client.channel(chanName)
+  .on('postgres_changes', { event: evt, schema: 'public', table },
+      (p) => { if (!got) got = p.new ?? p.old ?? p })
+
+const status = await new Promise((res) => {
+  ch.subscribe((s, err) => {
+    if (err) { errors++ }
+    if (s === 'SUBSCRIBED' || s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') res(s)
+  })
   setTimeout(() => res('NO_STATUS'), 25000)
 })
-if (sub !== 'SUBSCRIBED') { console.log('SUBSCRIBE_FAILED:' + sub); process.exit(3) }
+console.log('CLIENT_VERSION ' + (process.env.RT_CLIENT_VERSION || 'unrecorded'))
+if (status !== 'SUBSCRIBED') {
+  console.log('SUBSCRIBE_FAILED:' + status)
+  for (const l of seen) console.log(l)
+  process.exit(3)
+}
 console.log('SUBSCRIBED')
 
-// Insert through the REST API, so the whole path is the real one.
 const r = await fetch(`${insertUrl}/rest/v1/${table}`, {
   method: 'POST',
   headers: { apikey: insertKey, Authorization: `Bearer ${insertKey}`,
              'Content-Type': 'application/json', Prefer: 'return=representation' },
-  body: JSON.stringify({ label })
+  body: JSON.stringify({ label }),
 })
-if (!r.ok) { console.log('INSERT_FAILED:' + r.status + ':' + (await r.text()).slice(0,200)); process.exit(4) }
+if (!r.ok) {
+  console.log('INSERT_FAILED:' + r.status + ':' + scrub((await r.text()).slice(0, 200)))
+  process.exit(4)
+}
 console.log('INSERTED')
 
-// 20s for an event that should come; the same 20s of silence is what proves
-// one that should not. A shorter wait for the negative case would make the
-// isolation check pass simply by not waiting long enough.
-for (let i = 0; i < 100 && !got; i++) await new Promise(r => setTimeout(r, 200))
+for (let i = 0; i < 100 && !got; i++) await new Promise((r) => setTimeout(r, 200))
+
+// The stage-by-stage picture, whichever way it went.
+console.log(`STAGES socket_frames=${frames} join_replies=${joinReplies} ` +
+            `postgres_changes_frames=${pgFrames} callback_fired=${got ? 1 : 0} errors=${errors}`)
+for (const l of seen) console.log(l)
 
 if (expect === 'no-event') {
-  if (got) { console.log('LEAKED:' + JSON.stringify(got)); process.exit(6) }
+  if (got) { console.log('LEAKED:' + scrub(JSON.stringify(got))); process.exit(6) }
   console.log('NO_EVENT_AS_EXPECTED'); process.exit(0)
 }
-if (got) { console.log('EVENT_RECEIVED:' + JSON.stringify(got)); process.exit(0) }
+if (got) { console.log('EVENT_RECEIVED:' + scrub(JSON.stringify(got))); process.exit(0) }
 console.log('NO_EVENT'); process.exit(5)
 JS
     # Finish Realtime off BEFORE asking a client to subscribe. Its tenant
@@ -739,7 +796,41 @@ JS
     [ "$RT_EXEC" = "t" ] && pass "Realtime's own role may execute realtime.list_changes()" \
                          || fail "Realtime's role may NOT execute realtime.list_changes() (got '${RT_EXEC:-none}')"
 
-    OUT=$(RT_URL="http://$APP_DNS.staging.test" RT_KEY="$ANON" timeout 90 node rt.mjs 2>&1)
+    # ---------------------------------------------------------------
+    # THE SAME TEST, TWICE, DIFFERING ONLY IN THE CLIENT LIBRARY.
+    # ---------------------------------------------------------------
+    rt_run "$RT_OLD" RT_URL="http://$APP_DNS.staging.test" RT_KEY="$ANON" RT_LABEL=ab-old \
+      > /tmp/ab-old.log 2>&1 || true
+    note "--- client $RT_OLD (released 2024-12-19) ---"
+    detail grep -E "^(CLIENT_VERSION|SUBSCRIBED|INSERTED|STAGES|EVENT_RECEIVED|NO_EVENT|SUBSCRIBE_FAILED)" /tmp/ab-old.log
+    AB_OLD_RESULT="$(grep -oE 'EVENT_RECEIVED|NO_EVENT|SUBSCRIBE_FAILED:[A-Z_]*|INSERT_FAILED' /tmp/ab-old.log | head -1 || true)"
+    AB_OLD_STAGES="$(grep -oE '^STAGES .*' /tmp/ab-old.log | head -1 || true)"
+    note "client $RT_OLD -> ${AB_OLD_RESULT:-no result}"
+    [ -n "$AB_OLD_STAGES" ] && note "  $AB_OLD_STAGES"
+
+    rt_run "$RT_NEW" RT_URL="http://$APP_DNS.staging.test" RT_KEY="$ANON" RT_LABEL=ab-new \
+      > /tmp/ab-new.log 2>&1 || true
+    OUT="$(cat /tmp/ab-new.log)"
+    AB_NEW_RESULT="$(grep -oE 'EVENT_RECEIVED|NO_EVENT|SUBSCRIBE_FAILED:[A-Z_]*|INSERT_FAILED' /tmp/ab-new.log | head -1 || true)"
+    AB_NEW_STAGES="$(grep -oE '^STAGES .*' /tmp/ab-new.log | head -1 || true)"
+    note "--- client $RT_NEW (released 2026-10-15) ---"
+    note "client $RT_NEW -> ${AB_NEW_RESULT:-no result}"
+    [ -n "$AB_NEW_STAGES" ] && note "  $AB_NEW_STAGES"
+    # The stage counters say WHERE it stopped, for whichever version stopped.
+    note "--- socket frames, redacted, from the newer client ---"
+    DETAIL_LINES=24 detail grep "^WS|" /tmp/ab-new.log
+
+    # And the comparison itself is an assertion, not a note.
+    case "${AB_OLD_RESULT:-none}|${AB_NEW_RESULT:-none}" in
+      NO_EVENT*\|EVENT_RECEIVED|SUBSCRIBE_FAILED*\|EVENT_RECEIVED)
+        pass "the client version WAS the cause: $RT_OLD fails and $RT_NEW delivers, same table, same insert" ;;
+      EVENT_RECEIVED\|EVENT_RECEIVED)
+        pass "both client versions deliver, so the version was never the cause" ;;
+      *\|NO_EVENT)
+        fail "BOTH client versions fail to receive the event — it is not the client library" ;;
+      *)
+        fail "inconclusive comparison: $RT_OLD gave '${AB_OLD_RESULT:-none}', $RT_NEW gave '${AB_NEW_RESULT:-none}'" ;;
+    esac
     echo "$OUT" | grep -q '^SUBSCRIBED' && pass "a Realtime subscription was accepted through the proxy" \
                                         || fail "the subscription was not accepted: $(echo "$OUT" | head -2 | tr '\n' ' ')"
     # Realtime's log, unconditionally. It reports healthy while delivering
