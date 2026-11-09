@@ -123,21 +123,45 @@ def sourced_assignments(path, lines):
 
 
 def strip_quoted(line):
-    """Blank out single-quoted runs.
+    """Blank out single-quoted runs, but only OUTSIDE double quotes.
 
     `${VAR}` inside a single-quoted string is literal text -- it appears in
-    help text and error messages here -- and is not a variable read."""
+    help text and error messages here -- and is not a variable read.
+
+    The double-quote exception is not a nicety. These scripts send SQL, and
+    SQL quotes its own literals with apostrophes:
+
+        pg "select verify_pin('${PIN}')"
+
+    The shell is still expanding ${PIN} there, because the apostrophes are
+    inside a double-quoted string and have no meaning to it. Blanking them
+    anyway hid exactly that read, and this check reported "no variable is read
+    before it is assigned" for a script that used PIN sixteen lines before it
+    was generated -- which is the one thing it exists to catch.
+    """
     out, i, n = [], 0, len(line)
+    in_dquote = False
     while i < n:
-        if line[i] == "'":
+        c = line[i]
+        if c == '\\' and i + 1 < n:          # an escaped character, kept as-is
+            out.append(c)
+            out.append(line[i + 1])
+            i += 2
+            continue
+        if c == '"':
+            in_dquote = not in_dquote
+            out.append(c)
+            i += 1
+            continue
+        if c == "'" and not in_dquote:
             j = line.find("'", i + 1)
             if j == -1:
                 break
             out.append(" " * (j - i + 1))
             i = j + 1
-        else:
-            out.append(line[i])
-            i += 1
+            continue
+        out.append(c)
+        i += 1
     return "".join(out)
 
 
@@ -196,7 +220,19 @@ def check(path):
         # Track function bodies: a read inside one may legitimately happen
         # after a caller assigns, which this check cannot see.
         if re.search(r"^\s*(?:function\s+)?[A-Za-z_][A-Za-z0-9_]*\s*\(\)\s*\{", line):
-            in_func, depth = True, line.count("{") - line.count("}")
+            depth = line.count("{") - line.count("}")
+            # A ONE-LINE DEFINITION ENDS ON ITS OWN LINE.
+            #
+            #     pg() { echo "$1"; }
+            #
+            # braces balance here, so there is no body to skip. Setting
+            # in_func anyway carried it to the NEXT line, which was then
+            # skipped as though it were inside the function -- and the line
+            # after a one-line helper is exactly where these scripts do their
+            # first real work. Combined with the quoting bug above, that is
+            # why a read of PIN sixteen lines before its assignment went
+            # unreported.
+            in_func = depth > 0
             continue
         if in_func:
             depth += line.count("{") - line.count("}")
@@ -204,7 +240,36 @@ def check(path):
                 in_func = False
             continue
 
+        # TWO VIEWS OF THE SAME LINE, AND WHY.
+        #
+        # strip_quoted blanks single-quoted text, because `${VAR}` in a
+        # help message is not a read. It cannot be trusted on a line like
+        #
+        #     X="$(pg "select verify_pin('${PIN}')")"
+        #
+        # where a nested double quote inside $( ) takes any line-based quote
+        # tracker out of the string it is still in, so the SQL's apostrophes
+        # look like shell quoting and ${PIN} is blanked. That is not a bug to
+        # patch, it is the limit of reading shell one line at a time.
+        #
+        # So the stripped view is used as before, and the RAW view is used as
+        # well -- but only to catch a read whose variable is assigned LATER in
+        # this same file, and only on lines that are not printing text at the
+        # operator. A variable this file assigns further down is never
+        # literal help text when it appears above, which is what makes the
+        # raw view safe to trust in that one case.
+        raw_line = line
         line = strip_quoted(line)
+        is_output = re.match(r'^\s*(echo|printf|warn|dim|note|say|good|bad|info|ok|die)\b', raw_line)
+        if not is_output:
+            for m in USE.finditer(raw_line):
+                nm = m.group(1)
+                if nm in IGNORE or nm in external or re.match(r"^\d+$", nm):
+                    continue
+                w = first_assign.get(nm)
+                if w is not None and w > i and nm not in {q.group(1) for q in SAFE_USE.finditer(raw_line)}:
+                    problems.append(
+                        f"{path}:{i}: ${nm} is read here but first assigned on line {w}")
         # A BACKSLASH-ESCAPED dollar is a literal one. `\$SRC_URL` inside a
         # double-quoted string is text handed to another shell -- a container's
         # -- and `\$\$` is Postgres dollar-quoting. Neither is a read here.
@@ -242,9 +307,19 @@ def main():
     for p in sys.argv[1:]:
         bad += check(p)
     # Deduplicate per variable per file: one report is enough to act on.
+    #
+    # Not every message names a variable. `cannot read: ...` does not, and
+    # splitting on "$" then taking [1] raised IndexError on it -- so pointing
+    # this checker at a path that does not exist crashed it with a traceback
+    # instead of saying the file could not be read. A checker that dies on bad
+    # input teaches people to distrust it.
     seen, out = set(), []
     for b in bad:
-        key = (b.split(":")[0], b.split("$")[1].split(" ")[0])
+        parts = b.split("$")
+        if len(parts) < 2:
+            out.append(b)          # not a per-variable report; always keep it
+            continue
+        key = (b.split(":")[0], parts[1].split(" ")[0])
         if key in seen:
             continue
         seen.add(key)
@@ -252,8 +327,13 @@ def main():
     for b in out:
         print("  " + b)
     if out:
-        print(f"\n  {len(out)} variable(s) read before assignment. Under set -u each one")
-        print("  aborts the script at that line.")
+        reads = [b for b in out if "is read here" in b or "never assigned" in b]
+        errs = [b for b in out if b not in reads]
+        if reads:
+            print(f"\n  {len(reads)} variable(s) read before assignment. Under set -u each one")
+            print("  aborts the script at that line.")
+        if errs:
+            print(f"\n  {len(errs)} file(s) could not be read, so nothing was checked in them.")
         sys.exit(1)
     print("  no variable is read before it is assigned")
 

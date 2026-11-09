@@ -106,6 +106,40 @@ else
   bad "anon may NOT execute verify_pin (got '${PINX:-no answer}') — no cashier could sign in"
 fi
 
+# WHAT verify_pin READS AND WRITES, CHECKED BY NAME.
+#
+# The function exists, the grant is there, and it still answered HTTP 400 for
+# a whole run. PostgREST puts the database's own error class into that status:
+# a column the function reads that is not there is 42703, which is exactly a
+# 400. The table check above looks at five tables; this function also needs
+# pin_attempts, staff_sessions and staff.permissions, and none of those were
+# being checked -- so a migration that failed silently (these are applied with
+# error-stopping off) showed up only as an opaque 400 in a browser.
+PINDEPS=""
+for t in pin_attempts staff_sessions; do
+  [ "$(pg "select count(*) from information_schema.tables where table_schema='public' and table_name='$t'" | tr -d ' ')" = "1" ] \
+    || PINDEPS="$PINDEPS table:$t"
+done
+for c in permissions active pin_hash; do
+  [ "$(pg "select count(*) from information_schema.columns where table_schema='public' and table_name='staff' and column_name='$c'" | tr -d ' ')" = "1" ] \
+    || PINDEPS="$PINDEPS staff.$c"
+done
+if [ -z "$PINDEPS" ]; then
+  good "everything verify_pin reads and writes exists (pin_attempts, staff_sessions, staff.permissions/active/pin_hash)"
+else
+  bad "verify_pin cannot work here, these are missing:$PINDEPS — that is the HTTP 400 the browser sees"
+fi
+
+# And call it, from the database, before asking a browser to. A function that
+# raises here will raise there, and this says which with the actual message
+# instead of a status code.
+PINPROBE="$(pg "select (public.verify_pin('000000')::text)" 2>&1 | head -2 | tr '\n' ' ')"
+case "$PINPROBE" in
+  *success*) good "verify_pin returns a result when called directly (a wrong PIN, so no session was made)" ;;
+  *)         bad "verify_pin RAISES when called directly: $(printf '%s' "$PINPROBE" | cut -c1-180)" ;;
+esac
+
+
 # ---------------------------------------------------------------------------
 # 2. A staging staff member. The PIN is generated and never printed.
 # ---------------------------------------------------------------------------
@@ -118,6 +152,27 @@ if [ "$(pg "select count(*) from staff where name='Staging Probe'")" != "1" ]; t
   exit 2
 fi
 good "a staging staff member exists (PIN generated for this run, never printed)"
+
+# AND WITH THE REAL PIN, WHICH SPLITS THE REMAINING POSSIBILITIES IN TWO.
+#
+# If this succeeds and the browser still gets HTTP 400, the function and the
+# schema are fine and the fault is in the HTTP path -- PostgREST's schema
+# cache, the argument name, the role. If this fails, the browser was telling
+# the truth and the problem is below the API. One run, either answer.
+#
+# The PIN is interpolated into SQL that goes over a pipe to psql inside the
+# container, never onto a command line, and the result is matched rather than
+# printed -- a session token comes back in it.
+PINREAL="$(pg "select case when (public.verify_pin('${PIN}')->>'success') = 'true'
+                    then 'ACCEPTED' else 'REFUSED' end" 2>&1 | tr -d ' \n')"
+case "$PINREAL" in
+  ACCEPTED) good "verify_pin ACCEPTS the staging PIN when called in the database, so the auth path works below the API" ;;
+  REFUSED)  bad "verify_pin REFUSES the staging PIN in the database — the seeded bcrypt hash does not match, so no browser could ever sign in" ;;
+  *)        bad "verify_pin could not be called with the staging PIN: $(printf '%s' "$PINREAL" | cut -c1-160)" ;;
+esac
+# Sessions that probe made are not left behind.
+pg "delete from staff_sessions where staff_id in (select id from staff where name = 'Staging Probe')" >/dev/null 2>&1 || true
+pg "delete from pin_attempts where at > now() - interval '1 minute'" >/dev/null 2>&1 || true
 
 # WHAT THE TILL NEEDS FOR LIVE UPDATES, NOW THAT IT POLLS.
 #

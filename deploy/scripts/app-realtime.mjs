@@ -21,6 +21,17 @@ const {
 } = process.env
 
 let pass = 0, fail = 0, blocked = 0
+// EVERY BROWSER BEHAVIOUR BELOW NEEDS A SESSION.
+//
+// When the login failed, the run reported six further failures -- the sale,
+// the product, the website order, the reconnection, the restart -- as though
+// they were six independent defects in the application. They were one defect,
+// counted six times, and that is a misleading report in the direction that
+// matters: it makes a single broken precondition look like a broken product.
+//
+// Nothing downstream is attempted without a session now. They are recorded as
+// not attempted, naming what they were waiting for.
+let authed = false
 const good = (m) => { pass++; console.log(`  PASS ${m}`) }
 const bad = (m) => { fail++; console.log(`  FAIL ${m}`) }
 const block = (m) => { blocked++; console.log(`  BLOCKED ${m}`) }
@@ -134,10 +145,21 @@ const consoleErrors = [], failedRequests = [], sockets = []
 // they belonged to, and that is the difference between a missing EXECUTE
 // grant on the platform and a bug in the application.
 const pinCalls = []
-page.on('response', (r) => {
+page.on('response', async (r) => {
   const u = r.url()
   if (!/\/rest\/v1\/rpc\/verify_pin/.test(u)) return
-  pinCalls.push(`HTTP ${r.status()} ${r.statusText() || ''}`.trim())
+  // THE BODY, NOT JUST THE STATUS.
+  //
+  // A bare "HTTP 400" cost a run. PostgREST puts the database's own
+  // complaint in the body, and that names the cause: 42703 for a column
+  // this function reads that does not exist, 42P01 for a table it writes
+  // that does not exist. The body of a SUCCESSFUL call carries a session
+  // token, so it is never read -- only failures are.
+  let detail = ''
+  if (!r.ok()) {
+    try { detail = ' ' + scrub((await r.text()).slice(0, 220)) } catch {}
+  }
+  pinCalls.push(`HTTP ${r.status()} ${r.statusText() || ''}`.trim() + detail)
 })
 page.on('console', (m) => {
   if (m.type() === 'error') consoleErrors.push(scrub(m.text()).slice(0, 200))
@@ -175,6 +197,7 @@ try {
     // 2. Did verify_pin accept it and the till open?
     if (await loggedIn(page)) {
       good('verify_pin() accepted the PIN and the till opened')
+      authed = true
     } else {
       bad('the application did not reach its logged-in interface')
       // What was actually on screen, because "it did not log in" is not a
@@ -194,6 +217,22 @@ try {
       }
     }
   }
+
+  // THE GATE. Everything from here needs a signed-in till.
+  if (!authed) {
+    for (const what of [
+      'a new sale appearing without a refresh',
+      'a product change appearing',
+      'a website order change appearing',
+      'two workstations both receiving the same sale',
+      'another application\'s sale staying out of this interface',
+      'live updates resuming after a network interruption',
+      'live updates working after the application restarts',
+    ]) {
+      block(`NOT ATTEMPTED — ${what}: there is no session, because the login above failed. This is not a separate defect.`)
+    }
+    say('skipping every behaviour that needs a session; the root cause is the login failure above')
+  } else {
 
   // 3. The subscriptions the application actually makes.
   const subs = await page.evaluate(() => {
@@ -406,6 +445,7 @@ try {
   } catch (e) {
     bad(`the application restart check could not run: ${scrub(String(e)).slice(0, 160)}`)
   }
+  }   // end of the authenticated-only block
 } catch (e) {
   bad(`the browser run stopped: ${scrub(e && e.message ? e.message : e).slice(0, 220)}`)
 } finally {

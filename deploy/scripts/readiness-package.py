@@ -231,6 +231,17 @@ TESTS = [
     # role through PostgREST, and the migrations are applied with
     # ON_ERROR_STOP off, so a file can report success while the grant inside
     # it failed.
+    # verify_pin exists, the grant is there, and it still answered HTTP 400
+    # for a whole run: PostgREST turns the database's own error class into
+    # that status, and a column the function reads that is not there is
+    # exactly a 400. These two name the cause instead of leaving it as a
+    # status code seen through a browser.
+    ("Everything verify_pin reads and writes exists", True,
+     [r"everything verify_pin reads and writes exists"],
+     [r"verify_pin cannot work here, these are missing"]),
+    ("verify_pin returns rather than raising, called directly", True,
+     [r"verify_pin returns a result when called directly"],
+     [r"verify_pin RAISES when called directly"]),
     ("The browser role may execute verify_pin", True,
      [r"browser-facing role may EXECUTE verify_pin"],
      [r"anon may NOT execute verify_pin"]),
@@ -427,6 +438,8 @@ REQUIREMENTS = [
         "A write moves the revision the till polls",
         "The browser harness itself ran",
         "The real application's Login screen renders",
+        "Everything verify_pin reads and writes exists",
+        "verify_pin returns rather than raising, called directly",
         "The browser role may execute verify_pin",
         "verify_pin accepts a staging PIN and the till opens",
         "The real application receives a live event and SHOWS it",
@@ -778,6 +791,18 @@ def main():
     if unver_req:
         A("### Not verified")
         A("")
+        # A dependent check that was deliberately not attempted is not the
+        # same as one nobody thought about, and the difference is visible in
+        # the run's own log. Saying so here stops a reader counting one broken
+        # precondition as a dozen unexamined requirements.
+        if any("NOT ATTEMPTED" in t for t in texts):
+            A("Some of these were **not attempted on purpose**. The browser run")
+            A("stops every check that needs a signed-in till when the login")
+            A("itself fails, and records them as not attempted rather than")
+            A("failed -- one broken precondition is one defect, not one per")
+            A("check that depended on it. The run's log names the root cause")
+            A("beside each of them.")
+            A("")
         for name, _, _, _, _p in unver_req:
             A(f"- {name}")
         A("")
