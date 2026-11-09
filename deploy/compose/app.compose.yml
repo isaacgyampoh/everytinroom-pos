@@ -132,6 +132,21 @@ services:
       METRICS_JWT_SECRET: ${REALTIME_METRICS_JWT_SECRET:?REALTIME_METRICS_JWT_SECRET is not set}
       # The seed names the tenant after the application, so two applications
       # on this server never share one.
+      # EVERY TENANT NEEDS ITS OWN REPLICATION SLOT NAME.
+      #
+      # Realtime composes the slot as extension["slot_name"] <> SLOT_NAME_SUFFIX.
+      # With the suffix unset, every tenant on this server computes the same
+      # name -- `supabase_realtime_replication_slot_` -- and a PostgreSQL
+      # replication slot is CLUSTER-wide, not per database. So two
+      # applications fought over one slot:
+      #
+      #   error_code=ReplicationSlotBeingUsed  replication slot
+      #   "supabase_realtime_replication_slot_" is active for PID 1652
+      #
+      # Both reported healthy, both accepted subscriptions, and neither
+      # delivered reliably. On Supabase's own platform there is one project per
+      # cluster, so the suffix is never needed and never set.
+      SLOT_NAME_SUFFIX: ${REALTIME_SLOT_SUFFIX}
       SELF_HOST_TENANT_NAME: ${APP_DNS}
       SEED_SELF_HOST: "true"
       RUN_JANITOR: "true"

@@ -392,6 +392,18 @@ if [ "$DRY" = "0" ]; then
   # release during boot rather than degrading.
   [ -n "$(get_env_var "$APP_ENV" REALTIME_METRICS_JWT_SECRET 2>/dev/null || true)" ] \
     || set_env_var "$APP_ENV" REALTIME_METRICS_JWT_SECRET "$(gen_secret 32)"
+
+  # The replication slot suffix, which makes this tenant's slot its own.
+  #
+  # Realtime builds the slot name as its configured base plus SLOT_NAME_SUFFIX.
+  # Unset, every application on this server computes the same name, and a
+  # PostgreSQL replication slot is cluster-wide -- so two applications fight
+  # over one slot, both look healthy, both accept subscriptions and neither
+  # delivers. Slot names allow only lowercase letters, digits and underscores
+  # and are capped at 63 characters, of which the base uses 35.
+  [ -n "$(get_env_var "$APP_ENV" REALTIME_SLOT_SUFFIX 2>/dev/null || true)" ] \
+    || set_env_var "$APP_ENV" REALTIME_SLOT_SUFFIX \
+         "$(printf '%s' "$NAME" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_' '_' | cut -c1-24)"
 fi
 
 # ---------------------------------------------------------------------------

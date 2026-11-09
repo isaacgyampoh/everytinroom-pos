@@ -850,6 +850,37 @@ EOL
       fi
 
       # -----------------------------------------------------------------
+      # ONE REPLICATION SLOT PER TENANT.
+      #
+      # Realtime composes its slot name as a fixed base plus
+      # SLOT_NAME_SUFFIX. With the suffix unset every tenant computes the
+      # same name, and a replication slot is CLUSTER-wide -- so two
+      # applications fought over one and neither delivered, while both
+      # reported healthy and accepted subscriptions:
+      #   ReplicationSlotBeingUsed: replication slot
+      #   "supabase_realtime_replication_slot_" is active for PID 1652
+      # Two tenants must therefore hold two DISTINCT slots, and both must be
+      # active -- an inactive slot means that tenant is not reading the WAL.
+      note "----- replication slots across the cluster -----"
+      detail pgq "select slot_name, database, active, coalesce(plugin,'-') from pg_replication_slots order by slot_name"
+      NSLOT="$(pgq "select count(distinct slot_name) from pg_replication_slots where slot_name like 'supabase_realtime%'")"
+      NACTIVE="$(pgq "select count(*) from pg_replication_slots where slot_name like 'supabase_realtime%' and active")"
+      if [ "${NSLOT:-0}" -ge 2 ]; then
+        pass "each Realtime tenant has its own replication slot ($NSLOT distinct)"
+      else
+        fail "there is only ${NSLOT:-0} Realtime replication slot for two tenants — they will fight over it"
+      fi
+      if [ "${NACTIVE:-0}" -ge 2 ]; then
+        pass "$NACTIVE Realtime replication slot(s) are active, so both tenants are reading the WAL"
+      else
+        fail "only ${NACTIVE:-0} Realtime replication slot(s) are active; a tenant with an inactive slot delivers nothing"
+      fi
+      # And each slot must belong to its own database, not to one of them.
+      NDB="$(pgq "select count(distinct database) from pg_replication_slots where slot_name like 'supabase_realtime%'")"
+      [ "${NDB:-0}" -ge 2 ] && pass "the slots belong to different databases ($NDB)" \
+                            || fail "all Realtime slots belong to ${NDB:-0} database(s); the tenants are not separated at the WAL"
+
+      # -----------------------------------------------------------------
       # CROSS-TENANT: listen on gamma, write to alpha. Nothing may arrive.
       # A leak here would mean one shop seeing another's sales in real
       # time, and it would look like everything was working.
