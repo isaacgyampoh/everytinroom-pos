@@ -461,6 +461,15 @@ if [ -d /tmp/realtime-src/lib/realtime/tenants/repo/migrations ] \
     fail "Realtime's tenant migrations do not replay on this server under its own privileges"
     detail bash -c "grep -E 'PASS|FAIL|ERROR|stops at' /tmp/rtmig.log | head -12"
   fi
+  # And how far the WHOLE set gets, as information rather than a verdict. The
+  # migration after list_changes needs a reserved role this image does not
+  # have, so it is expected to stop there; this records where, so the claim
+  # that only broadcast and presence are affected rests on a measurement.
+  python3 "$DEPLOY/scripts/test-realtime-migrations.py" \
+    --migrations /tmp/realtime-src/lib/realtime/tenants/repo/migrations \
+    --via-docker central-postgres --all > /tmp/rtmig-all.log 2>&1 || true
+  note "----- the whole set, best effort (expected to stop at the reserved-role migration) -----"
+  detail bash -c "grep -E 'replayed with no failure|still stops at|ERROR|had no extractable' /tmp/rtmig-all.log | head -8"
 else
   skip "could not fetch Realtime's migration sources, so they were not replayed"
   detail tail -5 /tmp/rtfetch.log
