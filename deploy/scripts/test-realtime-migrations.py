@@ -137,6 +137,34 @@ DSL_EQUIVALENT = {
     ],
 }
 
+# Some migrations use BOTH the DSL and execute(). For those the equivalent is
+# PREPENDED to the SQL lifted out of the file, rather than replacing it: the
+# first version substituted, so `ALTER TABLE realtime.broadcasts` ran against
+# a table the DSL half was supposed to have created.
+DSL_PREFIX = {
+    # create table(:broadcasts) with a reference to channels, plus timestamps.
+    '20240227174441': [
+        'create table if not exists realtime.broadcasts ('
+        ' id bigserial primary key,'
+        ' channel_id bigint not null references realtime.channels(id) on delete cascade,'
+        ' "check" boolean not null default false,'
+        ' inserted_at timestamp(0) not null default now(),'
+        ' updated_at timestamp(0) not null default now())',
+        'create unique index if not exists broadcasts_channel_id_index'
+        ' on realtime.broadcasts (channel_id)',
+    ],
+    '20240321100241': [
+        'create table if not exists realtime.presences ('
+        ' id bigserial primary key,'
+        ' channel_id bigint not null references realtime.channels(id) on delete cascade,'
+        ' "check" boolean not null default false,'
+        ' inserted_at timestamp(0) not null default now(),'
+        ' updated_at timestamp(0) not null default now())',
+        'create unique index if not exists presences_channel_id_index'
+        ' on realtime.presences (channel_id)',
+    ],
+}
+
 HEREDOC = re.compile(r'execute\(\s*"""(.*?)"""\s*\)', re.S)
 PLAIN = re.compile(r'execute\(\s*"((?:[^"\\]|\\.)*)"\s*\)', re.S)
 
@@ -145,6 +173,7 @@ def extract(path):
     ver = os.path.basename(path).split("_")[0]
     if ver in DSL_EQUIVALENT:
         return list(DSL_EQUIVALENT[ver]), True
+    prefix = list(DSL_PREFIX.get(ver, []))
     text = open(path, encoding="utf-8").read()
     found = []
     for m in HEREDOC.finditer(text):
@@ -152,7 +181,7 @@ def extract(path):
     for m in PLAIN.finditer(text):
         found.append((m.start(), m.group(1).replace('\\"', '"').replace("\\\\", "\\")))
     found.sort(key=lambda x: x[0])
-    sqls = [s.strip() for _, s in found if s.strip()]
+    sqls = prefix + [s.strip() for _, s in found if s.strip()]
     # Did the file do anything this cannot see?
     uses_dsl = bool(re.search(r'^\s*(create table|alter table|create index|drop |rename )',
                               text, re.M | re.I))
@@ -176,7 +205,10 @@ def replay(migrations, upto, all_, grant_parameter, pre_create_admin, label):
     for sql in (f'GRANT CONNECT ON DATABASE "{DB}" TO "{OWNER}"',
                 f'GRANT CREATE ON DATABASE "{DB}" TO "{OWNER}"',
                 "CREATE SCHEMA IF NOT EXISTS realtime",
-                f'GRANT ALL ON SCHEMA realtime TO "{OWNER}"',
+                # WITH GRANT OPTION: migration 20240401105812 grants on the
+                # schema itself, and ALL without the grant option is not
+                # enough to re-grant. Found by replaying past list_changes.
+                f'GRANT ALL ON SCHEMA realtime TO "{OWNER}" WITH GRANT OPTION',
                 "GRANT USAGE ON SCHEMA realtime TO anon, authenticated, service_role",
                 "CREATE EXTENSION IF NOT EXISTS pgcrypto",
                 "CREATE SCHEMA IF NOT EXISTS extensions"):
@@ -187,10 +219,15 @@ def replay(migrations, upto, all_, grant_parameter, pre_create_admin, label):
         psql([], sql='CREATE ROLE supabase_realtime_admin NOINHERIT NOLOGIN NOREPLICATION',
              stop=False)
         psql([], sql=f'GRANT supabase_realtime_admin TO "{OWNER}" WITH ADMIN OPTION', stop=False)
+    # Created BY the owner, not created and then handed over. On a stock
+    # server the provisioning role is a superuser and ALTER TABLE ... OWNER TO
+    # works; on the real image it is not, so the transfer silently failed, the
+    # table stayed owned by postgres, and every migration's final INSERT was
+    # refused -- the whole replay reported "stops at migration 1, 0 applied"
+    # and looked like a platform finding when it was this line.
     psql([], sql="CREATE TABLE IF NOT EXISTS realtime.schema_migrations "
                  "(version bigint primary key, inserted_at timestamp default now())",
-         db=DB, stop=False)
-    psql([], sql=f'ALTER TABLE realtime.schema_migrations OWNER TO "{OWNER}"', db=DB, stop=False)
+         db=DB, user=OWNER, stop=False)
 
     files = sorted(f for f in os.listdir(migrations) if f.endswith(".ex"))
     applied, stopped_at, unparsed = 0, None, []

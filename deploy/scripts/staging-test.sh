@@ -831,11 +831,16 @@ if docker run -d --name staging-s3 --network central_edge \
     # storage-api's migrations have now created its tables. The roles it
     # switches into still have no rights on them, and there is no way to
     # arrange that in advance on this image, so the grants are applied here.
-    if "$ROOT_DIR/scripts/post-start.sh" --app "$APP" >/tmp/poststart.log 2>&1; then
-      pass "post-start granted the storage schema to the roles storage-api uses"
-    else
-      fail "post-start did not complete, so storage requests will be refused"
-    fi
+    "$ROOT_DIR/scripts/post-start.sh" --app "$APP" >/tmp/poststart.log 2>&1 || true
+    # Read the per-service result rather than one exit code: this application
+    # has both storage and realtime, and a report that blames storage for
+    # Realtime's incomplete migrations is simply wrong about storage.
+    PS_LINE="$(grep '^RESULT ' /tmp/poststart.log | tail -1)"
+    case "$PS_LINE" in
+      *storage=0*) pass "post-start granted the storage schema to the roles storage-api uses" ;;
+      *storage=1*) fail "post-start could not grant the storage schema, so storage requests will be refused" ;;
+      *) fail "post-start produced no result line; it did not get far enough to try" ;;
+    esac
     detail bash -c "grep -E 'storage|realtime|table|grant|MISSING|list_changes' /tmp/poststart.log | head -14"
     # ---------------------------------------------------------------------
     # EFFECTIVE PRIVILEGES, not "the grant statement ran".
@@ -940,7 +945,11 @@ if docker run -d --name staging-s3 --network central_edge \
     MN="$(grep -c 'multi-' /tmp/s3ls2.xml || true)"
     [ "${MN:-0}" -ge 1 ] && pass "two more objects were written for the multi-delete test" \
                          || { fail "the multi-delete fixtures were not written"; detail bash -c "head -c 400 /tmp/s3ls2.xml"; }
-    c=$(curl -s -o /tmp/rmm.json -w '%{http_code}' -X DELETE "$B/objects/product-images" \
+    # DELETE /object/{bucket} with a prefixes body. The first version used
+    # /objects/{bucket}, which storage-api answers with
+    #   Route DELETE:/objects/product-images not found
+    # so the multi-delete path was never actually exercised.
+    c=$(curl -s -o /tmp/rmm.json -w '%{http_code}' -X DELETE "$B/object/product-images" \
       -H "Authorization: Bearer $SVC" -H "Content-Type: application/json" \
       -d '{"prefixes":["test/multi-1.bin","test/multi-2.bin"]}')
     case "$c" in
@@ -1007,6 +1016,13 @@ if [ -f "$B_ENV" ]; then
     pass "GoTrue is running for the application that asked for auth"
   else
     fail "GoTrue never became healthy for $B_APP"
+    # Why it is not there at all is in compose's own output, which the first
+    # version captured and never printed -- the report said only
+    # "No such container: beta-shop-auth".
+    note "----- what compose said when starting $B_APP -----"
+    DETAIL_LINES=25 detail tail -25 /tmp/beta-up.log
+    detail bash -c "grep -E '^COMPOSE_PROFILES=' '$B_ENV' || echo '(no COMPOSE_PROFILES line)'"
+    detail bash -c "docker ps -a --format '{{.Names}} {{.Status}}' | grep '^${B_DNS}' || echo '(no ${B_DNS} containers at all)'"
     detail docker logs "${B_DNS}-auth" --tail=25
   fi
 
@@ -1288,18 +1304,19 @@ else
 fi
 # Throughput, latency and rows written belong in the report whether it passed
 # or not: a failure with no numbers is as hard to act on as a silent pass.
-detail bash -c "grep -E 'REQUEST|lookup|open-sale|add-items|daily-total|requests/second|rows written' /tmp/load.log"
+detail bash -c "grep -E 'REQUEST|lookup|open-sale|add-items|daily-total|requests/second|failed \\(non-2xx|rows written' /tmp/load.log"
 if grep -q "NOTHING SUCCEEDED" /tmp/load.log; then
   # Run 19 printed "measured throughput: 444 requests/second" for a run in
   # which every one of 27,124 requests was non-2xx. That is the speed of
   # producing errors and it was reported as a pass.
   fail "no request succeeded, so nothing was measured — the latency figures above are meaningless"
-elif grep -q "requests/second" /tmp/load.log; then
-  RPS="$(sed -n 's/.*= \([0-9]*\) requests\/second.*/\1/p' /tmp/load.log | head -1)"
+elif grep -q "successful requests/second" /tmp/load.log; then
+  RPS="$(sed -n 's/.*= \([0-9]*\) successful requests\/second.*/\1/p' /tmp/load.log | head -1)"
+  NFAIL="$(sed -n 's/^ *\([0-9]*\) failed (non-2xx.*/\1/p' /tmp/load.log | head -1)"
   P95="$(awk '$1=="open-sale"{print $5}' /tmp/load.log | head -1)"
   OKC="$(awk '$1=="open-sale"{print $3}' /tmp/load.log | head -1)"
   if [ "${OKC:-0}" -gt 0 ]; then
-    pass "measured throughput: ${RPS:-?} requests/second, opening a sale at p95 ${P95:-?} ms over ${OKC} successful writes"
+    pass "measured throughput: ${RPS:-?} successful requests/second, ${NFAIL:-0} failed, opening a sale at p95 ${P95:-?} ms over ${OKC} successful writes"
   else
     fail "no sale was successfully opened, so the write path was not measured"
   fi
@@ -1483,6 +1500,18 @@ elif [ "${ROWS_BEFORE:-0}" = "0" ]; then
 else
   fail "row count changed across the restart: $ROWS_BEFORE -> $ROWS_AFTER"
 fi
+
+# bootstrap's second run regenerates its own placeholder site file from the
+# template, which is written for https. Caddy then answers an http request
+# with 308, redirecting to a scheme staging has no certificate for. That is
+# correct behaviour for a real server and an artefact here, so the staging
+# rewrite is re-applied -- the same thing sections 6 and 7 do -- before asking
+# whether the API works.
+for f in "$ROOT_DIR/compose/caddy-sites/"*.caddy; do
+  [ -f "$f" ] && sed -i 's|^https://|http://|' "$f"
+done
+docker exec central-caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 || true
+sleep 3
 
 # Requests must work again without anyone touching anything.
 CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \

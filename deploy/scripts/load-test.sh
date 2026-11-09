@@ -237,8 +237,13 @@ for kind in lookup open-sale add-items daily-total; do
   mx="$(tail -1 "$WORK/t.txt" | awk '{printf "%.0f", $1*1000}')"
   printf '  %-14s %8s %8s %9s %9s %9s\n' "$kind" "$c" "$okc" "${p50:-0}" "${p95:-0}" "${mx:-0}"
 done
-printf '\n  %s requests in %ss = %s requests/second, %s non-2xx\n' \
-  "$TOTAL" "$ELAPSED" "$(( TOTAL / ELAPSED ))" "$BAD"
+# Successes and failures on separate lines. One combined count beside a
+# latency figure reads like a working system even when every request
+# failed -- which is how a run once reported 444 requests/second for a
+# load test that wrote no rows at all.
+printf '\n  %s succeeded (2xx) in %ss = %s successful requests/second\n' \
+  "$GOOD" "$ELAPSED" "$(( GOOD / ELAPSED ))"
+printf '  %s failed (non-2xx or no response), out of %s attempted\n' "$BAD" "$TOTAL"
 if [ "$GOOD" = "0" ]; then
   printf '\n  NOTHING SUCCEEDED. The figures above are the speed of producing\n'
   printf '  errors and measure nothing about this platform. Treat the whole run\n'

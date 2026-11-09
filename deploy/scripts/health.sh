@@ -61,6 +61,24 @@ while read -r name domain; do
   # database keeps the underscore. provision-app.sh derives it the same way.
   dns="$(printf '%s' "$name" | tr '_' '-')"
 
+  # An application that was provisioned with --no-start has no containers at
+  # all. That is not a health problem -- it is not running -- and counting it
+  # as one made health.sh report failures for applications nobody had started,
+  # which in turn failed the staging run for the wrong reason.
+  have=0
+  for svc in rest .realtime -realtime -storage -auth -functions -imgproxy; do
+    case "$svc" in
+      rest) cn="${dns}-rest" ;;
+      .realtime) cn="${dns}.realtime" ;;
+      *) cn="${dns}${svc}" ;;
+    esac
+    docker inspect "$cn" >/dev/null 2>&1 && { have=1; break; }
+  done
+  if [ "$have" = "0" ]; then
+    dim "  no containers — provisioned but not started, so nothing to check"
+    continue
+  fi
+
   # PostgREST, from inside the network, so this works before DNS exists.
   code="$(docker run --rm --network central_edge curlimages/curl:8.11.1 \
     -s -o /dev/null -w '%{http_code}' --max-time 5 "http://${dns}-rest:3000/" 2>/dev/null || echo 000)"

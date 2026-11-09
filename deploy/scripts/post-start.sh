@@ -58,6 +58,8 @@ printf '  database : %s\n' "$APP_DB"
 printf '  profiles : %s\n\n' "${PROFILES:-none}"
 
 RC=0
+RC_STORAGE=0
+RC_REALTIME=0
 
 # ---------------------------------------------------------------------------
 case ",$PROFILES," in
@@ -77,7 +79,7 @@ case ",$PROFILES," in
       warn "storage-api has created no tables in $APP_DB after ${WAIT}s."
       warn "Its migrations have not run or were rolled back. Nothing was granted."
       warn "  docker logs ${APP_DNS}-storage --tail=40"
-      RC=1
+      RC=1; RC_STORAGE=1
     else
       ok "storage-api has created $n table(s)"
       # Run the grants AS THE STORAGE ROLE, not as postgres.
@@ -98,7 +100,7 @@ case ",$PROFILES," in
       export PGPASSWORD
       if [ -z "$ST_USER" ] || [ -z "$PGPASSWORD" ]; then
         warn "could not read the storage role's credentials from $APP_ENV"
-        RC=1
+        RC=1; RC_STORAGE=1
       # -e PGPASSWORD with no value passes it from this environment rather than
       # putting it on the command line, where `ps` would show it.
       elif OUT="$(docker exec -i -e PGPASSWORD central-postgres \
@@ -107,7 +109,7 @@ case ",$PROFILES," in
         if printf '%s' "$OUT" | grep -q "no privileges were granted"; then
           warn "some objects were not granted even as their owner:"
           printf '%s\n' "$OUT" | grep "no privileges were granted" | head -10 | sed 's/^/      /'
-          RC=1
+          RC=1; RC_STORAGE=1
         else
           ok "grants applied to the storage schema, by the role that owns it"
           printf '%s\n' "$OUT" | grep -E 'NOTICE|storage grants' | sed 's/^/      /'
@@ -115,7 +117,7 @@ case ",$PROFILES," in
       else
         warn "applying the storage grants failed. The whole output follows:"
         printf '%s\n' "$OUT" | tail -15 | sed 's/^/      /'
-        RC=1
+        RC=1; RC_STORAGE=1
       fi
       unset PGPASSWORD
     fi
@@ -141,7 +143,7 @@ case ",$PROFILES," in
       warn "and no database change is ever delivered. That is the failure that"
       warn "looks most like success, so it is reported rather than ignored."
       warn "  docker logs ${APP_DNS}.realtime 2>&1 | head -60"
-      RC=1
+      RC=1; RC_REALTIME=1
     else
       NTAB="$(pg "$APP_DB" "select count(*) from pg_class c join pg_namespace s on s.oid=c.relnamespace where s.nspname='realtime' and c.relkind in ('r','p')" | tr -d ' ')"
       HASLC="$(pg "$APP_DB" "select count(*) from pg_proc p join pg_namespace s on s.oid=p.pronamespace where s.nspname='realtime' and p.proname='list_changes'" | tr -d ' ')"
@@ -151,15 +153,46 @@ case ",$PROFILES," in
       else
         warn "realtime.list_changes() is MISSING, so no change will be delivered."
         warn "Realtime's tenant migrations are incomplete."
-        RC=1
+        RC=1; RC_REALTIME=1
       fi
-      # Its own migration history, which says how far it got.
+      # How far its own migrations got, and what stopping short costs.
+      #
+      # Realtime has 91 tenant migrations. Everything the postgres_changes
+      # path needs -- subscription, apply_rls, cast, list_changes -- is in the
+      # first thirty. Migration 20240401105812 then wants to create
+      # supabase_realtime_admin and move ownership of its broadcast and
+      # presence tables to it. On this image that role does not exist and is
+      # one of supautils' reserved roles, and the application's realtime role
+      # cannot create roles, so that migration cannot succeed here.
+      #
+      # That is reported rather than worked around: creating or granting a
+      # reserved role on this image is the operation that has crashed the
+      # server, and it is not worth doing to tidy a count. What matters is
+      # which FEATURES work, so that is what this says.
       MIG="$(pg "$APP_DB" "select count(*) from realtime.schema_migrations" | tr -d ' ')"
-      [ -n "$MIG" ] && printf '      realtime.schema_migrations: %s row(s)\n' "$MIG"
+      case "$MIG" in ''|*[!0-9]*) MIG=0 ;; esac
+      printf '      realtime.schema_migrations: %s of 91 row(s)\n' "$MIG"
+      if [ "$MIG" -ge 91 ]; then
+        ok "every tenant migration applied"
+      elif [ "${HASLC:-0}" -gt 0 ]; then
+        printf '      %s\n' "Live database updates (postgres_changes) have everything they need:"
+        printf '      %s\n' "list_changes, apply_rls and the subscription table are all in the"
+        printf '      %s\n' "first thirty migrations and are present."
+        printf '      %s\n' "Realtime's broadcast and presence features are NOT fully set up:"
+        printf '      %s\n' "their migration needs the reserved role supabase_realtime_admin,"
+        printf '      %s\n' "which this image does not have and this role may not create."
+        printf '      %s\n' "Nothing in Everytinroom uses broadcast or presence; an application"
+        printf '      %s\n' "that does would need that role added by a superuser first."
+      fi
     fi
     ;;
 esac
 
+# One line per service, so a caller can tell which half failed. Reporting a
+# single exit code meant a run where storage was granted correctly and only
+# Realtime was incomplete said "post-start did not complete, so storage
+# requests will be refused" -- which was false about storage.
+printf '\nRESULT storage=%s realtime=%s\n' "$RC_STORAGE" "$RC_REALTIME"
 printf '\n'
 if [ "$RC" = "0" ]; then
   printf '  %sPost-start steps completed.%s\n\n' "$C_GRN" "$C_RESET"

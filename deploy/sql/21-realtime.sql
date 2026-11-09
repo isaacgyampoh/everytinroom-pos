@@ -69,7 +69,11 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA _realtime GRANT ALL ON SEQUENCES TO :"rt_user
 
 -- Realtime's migrations create everything in `realtime` as this role, so it
 -- needs CREATE there as well as USAGE.
-GRANT ALL ON SCHEMA realtime TO :"rt_user";
+-- WITH GRANT OPTION, because one of Realtime's later migrations grants on
+-- the realtime schema itself, and ALL privileges without the grant option
+-- are not enough to re-grant them. Found by replaying the migrations past
+-- the one that creates list_changes.
+GRANT ALL ON SCHEMA realtime TO :"rt_user" WITH GRANT OPTION;
 -- USAGE only for the three API roles, and deliberately no table grants. The
 -- tables do not exist yet, and nothing is granted speculatively: if a
 -- specific object turns out to need a grant, the run will name it and that
