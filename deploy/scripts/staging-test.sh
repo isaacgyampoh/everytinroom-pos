@@ -413,6 +413,33 @@ APP=alpha_shop
 APP_DNS="$(printf '%s' "$APP" | tr '_' '-')"
 
 # ---------------------------------------------------------------------------
+# FIRST, the one privilege everything below depends on.
+#
+# Run 22 carried the GRANT SET ON PARAMETER log_min_messages that
+# 21-realtime.sql makes, and the server still reported 29 of 91 migrations
+# applied -- the same as before the grant. Either the grant did not take,
+# because the provisioning role may not make it on this image, or it took and
+# Realtime did not retry. Those need different fixes, and the difference is
+# one query.
+RT_ROLE="${APP}_realtime"
+HAS_PARAM="$(pgq "select has_parameter_privilege('$RT_ROLE','log_min_messages','SET')::text")"
+if [ "$HAS_PARAM" = "true" ]; then
+  pass "$RT_ROLE may set log_min_messages, so migration 20230328144023 can create list_changes()"
+else
+  fail "$RT_ROLE may NOT set log_min_messages — Realtime's migration 30 cannot run"
+  note "Without it realtime.list_changes() is never created and Realtime accepts"
+  note "subscriptions while delivering nothing. 21-realtime.sql attempts the grant;"
+  note "the lines below say whether this server's provisioning role is allowed to."
+fi
+# Who may grant it, which decides whether this is fixable from provisioning.
+detail pgq "select 'provisioning role: ' || current_user || ', superuser=' || (select rolsuper::text from pg_roles where rolname = current_user)"
+detail pgq "select 'parameter ACL: ' || coalesce((select array_to_string(paracl,' | ') from pg_parameter_acl where parname='log_min_messages'), '(none recorded)')"
+detail pgq "select 'current_user may grant it: ' || has_parameter_privilege(current_user,'log_min_messages','SET WITH GRANT OPTION')::text"
+# What provisioning itself said about it, which is where the explanation is.
+note "----- what provisioning reported for realtime -----"
+detail bash -c "grep -iE 'log_min_messages|list_changes|realtime' /tmp/prov-alpha_shop.log | head -14"
+
+# ---------------------------------------------------------------------------
 # Before any client: replay Realtime's OWN tenant migrations against this
 # server, as a role shaped like the one it connects with.
 #

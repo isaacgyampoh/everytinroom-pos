@@ -254,6 +254,41 @@ else
       < "$ROOT_DIR/sql/21-realtime.sql" >/dev/null \
       || die "Preparing the database for Realtime failed." \
              "Everything before this step is done; re-running is safe."
+    # ---------------------------------------------------------------------
+    # The one privilege Realtime's own migrations need, and a fallback.
+    #
+    # Migration 20230328144023 creates realtime.list_changes() -- the function
+    # its write-ahead-log poller calls -- and that function carries
+    # `set log_min_messages to 'fatal'`. A role that may not set that
+    # parameter may not create the function, Ecto stops there, and Realtime
+    # then accepts subscriptions and delivers nothing at all.
+    #
+    # 21-realtime.sql attempts the grant as this role. Whether it is allowed
+    # to depends on the image: privileges on parameters are themselves
+    # granted, and initially only a superuser holds them. So if the privilege
+    # is not held afterwards, it is attempted once more as the image's own
+    # superuser -- which is administration of a server its operator already
+    # controls, not an escalation for the application. The application's role
+    # gains the ability to quiet its own logging and nothing else.
+    if [ "$(psqlq -d postgres -c "select has_parameter_privilege('$APP_RT_USER','log_min_messages','SET')::text")" != "true" ]; then
+      for admin in supabase_admin postgres; do
+        docker exec -i central-postgres psql -q -U "$admin" -d postgres \
+          -c "GRANT SET ON PARAMETER log_min_messages TO \"$APP_RT_USER\"" >/dev/null 2>&1 || true
+        [ "$(psqlq -d postgres -c "select has_parameter_privilege('$APP_RT_USER','log_min_messages','SET')::text")" = "true" ] \
+          && { ok "granted SET ON PARAMETER log_min_messages as $admin"; break; }
+      done
+    fi
+    if [ "$(psqlq -d postgres -c "select has_parameter_privilege('$APP_RT_USER','log_min_messages','SET')::text")" = "true" ]; then
+      ok "Realtime's role may set log_min_messages, so list_changes() can be created"
+    else
+      warn "$APP_RT_USER may NOT set log_min_messages."
+      warn "Realtime's migration 20230328144023 will fail, realtime.list_changes()"
+      warn "will not exist, and Realtime will accept subscriptions and deliver"
+      warn "NOTHING with no error a client can see. Live updates will not work."
+      warn "A superuser on this server can fix it with one statement:"
+      warn "  GRANT SET ON PARAMETER log_min_messages TO \"$APP_RT_USER\";"
+    fi
+
     set_env_var "$APP_ENV" APP_REALTIME_USER "$APP_RT_USER"
     set_env_var "$APP_ENV" APP_REALTIME_PASSWORD "$RT_PW"
     # Realtime's own requirements: the encryption key is exactly 16 bytes and
