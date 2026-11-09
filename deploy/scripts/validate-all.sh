@@ -214,6 +214,33 @@ else
   ok "every \$ROOT_DIR/ and \$DEPLOY/ path resolves ($(printf '%s' "$XREF" | sed -n 's/^CHECKED //p') reference(s))"
 fi
 
+hdr "No bash -c string carries a nested command substitution"
+# `bash -n` cannot catch a quoting error inside a string that is only parsed
+# at run time, and `detail bash -c "... $(...) ..."` nests a command
+# substitution inside a double-quoted string inside bash -c inside docker
+# exec. One of those got four levels deep, bash answered
+#   syntax error near unexpected token `('
+# at run time, the command never ran, and the empty result looked like a
+# finding about the platform rather than about the quoting.
+#
+# Where a value is needed, assign it first and pass the variable. This is a
+# narrow check for a specific trap, not a general shell linter -- there is no
+# shellcheck on this machine, and a guard that exists beats one that would be
+# better if it were installed.
+# This file is excluded from its own scan: the explanation above and the
+# implementation below both contain the pattern, so a clean tree failed on the
+# wording of the check. Third time that has happened; the exclusion is the
+# habit now.
+BADNEST="$(grep -rn 'bash -c "' "$DEPLOY"/scripts/*.sh "$DEPLOY"/*.sh 2>/dev/null \
+  | grep -v '/validate-all\.sh:' \
+  | grep '\$(' | grep -v '# allow-nested-substitution' || true)"
+if [ -z "$BADNEST" ]; then
+  ok "no bash -c string nests a command substitution"
+else
+  bad "a bash -c string nests a command substitution; it will fail at run time"
+  printf '%s\n' "$BADNEST" | sed 's/^/     /' | head -6
+fi
+
 hdr "No command substitution can kill a script that runs under set -e"
 # lib/common.sh sets -euo pipefail, so every script that sources it dies if an
 # assignment from a command substitution fails. health.sh had one `docker

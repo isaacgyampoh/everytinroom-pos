@@ -859,7 +859,19 @@ EOL
       export PGPASSWORD="$RT_PW_LOCAL"
       rtq() { docker exec -i -e PGPASSWORD central-postgres psql -tAqX \
                 -U "${APP}_realtime" -h 127.0.0.1 -d "$APP" -c "$1" 2>&1; }
-      detail bash -c "echo \"slot created: \$(docker exec -i -e PGPASSWORD central-postgres psql -tAqX -U '${APP}_realtime' -h 127.0.0.1 -d '$APP' -c \\\"select pg_create_logical_replication_slot('${PROBE_SLOT}','wal2json') is not null\\\" 2>&1)\""
+      # Through the rtq helper, not a nested bash -c. The first version wrapped
+      # a command substitution inside a double-quoted string inside bash -c
+      # inside docker exec, and bash answered
+      #   syntax error near unexpected token `('
+      # so the slot was never created and both list_changes calls then failed
+      # with "does not exist" -- a self-inflicted result that looked like a
+      # finding. The helper already existed; it should have been used.
+      SLOT_MADE="$(rtq "select pg_create_logical_replication_slot('${PROBE_SLOT}','wal2json') is not null")"
+      note "probe slot ${PROBE_SLOT} created: ${SLOT_MADE:-(no answer)}"
+      case "$SLOT_MADE" in
+        t|true) : ;;
+        *) note "the probe slot was NOT created, so the two queries below cannot mean anything" ;;
+      esac
       pgq "insert into public.tick (label) values ('slot-probe')" "$APP" >/dev/null
       note "inserted: $(pgq "select id || ' / ' || label from public.tick where label='slot-probe' order by id desc limit 1" "$APP")"
       sleep 2
