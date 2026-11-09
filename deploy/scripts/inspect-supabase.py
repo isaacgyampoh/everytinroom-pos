@@ -24,7 +24,8 @@ WHY IT DECIDES SERVICES RATHER THAN LISTING THEM
     project:
 
       postgrest  always -- it is the data API
-      realtime   only if tables are in a publication
+      realtime   only if named in REALTIME_PROJECTS -- a publication alone
+                 does NOT imply it, see the note at the decision itself
       storage    only if a bucket holds objects
       functions  only if edge functions are deployed
       gotrue     only if auth.users has rows
@@ -195,8 +196,35 @@ def inspect(project, token):
 
     # --- what the central platform must actually run for this project ---
     needs = ["postgrest"]
-    if p["realtime_tables"]:
+    # PUBLISHED TABLES ARE NO LONGER A REASON TO RUN REALTIME.
+    #
+    # This used to add realtime whenever the project had tables in the
+    # supabase_realtime publication, which is how a client subscribing to
+    # postgres_changes looks from the outside. Everytinroom's three tables are
+    # published on Supabase Cloud for exactly that reason -- and its till no
+    # longer subscribes. It polls revision counters through PostgREST instead,
+    # because on the self-hosted stack Realtime stops delivering after a
+    # restart while still reporting healthy and acknowledging subscriptions.
+    # See supabase/migrations/034_live_state.sql.
+    #
+    # So a publication is recorded and reported, and decides nothing. Whether
+    # a project needs Realtime depends on whether its CLIENT code subscribes,
+    # which this script cannot see from the database and must not guess: it
+    # would otherwise recommend a container, and 1 GB of the memory budget,
+    # for a service the application does not use. REALTIME_PROJECTS names the
+    # ones that genuinely do.
+    rt_wanted = {r.strip() for r in
+                 (os.environ.get("REALTIME_PROJECTS") or "").split(",") if r.strip()}
+    if ref in rt_wanted or (p.get("name") or "") in rt_wanted:
         needs.append("realtime")
+        p["realtime_reason"] = "named in REALTIME_PROJECTS"
+    elif p["realtime_tables"]:
+        p["realtime_reason"] = (
+            "has published tables, but a publication alone does not require the "
+            "service: the client polls instead. Add this project to "
+            "REALTIME_PROJECTS if its own code still subscribes.")
+    else:
+        p["realtime_reason"] = "no published tables"
     if p["storage_mb"] > 0 or any((b.get("objects") or 0) > 0 for b in p["buckets"]):
         needs.append("storage")
     if p["edge_functions"]:
@@ -295,6 +323,8 @@ def markdown(projects):
         A(f"- Auth: {p['auth_users']} GoTrue users"
           + (f"; custom auth tables: {', '.join(p['custom_auth_tables'])}" if p['custom_auth_tables'] else ""))
         A(f"- Realtime tables: {', '.join(p['realtime_tables']) or 'none'}")
+        A(f"- Realtime service: {'yes' if 'realtime' in p['needs'] else 'no'}"
+          f" ({p.get('realtime_reason', 'not assessed')})")
         if p.get("agent"):
             a = p["agent"]
             A(f"- WhatsApp agent: {a['settings_rows']} settings "

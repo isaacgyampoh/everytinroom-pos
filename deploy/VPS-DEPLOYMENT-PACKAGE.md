@@ -103,14 +103,26 @@ actually uses rather than from what a standard Supabase install provides:
 | Service | Runs only if |
 |---|---|
 | postgrest | always — it is the data API |
-| realtime | tables are in a publication |
+| realtime | the project is named in `REALTIME_PROJECTS` |
 | storage | a bucket holds objects |
 | functions | edge functions are deployed |
 | gotrue | `auth.users` has rows |
 | cron | `pg_cron` has jobs |
 
 That matters for cost: Everytinroom makes no call to `supabase.auth` at all, so
-running GoTrue for it would spend 14 MB and a container on nothing. The
+running GoTrue for it would spend 14 MB and a container on nothing.
+
+One of those rules had to be corrected as part of dropping Realtime. The
+inventory used to add the Realtime service whenever a project had tables in
+the `supabase_realtime` publication, which is how a subscribing client looks
+from the outside. Everytinroom's three tables **are** published on Supabase
+Cloud, for exactly that reason, and its till no longer subscribes — so the
+inventory would have recommended a container and 1 GB of the memory budget for
+a service the application does not use, contradicting the provisioning command
+in section 8. Whether a project needs Realtime depends on whether its own
+client code subscribes, which cannot be read from the database and is not
+guessed: a publication is now recorded and reported and decides nothing, and
+`REALTIME_PROJECTS` names the projects that genuinely need it. The
 platform runs per-application services behind Compose **profiles** so an
 application that does not need one does not start it.
 
