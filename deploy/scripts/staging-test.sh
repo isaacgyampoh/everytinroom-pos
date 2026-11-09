@@ -20,11 +20,12 @@
 #    5  two independent applications, and that neither can read the other
 #    6  Realtime, end to end, through the proxy
 #    7  object storage through storage-api: upload, download, delete
-#    8  Supabase Auth, for the application that actually uses it
-#    9  backup and restore rehearsal, reconciled by row count
-#   10  scheduled jobs, in another database, calling a new URL
-#   11  resource use UNDER LOAD, capacity, provisioning again from clean
-#   12  the whole deployment re-run, and recovery from a full stop
+#    8  Everytinroom's own application, in a real browser
+#    9  Supabase Auth, for the application that actually uses it
+#   10  backup and restore rehearsal, reconciled by row count
+#   11  scheduled jobs, in another database, calling a new URL
+#   12  resource use UNDER LOAD, capacity, provisioning again from clean
+#   13  the whole deployment re-run, and recovery from a full stop
 #
 # Exit code 0 only if every check passed.
 # ===========================================================================
@@ -1373,7 +1374,33 @@ fi
 
 # ===========================================================================
 gate_section 8
-section "8. Supabase Auth, for the application that actually uses it"
+section "8. Everytinroom's own application, in a real browser"
+# ===========================================================================
+# Not a synthetic client and not a reimplementation: the application from this
+# repository, built against this platform, opened in Chromium, logged in
+# through its own PIN screen, and watched for the sale popup it renders when a
+# `sales` INSERT arrives on its own `pos-live` channel.
+#
+# It is a separate script because it is the one check that can be BLOCKED for
+# reasons that say nothing about Realtime -- a build failure, a missing
+# dependency, a schema its migrations cannot produce here -- and those must be
+# reported as blocked rather than as a delivery failure.
+if "$DEPLOY/scripts/test-app-realtime.sh" --app "$APP" --other "${G_APP:-}" \
+     > /tmp/appreal.log 2>&1; then
+  pass "the real application received a live event and showed it in its interface"
+else
+  RC_APP=$?
+  if grep -q "^  BLOCKED" /tmp/appreal.log; then
+    skip "the real application could not be driven in a browser here (see below)"
+  else
+    fail "the real application did not show the live event"
+  fi
+fi
+DETAIL_LINES=40 detail bash -c "grep -E '^  (PASS|FAIL|BLOCKED|[a-z])' /tmp/appreal.log | head -40"
+
+# ===========================================================================
+gate_section 9
+section "9. Supabase Auth, for the application that actually uses it"
 # ===========================================================================
 # Everytinroom does NOT use Supabase Auth -- it checks a PIN against its own
 # staff_sessions table -- and the platform is built so that an application
@@ -1508,8 +1535,8 @@ else
 fi
 
 # ===========================================================================
-gate_section 9
-section "9. Backup and restore rehearsal"
+gate_section 10
+section "10. Backup and restore rehearsal"
 # ===========================================================================
 pgq "create table if not exists public.money (id serial primary key, total numeric)" "$APP" >/dev/null
 pgq "insert into public.money (total) select (random()*100)::numeric(10,2) from generate_series(1,500)" "$APP" >/dev/null
@@ -1549,8 +1576,8 @@ if [ -n "$BK" ]; then
 fi
 
 # ===========================================================================
-gate_section 10
-section "10. Scheduled jobs in another database, calling a new URL"
+gate_section 11
+section "11. Scheduled jobs in another database, calling a new URL"
 # ===========================================================================
 # The architectural claim: pg_cron's scheduler lives in one database, so each
 # application's jobs are registered with cron.schedule_in_database(). If that
@@ -1659,8 +1686,8 @@ pgq "select cron.unschedule('staging-proof')" >/dev/null 2>&1
 pgq "select cron.unschedule('staging-http')" >/dev/null 2>&1
 
 # ===========================================================================
-gate_section 11
-section "11. Resource usage, capacity, and provisioning from clean"
+gate_section 12
+section "12. Resource usage, capacity, and provisioning from clean"
 # ===========================================================================
 RUNNING="$(docker ps --format '{{.Names}}' | wc -l | tr -d ' ')"
 note "containers running: $RUNNING"
@@ -1792,8 +1819,8 @@ P2="$(sed -n 's/^APP_DB_PASSWORD=//p' "$ROOT_DIR/apps/alpha_shop/.env" | tail -1
   && pass "the standalone isolation test also passes here ($(grep -c PASS /tmp/iso.log) checks)" \
   || note "standalone isolation test: $(grep -c FAIL /tmp/iso.log) failure(s)"
 
-gate_section 12
-section "12. Running the whole deployment again, and surviving a reboot"
+gate_section 13
+section "13. Running the whole deployment again, and surviving a reboot"
 # ===========================================================================
 # Two things an operator does that nothing above tests.
 #
