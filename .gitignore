@@ -48,3 +48,6 @@ migration-plans/
 deploy/migration-plans/
 # Everything left in this directory is local operator material.
 supabase/AWAITING-APPROVAL/
+
+# Cloudflare R2 credentials, entered locally by setup-r2-credentials.sh.
+deploy/.r2.env

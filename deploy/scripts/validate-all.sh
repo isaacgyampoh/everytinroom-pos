@@ -242,7 +242,7 @@ hdr "No operator-only material is tracked"
 # `git add -f`. So it is checked rather than trusted.
 ROOT="$(cd "$DEPLOY/.." && pwd)"
 OPS="$(cd "$ROOT" && git ls-files 2>/dev/null \
-  | grep -E '(AWAITING-APPROVAL/|grants-(before|after)-[0-9]+\.json|/revoke-.*\.sql$|PAYMENT-CREDENTIAL)' || true)"
+  | grep -E '(AWAITING-APPROVAL/|grants-(before|after)-[0-9]+\.json|/revoke-.*\.sql$|PAYMENT-CREDENTIAL|\.r2\.env$)' || true)"
 if [ -z "$OPS" ]; then
   ok "no operator-only file is tracked by git"
 else
@@ -254,6 +254,13 @@ if (cd "$ROOT" && git check-ignore -q supabase/AWAITING-APPROVAL/probe.sql 2>/de
   ok "supabase/AWAITING-APPROVAL/ is ignored, so a stray file there is not staged"
 else
   bad "supabase/AWAITING-APPROVAL/ is NOT ignored — operator files there would be committed"
+fi
+# The R2 credentials file, specifically. It holds a live secret for a bucket
+# that serves a shop's images, so "probably ignored" is not good enough.
+if (cd "$ROOT" && git check-ignore -q deploy/.r2.env 2>/dev/null); then
+  ok "deploy/.r2.env is ignored, so the R2 credentials cannot be committed"
+else
+  bad "deploy/.r2.env is NOT ignored — the R2 credentials could be committed"
 fi
 
 hdr "Unit tests"
