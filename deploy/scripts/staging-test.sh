@@ -1648,7 +1648,22 @@ if "$DEPLOY/scripts/test-app-realtime.sh" --app "$APP" --other "${G_APP:-}" \
   pass "the real application received a live event and showed it in its interface"
 else
   RC_APP=$?
-  if grep -q "^  BLOCKED" /tmp/appreal.log; then
+  # A FAILURE OUTRANKS A BLOCK, AND THIS GOT IT BACKWARDS.
+  #
+  # Any BLOCKED line used to make the whole section a skip. This run printed
+  # five FAIL lines and one BLOCKED line, and the suite's headline read
+  # "118 passed, 0 failed, 1 skipped" -- the browser test had failed every
+  # check that matters and the summary said nothing had failed at all. That is
+  # the same class of misreporting as a green run whose tests never executed,
+  # and it is worse, because the evidence was right there in the log.
+  #
+  # Blocked means "could not be attempted". If anything was attempted and
+  # failed, that is the finding, whatever else was also blocked.
+  APP_FAILS="$(grep -c "^  FAIL" /tmp/appreal.log 2>/dev/null || echo 0)"
+  APP_BLOCKS="$(grep -c "^  BLOCKED" /tmp/appreal.log 2>/dev/null || echo 0)"
+  if [ "${APP_FAILS:-0}" -gt 0 ]; then
+    fail "the real application failed ${APP_FAILS} browser check(s)$( [ "${APP_BLOCKS:-0}" -gt 0 ] && echo " (and ${APP_BLOCKS} could not be attempted)" )"
+  elif [ "${APP_BLOCKS:-0}" -gt 0 ]; then
     skip "the real application could not be driven in a browser here (see below)"
   else
     fail "the real application did not show the live event"

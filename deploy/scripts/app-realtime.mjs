@@ -76,11 +76,48 @@ async function enterPin(p, pin) {
   const fields = p.locator('input[inputmode="numeric"], input[type="tel"], input[type="password"], input[maxlength="1"]')
   await fields.first().waitFor({ timeout: 25000 })
   const count = await fields.count()
-  await fields.first().click()
-  await p.keyboard.type(String(pin), { delay: 140 })
-  // Single-field variants need an explicit submit; the four-box form does not.
-  if (count < 4) await p.keyboard.press('Enter')
-  return { count }
+  const digits = String(pin).split('')
+  if (count >= 4) {
+    // fill() PER BOX, NOT keyboard.type(), AND THIS WAS MY MISTAKE TO MAKE
+    // TWICE.
+    //
+    // Run 40 logged in successfully by filling each box. I then decided the
+    // problem was typing faster than React can batch, and replaced filling
+    // with keyboard.type -- which broke a login that had been working.
+    //
+    // Typing cannot be relied on here because each box is maxLength={1} with
+    // a controlled value, and the component moves focus itself after every
+    // digit while an effect also force-focuses the first box. A keystroke
+    // that arrives at a box which already holds a digit is silently dropped,
+    // and the PIN is then short. fill() addresses each box directly, so it
+    // does not depend on where focus happens to be.
+    //
+    // The pause is for React to commit between digits: the handler reads the
+    // PIN out of state, and the fourth box submits whatever the first three
+    // had committed by then.
+    for (let i = 0; i < 4; i++) {
+      await fields.nth(i).fill(digits[i] ?? '')
+      await p.waitForTimeout(90)
+    }
+  } else {
+    await fields.first().fill(String(pin))
+    await p.keyboard.press('Enter')
+  }
+  // WHAT ACTUALLY LANDED IN THE BOXES.
+  //
+  // "it did not log in" has now cost two runs because it does not say whether
+  // the PIN was rejected or never arrived. Reading the fields back separates
+  // those: four filled boxes and no session means verify_pin refused it; empty
+  // or partly filled boxes mean this function typed into the wrong place.
+  // The digits themselves are never printed -- only how many are present.
+  let filled = 0
+  try {
+    for (let i = 0; i < count; i++) {
+      const v = await fields.nth(i).inputValue()
+      if (v && v.length > 0) filled++
+    }
+  } catch {}
+  return { count, filled }
 }
 
 const loggedIn = (p) => p.locator('text=/Staging Probe|Checkout|Products|Sales/i')
@@ -92,6 +129,16 @@ const page = await ctx.newPage()
 
 // Item 8: console errors, failed requests, websocket diagnostics.
 const consoleErrors = [], failedRequests = [], sockets = []
+// The one call that decides whether the till opens. Watched separately
+// because run 42 reported several 401s with no indication of which request
+// they belonged to, and that is the difference between a missing EXECUTE
+// grant on the platform and a bug in the application.
+const pinCalls = []
+page.on('response', (r) => {
+  const u = r.url()
+  if (!/\/rest\/v1\/rpc\/verify_pin/.test(u)) return
+  pinCalls.push(`HTTP ${r.status()} ${r.statusText() || ''}`.trim())
+})
 page.on('console', (m) => {
   if (m.type() === 'error') consoleErrors.push(scrub(m.text()).slice(0, 200))
 })
@@ -122,7 +169,9 @@ try {
     block('the application rendered no PIN entry, so its real login could not be driven')
   } else {
     good(`the application's own Login screen rendered (${n} PIN field(s))`)
-    await enterPin(page, APP_PIN)
+    const typed = await enterPin(page, APP_PIN)
+    say(`PIN entry: ${typed.filled} of ${typed.count} field(s) hold a digit ` +
+        `(the digits themselves are never printed)`)
     // 2. Did verify_pin accept it and the till open?
     if (await loggedIn(page)) {
       good('verify_pin() accepted the PIN and the till opened')
@@ -136,6 +185,13 @@ try {
         await page.screenshot({ path: '/tmp/app-login-failed.png' })
         say('screenshot: /tmp/app-login-failed.png')
       } catch {}
+      // And what the server said to the one call that decides this. A 401 or
+      // a 404 on verify_pin is a grant or a schema-cache problem on the
+      // platform; a 200 that still does not log in is the application's.
+      for (const r of pinCalls.slice(0, 4)) say(`  verify_pin call: ${r}`)
+      if (pinCalls.length === 0) {
+        say('  verify_pin was never called, so the form did not submit at all')
+      }
     }
   }
 

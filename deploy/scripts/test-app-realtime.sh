@@ -92,7 +92,19 @@ if [ "$(pg "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronam
   blocked "verify_pin() does not exist, so the real login screen cannot authenticate"
   exit 2
 fi
-good "verify_pin() exists, so the real PIN screen can authenticate"
+good "verify_pin() exists"
+# EXISTING IS NOT ENOUGH. The browser calls it through PostgREST as the anon
+# role, so what decides whether a cashier can sign in is the EXECUTE
+# privilege, not the function's presence. Migration 015 grants it, and these
+# migrations are applied with ON_ERROR_STOP off -- a file reports success
+# while individual statements inside it have failed -- so "35 applied" says
+# nothing about whether this particular grant landed. Asked directly.
+PINX="$(pg "select has_function_privilege('anon','public.verify_pin(text)','EXECUTE')" 2>/dev/null | tr -d ' ')"
+if [ "$PINX" = "t" ]; then
+  good "the browser-facing role may EXECUTE verify_pin, so the real PIN screen can authenticate"
+else
+  bad "anon may NOT execute verify_pin (got '${PINX:-no answer}') — no cashier could sign in"
+fi
 
 # ---------------------------------------------------------------------------
 # 2. A staging staff member. The PIN is generated and never printed.

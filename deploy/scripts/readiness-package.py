@@ -227,6 +227,13 @@ TESTS = [
     ("The real application's Login screen renders", True,
      [r"application's own Login screen rendered"],
      [r"rendered no PIN entry"]),
+    # Existing is not the same as callable. The browser calls it as the anon
+    # role through PostgREST, and the migrations are applied with
+    # ON_ERROR_STOP off, so a file can report success while the grant inside
+    # it failed.
+    ("The browser role may execute verify_pin", True,
+     [r"browser-facing role may EXECUTE verify_pin"],
+     [r"anon may NOT execute verify_pin"]),
     ("verify_pin accepts a staging PIN and the till opens", True,
      [r"verify_pin\(\) accepted the PIN and the till opened"],
      [r"did not reach its logged-in interface"]),
@@ -420,6 +427,7 @@ REQUIREMENTS = [
         "A write moves the revision the till polls",
         "The browser harness itself ran",
         "The real application's Login screen renders",
+        "The browser role may execute verify_pin",
         "verify_pin accepts a staging PIN and the till opens",
         "The real application receives a live event and SHOWS it",
         "A product change appears in the interface",
