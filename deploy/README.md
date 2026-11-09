@@ -188,26 +188,44 @@ once as the image's superuser and then **checks that the privilege is held**
 rather than trusting the statement — a GRANT that the grantor may not make
 raises, while a GRANT on an object it does not own only warns.
 
-### What does not work, and does not matter here
+### The second thing it needs, and why it is not optional
 
-A later migration wants to create the role `supabase_realtime_admin` and move
+Migration 40 of 91 creates the role `supabase_realtime_admin` and moves
 ownership of Realtime's broadcast and presence tables to it. On this image
 that role does not exist, it is one of `supautils.reserved_roles`, and an
-application's realtime role cannot create roles — so that migration cannot
-succeed. Creating or granting a reserved role on this image is the operation
-that has crashed the server twice, and it is not worth doing to tidy a count.
+application's realtime role cannot create roles — so without help that
+migration fails, and **nothing after a failed migration runs.**
 
-The consequence is specific:
+I first wrote this up as a limitation affecting only broadcast and presence.
+That was wrong, and the run that followed said so:
 
-| Feature | Works | Why |
-|---|---|---|
-| live database updates (`postgres_changes`) | **yes** | everything it needs is in the first thirty migrations |
-| broadcast, presence | **no** | their migration needs that reserved role |
+```
+column "slot_changes_count" does not exist
+query: SELECT ... slot_changes_count FROM realtime.list_changes(...)
+```
 
-Nothing in Everytinroom uses broadcast or presence. An application that does
-would need a superuser to create `supabase_realtime_admin` before it is
-provisioned. `post-start.sh` reports which of the two states a given
-application is in, every time it runs.
+Migration 30 creates `list_changes` as it was in 2023. Migration **69**
+replaces it with the version Realtime v2.148 actually calls. Migration 40 sits
+between them. So stopping at 40 leaves live database updates broken too, with
+the client reporting `SUBSCRIBED` throughout.
+
+So `provision-app.sh` creates that role and grants it to the application's
+realtime role, both as the image's superuser — which is how Supabase's own
+platform runs these migrations, and why none of this appears there. Realtime
+then runs its own migrations, so the schema is whatever Realtime says it
+should be rather than something reconstructed from reading its source.
+
+A membership grant on a reserved role is the operation that has taken this
+server down twice, so it is followed by a liveness probe: if PostgreSQL stops
+answering, provisioning stops and says so rather than carrying on. The
+membership is then confirmed with `pg_has_role`, not inferred from the
+statement not erroring.
+
+**It does not weaken isolation.** `supabase_realtime_admin` is a cluster-level
+role, so several applications' realtime roles may each be members of it — but
+those roles hold `CONNECT` on their own database and no other, and that is the
+boundary. Membership in a shared role creates no path into a database the role
+cannot open.
 
 ### Checking it without a server
 
@@ -344,8 +362,11 @@ keeps finding — it says so in its own output.
 - **a real VPS.** Every result comes from a CI runner: a different machine,
   different disks, different network. The same staging script should be run on
   the server before cutover.
-- **Realtime's broadcast and presence features.** See the Realtime section
-  above: they need a reserved role this image does not have.
+- **Realtime end to end.** The two privileges its migrations need are now
+  granted and verified, and the staging run checks delivery on two independent
+  tenants, that one tenant's change does not reach the other, and that
+  delivery resumes after a restart. Until a run shows those passing, live
+  updates are not claimed to work.
 
 Until those are done this is a tested platform, not a completed migration,
 and the difference matters.

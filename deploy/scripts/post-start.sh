@@ -174,15 +174,24 @@ case ",$PROFILES," in
       printf '      realtime.schema_migrations: %s of 91 row(s)\n' "$MIG"
       if [ "$MIG" -ge 91 ]; then
         ok "every tenant migration applied"
-      elif [ "${HASLC:-0}" -gt 0 ]; then
-        printf '      %s\n' "Live database updates (postgres_changes) have everything they need:"
-        printf '      %s\n' "list_changes, apply_rls and the subscription table are all in the"
-        printf '      %s\n' "first thirty migrations and are present."
-        printf '      %s\n' "Realtime's broadcast and presence features are NOT fully set up:"
-        printf '      %s\n' "their migration needs the reserved role supabase_realtime_admin,"
-        printf '      %s\n' "which this image does not have and this role may not create."
-        printf '      %s\n' "Nothing in Everytinroom uses broadcast or presence; an application"
-        printf '      %s\n' "that does would need that role added by a superuser first."
+      else
+        # Stopping short is NOT benign, and an earlier version of this said it
+        # was. Migration 40 needs the reserved role supabase_realtime_admin,
+        # and migration 69 -- on the far side of it -- replaces list_changes()
+        # with the version this Realtime actually calls. Stop at 40 and the
+        # poller fails every cycle with `column "slot_changes_count" does not
+        # exist` while the client reports SUBSCRIBED. So this is a failure,
+        # not a note about two features nobody uses.
+        warn "only $MIG of 91 tenant migrations applied."
+        warn "Anything after the first failure has not run. If that includes"
+        warn "migration 20260326120000, realtime.list_changes() is the older"
+        warn "version and the poller fails on every cycle with"
+        warn "  column \"slot_changes_count\" does not exist"
+        warn "while a subscribed client is told SUBSCRIBED and sees no error."
+        warn "The usual cause is migration 20240401105812, which needs the role"
+        warn "supabase_realtime_admin. provision-app.sh creates and grants it"
+        warn "as the image's superuser; check its output for that step."
+        RC=1; RC_REALTIME=1
       fi
     fi
     ;;
