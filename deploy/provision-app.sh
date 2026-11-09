@@ -291,20 +291,47 @@ else
 
     set_env_var "$APP_ENV" APP_REALTIME_USER "$APP_RT_USER"
     set_env_var "$APP_ENV" APP_REALTIME_PASSWORD "$RT_PW"
-    # Realtime's own requirements: the encryption key is exactly 16 bytes and
-    # SECRET_KEY_BASE must be at least 64 characters. Realtime refuses to boot
-    # on anything else, with a message that does not say so.
-    [ -n "$(get_env_var "$APP_ENV" REALTIME_ENC_KEY 2>/dev/null || true)" ] \
-      || set_env_var "$APP_ENV" REALTIME_ENC_KEY "$(openssl rand -hex 8)"
-    [ -n "$(get_env_var "$APP_ENV" REALTIME_SECRET_KEY_BASE 2>/dev/null || true)" ] \
-      || set_env_var "$APP_ENV" REALTIME_SECRET_KEY_BASE "$(openssl rand -hex 32)"
-    # Realtime calls fetch_env! on this one, so an absent value terminates the
-    # release during boot rather than degrading.
-    [ -n "$(get_env_var "$APP_ENV" REALTIME_METRICS_JWT_SECRET 2>/dev/null || true)" ] \
-      || set_env_var "$APP_ENV" REALTIME_METRICS_JWT_SECRET "$(gen_secret 32)"
     ok "Realtime role, schema and keys ready (tenant: $NAME)"
   fi
   PROFILES="realtime"
+fi
+
+# ---------------------------------------------------------------------------
+# Realtime's three required secrets are written for EVERY application, not
+# only the ones that run Realtime.
+#
+# Docker Compose interpolates every service's environment when it reads the
+# file, regardless of which profiles are active. app.compose.yml guards those
+# three with ${VAR:?...} because Realtime terminates during boot on a missing
+# one rather than degrading -- so for an application provisioned WITHOUT
+# realtime, `compose up` failed outright:
+#
+#   error while interpolating services.realtime.environment.DB_ENC_KEY:
+#   required variable REALTIME_ENC_KEY is missing a value
+#
+# No container started, including the ones that application does use. Two of
+# the five inventoried projects need no Realtime, so this was not a corner:
+# it meant they could not be started at all. It went unnoticed because the
+# test application without Realtime was never started until a check was
+# written for it.
+#
+# Dropping the :? guard would trade this for the original failure it was added
+# to prevent: a Realtime that boots with an empty key and crash-loops with a
+# message that does not say why. Real values cost a few random bytes, mean an
+# application can have Realtime switched on later without a missing secret,
+# and are written once and never regenerated.
+#
+# The encryption key is exactly 16 bytes and SECRET_KEY_BASE must be at least
+# 64 characters; Realtime refuses to boot on anything else and does not say so.
+if [ "$DRY" = "0" ]; then
+  [ -n "$(get_env_var "$APP_ENV" REALTIME_ENC_KEY 2>/dev/null || true)" ] \
+    || set_env_var "$APP_ENV" REALTIME_ENC_KEY "$(openssl rand -hex 8)"
+  [ -n "$(get_env_var "$APP_ENV" REALTIME_SECRET_KEY_BASE 2>/dev/null || true)" ] \
+    || set_env_var "$APP_ENV" REALTIME_SECRET_KEY_BASE "$(openssl rand -hex 32)"
+  # Realtime calls fetch_env! on this one, so an absent value terminates the
+  # release during boot rather than degrading.
+  [ -n "$(get_env_var "$APP_ENV" REALTIME_METRICS_JWT_SECRET 2>/dev/null || true)" ] \
+    || set_env_var "$APP_ENV" REALTIME_METRICS_JWT_SECRET "$(gen_secret 32)"
 fi
 
 # ---------------------------------------------------------------------------

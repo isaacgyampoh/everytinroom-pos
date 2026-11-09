@@ -138,6 +138,34 @@ detail() {                      # detail <command> [args...]   -- stderr include
 [ "$(id -u)" = "0" ] || { echo "Run with sudo: sudo $0"; exit 2; }
 
 pgq() { docker exec central-postgres psql -tAqX -U postgres -d "${2:-postgres}" -c "$1" 2>/dev/null; }
+
+# Site files are generated for https, and these hostnames have no public DNS,
+# so staging rewrites them to plain http. ONE function, because there were
+# three copies and two of them were wrong: provision-app.sh writes the site
+# address with no scheme at all --
+#     alpha-shop.staging.test {
+# -- and the later copies matched `^https://`, which never appears. So the
+# site file for an application provisioned mid-run stayed on automatic HTTPS,
+# Caddy answered its http requests with 308, and its websocket never
+# connected. It reports what it changed, so a no-op is visible.
+staging_http_sites() {
+  local f base changed=0
+  for f in "$ROOT_DIR/compose/caddy-sites/"*.caddy; do
+    [ -f "$f" ] || continue
+    base="$(basename "$f")"
+    grep -q "^# staging:" "$f" && continue
+    sed -i "1s|^|# staging: plain HTTP, these hostnames have no public DNS\n|" "$f"
+    sed -i -E "s|^([a-z0-9-]+\\.staging\\.test) \\{|http://\\1 {|" "$f"
+    sed -i -E "s|^https://([a-z0-9-]+\\.staging\\.test)|http://\\1|" "$f"
+    note "$base switched to http:// (no ACME in staging)"
+    changed=$((changed+1))
+  done
+  [ "$changed" = "0" ] && return 1
+  docker exec central-caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 \
+    || docker restart central-caddy >/dev/null 2>&1
+  sleep 4
+  return 0
+}
 psqlq_db() { docker exec central-postgres psql -tAqX -U postgres -d "$1" -c "$2" 2>/dev/null; }
 
 # ===========================================================================
@@ -351,6 +379,32 @@ printf '%s' "$A_PROF" | grep -q realtime && printf '%s' "$A_PROF" | grep -qv aut
 printf '%s' "$B_PROF" | grep -q auth \
   && pass "beta_shop's profiles are '$B_PROF' — auth only" \
   || fail "beta_shop's profiles are '$B_PROF'"
+# Every provisioned application's compose configuration must be VALID, for
+# every one of them, before anything is started.
+#
+# Compose interpolates every service's environment when it reads the file,
+# whatever profiles are active. app.compose.yml guards Realtime's three
+# required secrets with ${VAR:?...}, and those were written only for
+# applications that asked for Realtime -- so `compose up` for an application
+# WITHOUT Realtime failed outright and started nothing at all, including the
+# services it does use. Two of the five inventoried projects need no Realtime.
+#
+# It went unnoticed for eight runs because the application without Realtime
+# was never started. This check costs nothing, needs no container, and would
+# have caught it the first time.
+for a in alpha_shop beta_shop; do
+  if [ -x "$ROOT_DIR/apps/$a/compose.sh" ]; then
+    if OUT="$(cd "$ROOT_DIR/apps/$a" && ./compose.sh config -q 2>&1)"; then
+      pass "$a's compose configuration is valid, so every service it uses can start"
+    else
+      fail "$a's compose configuration is INVALID — nothing would start for it"
+      DETAIL_LINES=12 detail bash -c "printf '%s\n' \"$OUT\" | grep -iE 'error|missing' | head -12"
+    fi
+  else
+    fail "$a has no compose.sh, so provisioning did not finish"
+  fi
+done
+
 [ -n "$(psqlq_db beta_shop "select 1 from pg_namespace where nspname='auth'" 2>/dev/null)" ] \
   && pass "beta_shop's database has an auth schema" \
   || fail "beta_shop has no auth schema"
@@ -485,15 +539,8 @@ ENV="$ROOT_DIR/apps/$APP/.env"
 # kept trying to reach Let's Encrypt for a hostname with no public DNS, which
 # left the proxy reporting "starting" for minutes and made unrelated checks
 # look flaky.
-for SITE in "$ROOT_DIR"/compose/caddy-sites/*.caddy; do
-  [ -f "$SITE" ] || continue
-  grep -q "^# staging:" "$SITE" && continue
-  sed -i "1s|^|# staging: plain HTTP, these hostnames have no public DNS\n|" "$SITE"
-  sed -i -E "s|^([a-z0-9-]+\\.staging\\.test) \\{|http://\\1 {|" "$SITE"
-  note "$(basename "$SITE") switched to http:// (no ACME in staging)"
-done
+staging_http_sites || note "every site file was already on http://"
 grep -q "staging.test" /etc/hosts || echo "127.0.0.1 alpha-shop.staging.test beta-shop.staging.test" >> /etc/hosts
-docker restart central-caddy >/dev/null 2>&1; sleep 4
 
 cd "$ROOT_DIR/apps/$APP" && ./compose.sh up -d >/tmp/app-up.log 2>&1
 ok=0
@@ -688,11 +735,9 @@ EOL
       detail tail -20 /tmp/prov-gamma-rt.log
     fi
     grep -q "$G_DNS.staging.test" /etc/hosts || echo "127.0.0.1 $G_DNS.staging.test" >> /etc/hosts
-    # The site files are written for https; staging has no ACME.
-    for f in "$ROOT_DIR/compose/caddy-sites/"*.caddy; do
-      [ -f "$f" ] && sed -i 's|^https://|http://|' "$f"
-    done
-    docker exec central-caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 || true
+    # The new application's site file needs the same staging rewrite, and it
+    # was written after the first pass ran.
+    staging_http_sites || note "no site file needed rewriting"
 
     if [ -f "$G_ENV" ]; then
       G_ANON="$(sed -n 's/^ANON_KEY=//p' "$G_ENV" | tail -1)"
@@ -1537,24 +1582,27 @@ else
   fail "row count changed across the restart: $ROWS_BEFORE -> $ROWS_AFTER"
 fi
 
-# bootstrap's second run regenerates its own placeholder site file from the
-# template, which is written for https. Caddy then answers an http request
-# with 308, redirecting to a scheme staging has no certificate for. That is
-# correct behaviour for a real server and an artefact here, so the staging
-# rewrite is re-applied -- the same thing sections 6 and 7 do -- before asking
-# whether the API works.
-for f in "$ROOT_DIR/compose/caddy-sites/"*.caddy; do
-  [ -f "$f" ] && sed -i 's|^https://|http://|' "$f"
-done
-docker exec central-caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 || true
-sleep 3
+# Re-apply the staging rewrite in case the second bootstrap or the restart
+# reinstated a site file written for https.
+staging_http_sites || note "every site file was already on http://"
 
 # Requests must work again without anyone touching anything.
 CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
   -H "apikey: $ANON" -H "Authorization: Bearer $ANON" \
   "http://$APP_DNS.staging.test/rest/v1/load_sales?select=id&limit=1" 2>/dev/null || echo 000)"
-[ "$CODE" = "200" ] && pass "the API answers again after the restart, unattended (HTTP 200)" \
-                    || fail "the API returned HTTP $CODE after the restart"
+if [ "$CODE" = "200" ]; then
+  pass "the API answers again after the restart, unattended (HTTP 200)"
+else
+  fail "the API returned HTTP $CODE after the restart"
+  # A 308 means Caddy is redirecting, which means this host is being served
+  # over https somewhere. Say where, rather than leaving it to be guessed:
+  # the redirect target, what the site file actually starts with, and which
+  # hosts Caddy's running configuration has.
+  note "----- why -----"
+  detail bash -c "curl -s -o /dev/null -D - --max-time 10 -H 'apikey: $ANON' 'http://$APP_DNS.staging.test/rest/v1/load_sales?select=id&limit=1' | grep -iE '^(HTTP|location)' | head -4"
+  detail bash -c "head -3 '$ROOT_DIR/compose/caddy-sites/${APP}.caddy' 2>/dev/null || ls '$ROOT_DIR/compose/caddy-sites/'"
+  detail bash -c "docker exec central-caddy caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile 2>/dev/null | grep -oE '\"[a-z0-9-]+\\.staging\\.test\"' | sort -u | head -8"
+fi
 
 # ===========================================================================
 section "Logs from anything that is not healthy"

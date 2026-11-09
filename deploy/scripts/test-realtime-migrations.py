@@ -33,6 +33,7 @@ WHAT IT PROVES, AND WHAT IT DOES NOT
 """
 
 import argparse
+import hashlib
 import os
 import re
 import subprocess
@@ -64,12 +65,35 @@ def bad(m):
 VIA_DOCKER = None
 
 
+# A password for the owner role, generated per run. Connecting as a role over
+# the local socket goes through peer authentication, where the OS user decides
+# who you may be -- so `psql -U <owner>` inside the container is refused,
+# because the OS user there is postgres. The first version did exactly that,
+# ignored the failure, and then reported "stops at migration 1, 0 applied" on
+# the real server: the scaffolding table was never created and every
+# migration's final INSERT was refused. A tool written to end guesswork gave a
+# confident wrong answer twice. Now the owner connects over TCP with a
+# password, and the connection is CHECKED before anything is replayed.
+OWNER_PW = hashlib.sha256(os.urandom(16)).hexdigest()
+
+
 def psql(args, sql=None, db="postgres", user=None, stop=True, stdin=None):
     inner = ["psql", "-X", "-q", "-d", db]
     if stop:
         inner += ["-v", "ON_ERROR_STOP=1"]
+    env = dict(os.environ)
+    docker_env = []
     if user:
         inner += ["-U", user]
+        env["PGPASSWORD"] = OWNER_PW
+        # Inside the container, TCP on loopback with a password: a socket
+        # connection there goes through peer authentication and the OS user is
+        # postgres, so it cannot be this role. Outside, PGHOST is whatever the
+        # caller set -- typically a socket directory for a throwaway cluster
+        # that is not listening on TCP at all, so the host is left alone.
+        if VIA_DOCKER:
+            inner += ["-h", "127.0.0.1"]
+            docker_env = ["-e", "PGPASSWORD"]
     elif VIA_DOCKER:
         inner += ["-U", "postgres"]
     if sql is not None:
@@ -77,9 +101,9 @@ def psql(args, sql=None, db="postgres", user=None, stop=True, stdin=None):
     if stdin is not None:
         inner += ["-f", "-"]
     inner += list(args)
-    cmd = (["docker", "exec", "-i", VIA_DOCKER] + inner) if VIA_DOCKER else inner
-    r = subprocess.run(cmd, capture_output=True, text=True,
-                       input=stdin, env=dict(os.environ))
+    cmd = (["docker", "exec", "-i"] + docker_env + [VIA_DOCKER] + inner) \
+        if VIA_DOCKER else inner
+    r = subprocess.run(cmd, capture_output=True, text=True, input=stdin, env=env)
     return r.returncode, (r.stdout or "") + (r.stderr or "")
 
 
@@ -193,7 +217,8 @@ def replay(migrations, upto, all_, grant_parameter, pre_create_admin, label):
     psql([], sql=f'DROP DATABASE IF EXISTS "{DB}" WITH (FORCE)', stop=False)
     psql([], sql=f'REVOKE ALL ON PARAMETER log_min_messages FROM "{OWNER}"', stop=False)
     psql([], sql=f'DROP ROLE IF EXISTS "{OWNER}"', stop=False)
-    rc, out = psql([], sql=f'CREATE ROLE "{OWNER}" LOGIN NOCREATEROLE NOSUPERUSER')
+    rc, out = psql([], sql=f'CREATE ROLE "{OWNER}" LOGIN NOCREATEROLE NOSUPERUSER '
+                           f"PASSWORD '{OWNER_PW}'")
     if rc != 0:
         sys.exit(f"could not create the role:\n{out}")
     for r in ("anon", "authenticated", "service_role"):
@@ -228,6 +253,14 @@ def replay(migrations, upto, all_, grant_parameter, pre_create_admin, label):
     psql([], sql="CREATE TABLE IF NOT EXISTS realtime.schema_migrations "
                  "(version bigint primary key, inserted_at timestamp default now())",
          db=DB, user=OWNER, stop=False)
+
+    # Before replaying anything: can the owner connect, as itself? If not,
+    # every migration below fails for a reason that has nothing to do with
+    # Realtime, and the result looks like a platform finding.
+    rc, out = psql([], sql="select current_user", db=DB, user=OWNER)
+    if rc != 0 or OWNER not in out:
+        sys.exit(f"{OWNER} cannot connect to {DB} as itself, so nothing was "
+                 f"replayed and no conclusion can be drawn:\n{out.strip()[:400]}")
 
     files = sorted(f for f in os.listdir(migrations) if f.endswith(".ex"))
     applied, stopped_at, unparsed = 0, None, []
