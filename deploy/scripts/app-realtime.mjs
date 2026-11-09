@@ -335,5 +335,10 @@ try {
   await browser.close().catch(() => {})
 }
 
+// An explicit line, because "no timeout was reported" is not evidence that
+// the run finished -- a crash before this point produces no line either, and
+// the acceptance roll-up has to be able to tell the difference between a
+// harness that completed and one that vanished.
+console.log(`  PASS the browser run completed all of its checks`)
 console.log(`\n  passed ${pass}  failed ${fail}  blocked ${blocked}`)
 process.exit(fail > 0 ? 1 : blocked > 0 ? 2 : 0)

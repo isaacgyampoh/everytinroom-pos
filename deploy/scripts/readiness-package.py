@@ -228,8 +228,8 @@ TESTS = [
       r"did not reach its interface again after a restart",
       r"the application restart check could not run"]),
     ("The browser run finished rather than hanging", True,
-     [r"passed \d+  failed \d+  blocked \d+"],
-     [r"did not finish within 7 minutes"]),
+     [r"the browser run completed all of its checks"],
+     [r"did not finish within 7 minutes", r"the browser run stopped"]),
     ("Another application's sale does not appear in this one's interface", True,
      [r"did not appear in this application's interface"],
      [r"APPEARED in \w+'s interface"]),
@@ -507,10 +507,22 @@ def state_of(patterns, texts, fail_patterns=()):
     """
     # A failure is looked for FIRST: a run can print a PASS for one half of a
     # check and a FAIL for the other, and the failure is the finding.
+    #
+    # NESTED RESULTS COUNT. The suite's own checks print at the top level as
+    # "- PASS ..." and "- **FAIL** ...". The browser harness is a separate
+    # program whose output is indented underneath, so its results arrive as
+    # "PASS ...", "FAIL ..." and "BLOCKED ..." with no list marker. This used
+    # to require the marker, which meant every browser-level requirement --
+    # the login screen, the sale appearing on screen, cross-tenant isolation
+    # in the interface -- could only ever read NOT TESTED, even with the
+    # report printing PASS two files away. Nothing caught it because the
+    # browser test had never got far enough to pass, so the contradiction had
+    # never been printed. Two artifacts disagreeing about the same run is
+    # worse than either being wrong on its own.
     for text in texts:
         for line in text.split("\n"):
             st = line.strip()
-            if "**FAIL**" not in st:
+            if not ("**FAIL**" in st or st.startswith("FAIL ") or st.startswith("BLOCKED ")):
                 continue
             for p in tuple(fail_patterns) + tuple(patterns):
                 if re.search(p, st, re.I):
@@ -518,7 +530,7 @@ def state_of(patterns, texts, fail_patterns=()):
     for text in texts:
         for line in text.split("\n"):
             st = line.strip()
-            if not st.startswith("- PASS"):
+            if not (st.startswith("- PASS") or st.startswith("PASS ")):
                 continue
             for p in patterns:
                 if re.search(p, st, re.I):
