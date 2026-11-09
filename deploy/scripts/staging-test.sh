@@ -148,6 +148,32 @@ pgq() { docker exec central-postgres psql -tAqX -U postgres -d "${2:-postgres}" 
 # site file for an application provisioned mid-run stayed on automatic HTTPS,
 # Caddy answered its http requests with 308, and its websocket never
 # connected. It reports what it changed, so a no-op is visible.
+# Wait until a Realtime container is genuinely ready, not merely running.
+#
+# post-start restarts Realtime up to twice while completing its migrations, and
+# the client test ran straight afterwards: run 29 reported
+# SUBSCRIBE_FAILED:CHANNEL_ERROR for an application whose migrations had just
+# all applied. The container's own healthcheck asks the tenant health endpoint,
+# which is exactly the question worth waiting on, so this waits for that rather
+# than sleeping a guessed number of seconds.
+wait_realtime_ready() {
+  local cn="$1" label="${2:-$1}" i h st
+  for i in $(seq 1 36); do
+    st="$(docker inspect -f '{{.State.Status}}' "$cn" 2>/dev/null | tr -d '[:space:]' || true)"
+    h="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cn" 2>/dev/null | tr -d '[:space:]' || true)"
+    if [ "$st" = "running" ] && { [ "$h" = "healthy" ] || [ "$h" = "none" ]; }; then
+      # Healthy means the tenant endpoint answered. Give the CDC extension a
+      # moment to attach to the replication slot after that.
+      sleep 8
+      note "$label is ready (status $st, health ${h:-none})"
+      return 0
+    fi
+    sleep 5
+  done
+  note "$label did not become ready (status ${st:-absent}, health ${h:-none})"
+  return 1
+}
+
 staging_http_sites() {
   local f base changed=0
   for f in "$ROOT_DIR/compose/caddy-sites/"*.caddy; do
@@ -667,6 +693,9 @@ JS
       fail "post-start could not complete Realtime's setup for $APP"
     fi
     DETAIL_LINES=22 detail bash -c "grep -vE '^$' /tmp/poststart-rt.log | tail -22"
+    wait_realtime_ready "${APP_DNS}.realtime" "${APP_DNS}.realtime" \
+      && pass "Realtime is ready after its migrations completed" \
+      || fail "Realtime did not become ready after its migrations completed"
     # The three migrations that decide whether live updates work, named.
     for v in 20230328144023 20240401105812 20260326120000; do
       n="$(pgq "select count(*) from realtime.schema_migrations where version = $v" "$APP")"
@@ -808,6 +837,9 @@ EOL
       "$ROOT_DIR/scripts/post-start.sh" --app "$G_APP" --only realtime \
         >/tmp/poststart-gamma.log 2>&1 || true
       detail bash -c "grep -E 'schema_migrations|list_changes|applied migration' /tmp/poststart-gamma.log | tail -6"
+      wait_realtime_ready "$G_DNS.realtime" "$G_DNS.realtime" \
+        && pass "the second tenant's Realtime is ready after its migrations completed" \
+        || fail "the second tenant's Realtime did not become ready"
       OUT2=$(RT_URL="http://$G_DNS.staging.test" RT_KEY="$G_ANON" RT_LABEL="gamma-probe" \
              timeout 90 node rt.mjs 2>&1)
       if echo "$OUT2" | grep -q 'EVENT_RECEIVED'; then
@@ -844,15 +876,13 @@ EOL
     # needs a human after every restart is not one to run a shop on.
     # -------------------------------------------------------------------
     docker restart "${APP_DNS}.realtime" >/dev/null 2>&1
-    rok=0
-    for _ in $(seq 1 24); do
-      st="$(docker inspect -f '{{.State.Status}}' "${APP_DNS}.realtime" 2>/dev/null || echo absent)"
-      [ "$st" = "running" ] && { rok=1; break; }
-      sleep 5
-    done
-    [ "$rok" = "1" ] && pass "${APP_DNS}.realtime came back up after a restart" \
-                     || fail "${APP_DNS}.realtime did not come back after a restart"
-    sleep 10
+    # "running" is not the same as ready, and a client that subscribes to a
+    # process still re-establishing its tenant gets CHANNEL_ERROR.
+    if wait_realtime_ready "${APP_DNS}.realtime" "${APP_DNS}.realtime after the restart"; then
+      pass "${APP_DNS}.realtime came back and became ready after a restart"
+    else
+      fail "${APP_DNS}.realtime did not become ready after a restart"
+    fi
     OUT4=$(RT_URL="http://$APP_DNS.staging.test" RT_KEY="$ANON" RT_LABEL="after-restart" \
            timeout 90 node rt.mjs 2>&1)
     if echo "$OUT4" | grep -q 'EVENT_RECEIVED'; then
