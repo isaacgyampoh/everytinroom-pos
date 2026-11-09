@@ -654,6 +654,26 @@ if (expect === 'no-event') {
 if (got) { console.log('EVENT_RECEIVED:' + JSON.stringify(got)); process.exit(0) }
 console.log('NO_EVENT'); process.exit(5)
 JS
+    # Finish Realtime off BEFORE asking a client to subscribe. Its tenant
+    # migrations stop at the first one the application's role cannot run, and
+    # post-start applies that one as the image's superuser and waits for
+    # Realtime to continue. Run 26 did this in section 7 instead -- after
+    # these tests -- so the report showed 39 of 91 migrations beside a failed
+    # delivery check and 83 of 91 two sections later.
+    if "$ROOT_DIR/scripts/post-start.sh" --app "$APP" --only realtime \
+         >/tmp/poststart-rt.log 2>&1; then
+      pass "post-start completed Realtime's setup for $APP"
+    else
+      fail "post-start could not complete Realtime's setup for $APP"
+    fi
+    DETAIL_LINES=22 detail bash -c "grep -vE '^$' /tmp/poststart-rt.log | tail -22"
+    # The three migrations that decide whether live updates work, named.
+    for v in 20230328144023 20240401105812 20260326120000; do
+      n="$(pgq "select count(*) from realtime.schema_migrations where version = $v" "$APP")"
+      [ "${n:-0}" = "1" ] && pass "Realtime migration $v is applied" \
+                          || fail "Realtime migration $v is NOT applied"
+    done
+
     OUT=$(RT_URL="http://$APP_DNS.staging.test" RT_KEY="$ANON" timeout 90 node rt.mjs 2>&1)
     echo "$OUT" | grep -q '^SUBSCRIBED' && pass "a Realtime subscription was accepted through the proxy" \
                                         || fail "the subscription was not accepted: $(echo "$OUT" | head -2 | tr '\n' ' ')"
@@ -761,6 +781,9 @@ EOL
       [ "$gok" = "1" ] || note "$G_DNS.realtime is not running; the check below will show what that means"
       sleep 10
 
+      "$ROOT_DIR/scripts/post-start.sh" --app "$G_APP" --only realtime \
+        >/tmp/poststart-gamma.log 2>&1 || true
+      detail bash -c "grep -E 'schema_migrations|list_changes|applied migration' /tmp/poststart-gamma.log | tail -6"
       OUT2=$(RT_URL="http://$G_DNS.staging.test" RT_KEY="$G_ANON" RT_LABEL="gamma-probe" \
              timeout 90 node rt.mjs 2>&1)
       if echo "$OUT2" | grep -q 'EVENT_RECEIVED'; then
@@ -1456,7 +1479,7 @@ else
   # The whole tail, not a grep for FAIL|WARN. Run 19 matched neither and the
   # report said "(the command produced no output)" beside a failure, which is
   # the least useful thing a diagnostic can do.
-  DETAIL_LINES=25 detail tail -25 /tmp/health.log
+  DETAIL_LINES=45 detail tail -45 /tmp/health.log
 fi
 
 # Provisioning a third application from scratch, now that the machine is busy.

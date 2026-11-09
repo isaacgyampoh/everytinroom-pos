@@ -33,11 +33,16 @@ ROOT_DIR="${ROOT_DIR:-/srv/central}"
 # shellcheck disable=SC1091
 . "$DEPLOY/lib/common.sh"
 
-APP=""; WAIT=180
+APP=""; WAIT=180; ONLY=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --app) APP="${2:-}"; shift 2 ;;
     --wait) WAIT="${2:-180}"; shift 2 ;;
+    # Realtime's half has to run BEFORE a client is asked to subscribe, and
+    # storage's half cannot run until storage-api has started. They were one
+    # step, so the Realtime fix was applied after the delivery test had
+    # already failed.
+    --only) ONLY="${2:-}"; shift 2 ;;
     -h|--help) sed -n '2,27p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
@@ -64,6 +69,9 @@ RC_REALTIME=0
 # ---------------------------------------------------------------------------
 case ",$PROFILES," in
   *,storage,*)
+    if [ -n "$ONLY" ] && [ "$ONLY" != "storage" ]; then
+      :
+    else
     printf '  %sstorage%s\n' "$C_BLD" "$C_RESET"
     # Wait for the tables, not for the container: a healthy container with a
     # rolled-back migration has no tables, and that is the failure this is
@@ -121,12 +129,16 @@ case ",$PROFILES," in
       fi
       unset PGPASSWORD
     fi
+    fi
     ;;
 esac
 
 # ---------------------------------------------------------------------------
 case ",$PROFILES," in
   *,realtime,*)
+    if [ -n "$ONLY" ] && [ "$ONLY" != "realtime" ]; then
+      :
+    else
     printf '\n  %srealtime%s\n' "$C_BLD" "$C_RESET"
     deadline=$(( $(date +%s) + WAIT ))
     have=0
@@ -199,10 +211,26 @@ case ",$PROFILES," in
           done
           HASLC2="$(pg "$APP_DB" "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='realtime' and p.proname='list_changes'" | tr -d ' ')"
           printf '      realtime.schema_migrations: %s of 91 row(s) after the restart\n' "${NEWMIG:-0}"
+          # 83 of 91 is the expected landing place, not a failure. Migrations
+          # 84 onwards do things like
+          #   ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin ...
+          # which is the same "act as another role" an application's role
+          # cannot do, and they exist to delegate Realtime's message tables to
+          # Supabase's own platform roles. Nothing here uses them. What decides
+          # whether live updates work is migration 20260326120000, which
+          # replaces list_changes() with the version this Realtime calls.
+          POLLERFN="$(pg "$APP_DB" "select count(*) from realtime.schema_migrations where version = 20260326120000" | tr -d ' ')"
           if [ "${NEWMIG:-0}" -ge 91 ]; then
             ok "every tenant migration applied"
+          elif [ "${POLLERFN:-0}" = "1" ]; then
+            ok "migration 20260326120000 applied, so list_changes() is the version this Realtime calls"
+            printf '      %s\n' "${NEWMIG} of 91 applied. The remainder delegate Realtime's message"
+            printf '      %s\n' "tables to Supabase's own platform roles -- an application's role"
+            printf '      %s\n' "cannot perform those and nothing here uses them."
           else
-            warn "still only ${NEWMIG:-0} of 91. Something after 40 is also refused;"
+            warn "only ${NEWMIG:-0} of 91, and migration 20260326120000 is not among them."
+            warn "list_changes() is the older version and the poller will fail on"
+            warn "every cycle with: column \"slot_changes_count\" does not exist"
             warn "  docker logs ${APP_DNS}.realtime 2>&1 | grep -iE 'migrat|error' | head -40"
             RC=1; RC_REALTIME=1
           fi
@@ -231,6 +259,7 @@ case ",$PROFILES," in
         warn "as the image's superuser; check its output for that step."
         RC=1; RC_REALTIME=1
       fi
+    fi
     fi
     ;;
 esac

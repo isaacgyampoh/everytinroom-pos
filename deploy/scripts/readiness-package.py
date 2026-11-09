@@ -109,9 +109,23 @@ TESTS = [
     ("Delivery resumes after Realtime is restarted", True,
      [r"delivery resumed after the Realtime service was restarted"],
      [r"nothing was delivered after the restart"]),
-    ("Realtime's tenant migrations all applied", True,
-     [r"tenant migrations applied: 91 of 91"],
-     [r"creating list_changes \(20230328144023\) applied: 0"]),
+    # The three migrations named in the acceptance requirement, each checked
+    # by number. A count of 91 was my own criterion and the wrong one: the
+    # last eight are Supabase-platform delegation that a non-superuser cannot
+    # perform and nothing here uses. These three decide whether live updates
+    # work.
+    ("Realtime migration 20230328144023 applied (creates list_changes)", True,
+     [r"migration 20230328144023 is applied"],
+     [r"migration 20230328144023 is NOT applied"]),
+    ("Realtime migration 20240401105812 applied (the reserved-role one)", True,
+     [r"migration 20240401105812 is applied"],
+     [r"migration 20240401105812 is NOT applied"]),
+    ("Realtime migration 20260326120000 applied (the list_changes the poller calls)", True,
+     [r"migration 20260326120000 is applied"],
+     [r"migration 20260326120000 is NOT applied"]),
+    ("Realtime's setup completed before a client subscribed", True,
+     [r"post-start completed Realtime's setup"],
+     [r"post-start could not complete Realtime's setup"]),
     ("Realtime's role is a member of supabase_realtime_admin", True,
      [r"member of supabase_realtime_admin, so its migrations can complete"],
      [r"is NOT a member of supabase_realtime_admin"]),
@@ -210,7 +224,10 @@ REQUIREMENTS = [
         "The privilege Realtime's migrations need is actually held",
         "Realtime's role is a member of supabase_realtime_admin",
         "Realtime's own migrations replay under this platform's privileges",
-        "Realtime's tenant migrations all applied",
+        "Realtime migration 20230328144023 applied (creates list_changes)",
+        "Realtime migration 20240401105812 applied (the reserved-role one)",
+        "Realtime migration 20260326120000 applied (the list_changes the poller calls)",
+        "Realtime's setup completed before a client subscribed",
         "Realtime's own schema and WAL reader exist",
         "Realtime subscription accepted",
         "Realtime delivers a database change end to end",
