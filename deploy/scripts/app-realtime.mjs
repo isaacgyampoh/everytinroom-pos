@@ -17,7 +17,7 @@
 import { chromium } from 'playwright'
 
 const {
-  APP_URL, APP_PIN, APP_BASE, APP_ANON, OTHER_DB = '',
+  APP_URL, APP_PIN, APP_PIN2 = '', APP_BASE, APP_ANON, OTHER_DB = '',
 } = process.env
 
 let pass = 0, fail = 0, blocked = 0
@@ -43,6 +43,7 @@ const scrub = (s) => String(s)
   .replace(/eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]*/g, '<jwt>')
   .replace(new RegExp(String(APP_ANON).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '<key>')
   .replace(new RegExp(`\\b${APP_PIN}\\b`, 'g'), '<pin>')
+  .replace(new RegExp(`\\b${APP_PIN2 || APP_PIN}\\b`, 'g'), '<pin>')
 
 const tag = `STAGING-PROBE-${Date.now().toString(36)}`
 
@@ -54,6 +55,7 @@ const tag = `STAGING-PROBE-${Date.now().toString(36)}`
 let receiptN = 0
 async function insertSale(base, key, customer, total) {
   receiptN += 1
+  const tIns = Date.now()
   const r = await fetch(`${base}/rest/v1/sales`, {
     method: 'POST',
     headers: { apikey: key, Authorization: `Bearer ${key}`,
@@ -63,7 +65,7 @@ async function insertSale(base, key, customer, total) {
       customer, total, payment: 'Cash', cashier: 'Staging Probe',
     }),
   })
-  return { ok: r.ok, status: r.status, body: scrub((await r.text()).slice(0, 200)) }
+  return { ok: r.ok, status: r.status, body: scrub((await r.text()).slice(0, 200)), ms: Date.now() - tIns }
 }
 
 // TYPED, NOT FILLED, AND THIS IS NOT COSMETIC.
@@ -248,23 +250,30 @@ try {
 
   // 4. THE ACTUAL TEST: insert a sale and wait for the application's popup.
   await page.waitForTimeout(6000)   // let the channel finish joining
+  // TIMED FROM BEFORE THE INSERT IS SENT, WITH THE INSERT'S OWN DURATION
+  // BESIDE IT.
+  //
+  // This used to start the clock after the insert returned and reported 38ms
+  // for a mechanism that polls every three seconds. That figure may be real
+  // -- a poll can land just as the row commits -- but three sales checks in
+  // one run all came back under 100ms, and a number that cannot be explained
+  // is not a measurement yet. Starting the clock before the request and
+  // printing how long the request took leaves nothing to infer: the figure
+  // is the whole wait, and the insert's share of it is stated.
+  const shownP = page.locator('text=/42\\.50/').first()
+    .waitFor({ timeout: 30000 }).then(() => Date.now()).catch(() => 0)
+  const tSent = Date.now()
   const ins = await insertSale(APP_BASE, APP_ANON, `${tag}-own`, 42.5)
   if (!ins.ok) {
     bad(`could not insert a sale through the API (HTTP ${ins.status}): ${ins.body}`)
   } else {
     say('inserted a sale; waiting up to 30s for the application to show it')
-    // From the instant the API confirmed the insert to the instant the figure
-    // is on screen. This is the only latency figure in the suite that
-    // measures what a cashier experiences: it includes the websocket, the
-    // application's own handler, its re-read of the sale through the API and
-    // React's render. The synthetic client's number stops at the callback.
-    const tCommitted = Date.now()
-    const shown = await page.locator('text=/42\\.50/').first()
-      .waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
-    const uiMs = Date.now() - tCommitted
+    const shownAt = await shownP
+    const shown = shownAt > 0
+    const uiMs = shown ? shownAt - tSent : -1
     if (shown) {
       good('THE APPLICATION RECEIVED THE LIVE EVENT AND SHOWED IT IN THE INTERFACE')
-      say(`UI_LATENCY_MS ${uiMs} — from the API confirming the insert to the figure being on screen`)
+      say(`UI_LATENCY_MS ${uiMs} — from the insert being SENT to the figure being on screen; the insert itself took ${ins.ms}ms`)
       try {
         await page.screenshot({ path: '/tmp/app-realtime-popup.png' })
         say('screenshot: /tmp/app-realtime-popup.png (taken after login; no PIN on screen)')
@@ -347,10 +356,30 @@ try {
     const errs2 = []
     page2.on('console', (m) => { if (m.type() === 'error') errs2.push(scrub(m.text()).slice(0, 160)) })
     await page2.goto(APP_URL, { waitUntil: 'domcontentloaded', timeout: 45000 })
-    await enterPin(page2, APP_PIN)
+    // ITS OWN CASHIER. verify_pin deletes any existing session for the same
+    // staff member, so one PIN on two tills signs the first one out -- that
+    // is the application's design, and two tills in a real shop are two
+    // people. Using one PIN for both tested something no shop does.
+    const pin2Calls = []
+    page2.on('response', async (r) => {
+      if (!/\/rest\/v1\/rpc\/verify_pin/.test(r.url())) return
+      let d = ''
+      if (!r.ok()) { try { d = ' ' + scrub((await r.text()).slice(0, 200)) } catch {} }
+      pin2Calls.push(`HTTP ${r.status()}` + d)
+    })
+    const typed2 = await enterPin(page2, APP_PIN2 || APP_PIN)
     const in2 = await loggedIn(page2)
     if (!in2) {
-      block('a second workstation could not sign in, so multi-till delivery was not tested')
+      // Attempted and failed is a failure, not a block, and it says why.
+      bad('a second workstation could not sign in, so multi-till delivery is unproven')
+      say(`  second till PIN entry: ${typed2.filled} of ${typed2.count} field(s) hold a digit`)
+      for (const c of pin2Calls.slice(0, 3)) say(`  second till verify_pin call: ${c}`)
+      if (pin2Calls.length === 0) say('  second till never called verify_pin')
+      try {
+        const v2 = (await page2.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 240)
+        say(`  second till screen: ${scrub(v2)}`)
+      } catch {}
+      if (errs2.length) say(`  second till console errors: ${errs2.slice(0, 3).join(' | ')}`)
     } else {
       good('a second workstation signed in independently')
       await page2.waitForTimeout(6000)   // let its channel finish joining
@@ -358,14 +387,14 @@ try {
         .waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
       const w2 = page2.locator('text=/77\\.25/').first()
         .waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
+      const t2 = Date.now()
       const ins2 = await insertSale(APP_BASE, APP_ANON, `${tag}-multi`, 77.25)
       if (!ins2.ok) {
         bad(`could not insert the multi-workstation sale (HTTP ${ins2.status}): ${ins2.body}`)
       } else {
-        const t2 = Date.now()
         const [s1, s2] = await Promise.all([w1, w2])
         if (s1 && s2) {
-          good(`BOTH workstations showed the same sale without a refresh (${Date.now() - t2}ms)`)
+          good(`BOTH workstations showed the same sale without a refresh (${Date.now() - t2}ms from the insert being sent; insert ${ins2.ms}ms)`)
         } else {
           bad(`only ${(s1 ? 1 : 0) + (s2 ? 1 : 0)} of 2 workstations showed the sale ` +
               `(first till ${s1 ? 'yes' : 'no'}, second till ${s2 ? 'yes' : 'no'})`)
@@ -407,12 +436,12 @@ try {
     await page.waitForTimeout(15000)
     const w = page.locator('text=/88\\.80/').first()
       .waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
+    const t = Date.now()
     const r = await insertSale(APP_BASE, APP_ANON, `${tag}-reconnect`, 88.8)
     if (!r.ok) {
       bad(`could not insert the reconnection probe (HTTP ${r.status}): ${r.body}`)
     } else {
-      const t = Date.now()
-      if (await w) good(`live updates resumed after a network interruption, unattended (${Date.now() - t}ms)`)
+      if (await w) good(`live updates resumed after a network interruption, unattended (${Date.now() - t}ms from the insert being sent; insert ${r.ms}ms)`)
       else bad('live updates did NOT resume after a network interruption — a till would go quietly stale')
     }
   } catch (e) {
@@ -433,12 +462,12 @@ try {
       await page.waitForTimeout(6000)   // let the channel finish joining
       const w = page.locator('text=/66\\.60/').first()
         .waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
+      const t = Date.now()
       const r = await insertSale(APP_BASE, APP_ANON, `${tag}-restart`, 66.6)
       if (!r.ok) {
         bad(`could not insert the restart probe (HTTP ${r.status}): ${r.body}`)
       } else {
-        const t = Date.now()
-        if (await w) good(`live updates work after the application was restarted (${Date.now() - t}ms)`)
+        if (await w) good(`live updates work after the application was restarted (${Date.now() - t}ms from the insert being sent; insert ${r.ms}ms)`)
         else bad('live updates did NOT work after the application was restarted')
       }
     }

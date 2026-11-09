@@ -153,6 +153,28 @@ if [ "$(pg "select count(*) from staff where name='Staging Probe'")" != "1" ]; t
 fi
 good "a staging staff member exists (PIN generated for this run, never printed)"
 
+# A SECOND CASHIER, FOR THE SECOND TILL.
+#
+# verify_pin deletes any existing session belonging to the same staff member,
+# so signing in at a second workstation with the same PIN signs the first one
+# out. That is the application's design, and it means two tills are two
+# people. The multi-workstation check used one PIN for both, which tested
+# something no shop does. The second PIN is forced to differ from the first:
+# verify_pin matches a PIN to whichever staff member has it, and two members
+# with the same PIN would both resolve to one of them.
+PIN2="$PIN"
+while [ "$PIN2" = "$PIN" ]; do
+  PIN2="$(shuf -i 1000-9999 -n 1 2>/dev/null || echo $(( (RANDOM % 9000) + 1000 )))"
+done
+pg "delete from staff where name = 'Staging Probe 2'" >/dev/null
+pg "insert into staff (name, role, pin_hash, active) values ('Staging Probe 2','Admin', crypt('${PIN2}', gen_salt('bf',10)), true)" >/dev/null 2>&1 \
+  || pg "insert into staff (name, role, pin_hash) values ('Staging Probe 2','Admin', crypt('${PIN2}', gen_salt('bf',10)))" >/dev/null 2>&1
+if [ "$(pg "select count(*) from staff where name='Staging Probe 2'")" = "1" ]; then
+  good "a second staging staff member exists, for the second workstation"
+else
+  bad "could not seed a second staff member, so two workstations cannot be tested as two cashiers"
+fi
+
 # AND WITH THE REAL PIN, WHICH SPLITS THE REMAINING POSSIBILITIES IN TWO.
 #
 # If this succeeds and the browser still gets HTTP 400, the function and the
@@ -273,7 +295,7 @@ for _ in $(seq 1 20); do
   sleep 1
 done
 
-export APP_URL="http://127.0.0.1:$PORT/" APP_PIN="$PIN" APP_BASE="$BASE" \
+export APP_URL="http://127.0.0.1:$PORT/" APP_PIN="$PIN" APP_PIN2="$PIN2" APP_BASE="$BASE" \
        APP_ANON="$ANON" APP_DB="$APP" OTHER_DB="${OTHER:-}"
 # Bounded. The browser flow now covers two workstations, a network
 # interruption and a restart, so it legitimately takes minutes -- and an
@@ -295,6 +317,7 @@ pg "delete from sales where customer like 'STAGING-PROBE%'" >/dev/null 2>&1 || t
 # run in a database the next run then reports on.
 pg "delete from products where name like 'STAGING-PROBE%'" >/dev/null 2>&1 || true
 pg "delete from whatsapp_orders where order_no like 'STAGING-PROBE%'" >/dev/null 2>&1 || true
-pg "delete from staff where name = 'Staging Probe'" >/dev/null 2>&1 || true
+pg "delete from staff_sessions where staff_id in (select id from staff where name like 'Staging Probe%')" >/dev/null 2>&1 || true
+pg "delete from staff where name like 'Staging Probe%'" >/dev/null 2>&1 || true
 say "staging rows removed"
 exit "$RC"
