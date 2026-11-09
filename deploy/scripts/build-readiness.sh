@@ -70,6 +70,10 @@ trap 'rm -rf "$WORK"' EXIT
 if [ -n "$REPORT" ]; then
   [ -f "$REPORT" ] || { echo "$REPORT does not exist." >&2; exit 2; }
   cp "$REPORT" "$WORK/report.md"
+  # The run id lives beside the report in the archive, so a package built from
+  # an archived run names it instead of saying "(not given)".
+  [ -f "$(dirname "$REPORT")/run-info.txt" ] \
+    && cp "$(dirname "$REPORT")/run-info.txt" "$WORK/run-info.txt"
   echo "report: $REPORT"
 else
   git -C "$REPO" fetch -q origin "$BRANCH" 2>/dev/null \
