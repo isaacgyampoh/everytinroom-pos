@@ -784,6 +784,29 @@ EOL
     else
       fail "no Realtime event arrived: $(echo "$OUT" | tail -2 | tr '\n' ' ')"
       detail docker logs "${APP_DNS}.realtime" --tail=25
+
+      # There are now no replication errors, the slot is active and the
+      # publication contains the table -- so the question is no longer whether
+      # Realtime is connected but whether the change MATCHES the subscription.
+      # These two queries separate those for good:
+      #
+      #   what the subscription actually asks for, and as which role
+      #   what list_changes() returns when called directly
+      #
+      # If list_changes returns the row, the fault is in matching or RLS. If
+      # it returns nothing, the fault is the slot or the publication. Called as
+      # the image's superuser because reading a logical slot needs it.
+      note "----- what the subscription asks for -----"
+      detail pgq "select id, entity::text as table, claims->>'role' as role, coalesce(array_length(filters,1),0) as filters from realtime.subscription" "$APP"
+      note "----- is public.tick visible to the subscribed role? -----"
+      detail pgq "select 'anon may select tick: ' || has_table_privilege('anon','public.tick','SELECT')::text" "$APP"
+      detail pgq "select 'rls enabled on tick: ' || relrowsecurity::text from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='tick'" "$APP"
+      detail pgq "select 'policies on tick: ' || count(*) from pg_policies where schemaname='public' and tablename='tick'" "$APP"
+      note "----- what list_changes() returns, called directly -----"
+      SLOTSUF="$(sed -n 's/^REALTIME_SLOT_SUFFIX=//p' "$ENV" | tail -1)"
+      pgq "insert into public.tick (label) values ('direct-probe')" "$APP" >/dev/null
+      sleep 2
+      DETAIL_LINES=12 detail bash -c "docker exec -i central-postgres psql -tAqX -U supabase_admin -d '$APP' -c \"select count(*) as rows_returned, coalesce(string_agg(distinct (wal->>'table'), ','), '-') as tables, coalesce(max(array_length(subscription_ids,1)),0) as matched_subs from realtime.list_changes('supabase_realtime', 'supabase_realtime_replication_slot_${SLOTSUF}', 100, 1048576)\" 2>&1"
     fi
 
     # -------------------------------------------------------------------
