@@ -281,6 +281,19 @@ else
   ok "$(printf '%s' "$SUBOUT" | sed -n 's/^CHECKED //p')"
 fi
 
+hdr "No schema lives only in a hand-run script"
+# The root-level .sql files were pasted into the SQL editor by hand, and some
+# added columns the application reads. None of it was in supabase/migrations/,
+# so a database built from the migrations answered HTTP 400 to every PIN:
+# verify_pin reads staff.permissions and the column was not there.
+GAPOUT="$(python3 "$DEPLOY/scripts/check-schema-gaps.py" --repo "$DEPLOY/.." 2>&1 || true)"
+if printf '%s' "$GAPOUT" | grep -q '^  MISSING '; then
+  bad "schema exists only in a hand-run setup script, not in the migrations"
+  printf '%s\n' "$GAPOUT" | awk 'NR <= 10'
+else
+  ok "$(printf '%s' "$GAPOUT" | sed -n 's/^ *\(every table.*\)$/\1/p;s/^ *\(skipped.*\)$/\1/p' | awk 'NR == 1')"
+fi
+
 hdr "JavaScript inside a heredoc actually parses"
 # staging-test.sh carries a real supabase-js client in a quoted heredoc, and
 # `bash -n` does not look inside one -- to the shell it is text. So a syntax
