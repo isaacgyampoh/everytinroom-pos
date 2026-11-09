@@ -295,8 +295,22 @@ services:
       # a real one, so the staging run can set a different value without the
       # production default changing.
       STORAGE_S3_REGION: ${R2_REGION:-auto}
-      # R2 rejects the trailing-checksum headers the AWS SDK adds by default.
-      # Without this, uploads fail with an opaque signature error.
+      # KEPT, but not for the reason originally written here.
+      #
+      # This said "R2 rejects the trailing-checksum headers the AWS SDK adds
+      # by default. Without this, uploads fail with an opaque signature
+      # error." That was carried for weeks on the strength of a report
+      # elsewhere, and the real service has now contradicted it: tested
+      # against everytinroom-media on 2026-11-09, an upload in the SDK's
+      # default shape -- aws-chunked framing, x-amz-trailer naming a CRC32
+      # that arrives after the data, signed with
+      # STREAMING-UNSIGNED-PAYLOAD-TRAILER -- was ACCEPTED with HTTP 200.
+      #
+      # So the setting is not load-bearing on this bucket today. It stays
+      # because WHEN_REQUIRED is also accepted, it sends less, and R2's
+      # behaviour here is not something this platform controls. What has
+      # changed is the claim: deploy/scripts/test-r2.py now sends both shapes
+      # to the real bucket on every run and reports which one it is.
       STORAGE_S3_REQUEST_CHECKSUM_CALCULATION: WHEN_REQUIRED
       STORAGE_S3_RESPONSE_CHECKSUM_VALIDATION: WHEN_REQUIRED
       AWS_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}

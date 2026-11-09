@@ -235,8 +235,31 @@ TESTS = [
     ("API answers again after a restart with no intervention", True,
      [r"API answers again after the restart"],
      [r"API returned HTTP .* after the restart"]),
-    # Cannot be done from here: needs the owner's Cloudflare credentials.
-    ("Cloudflare R2: real upload, download, integrity, delete", True, [r"__never_matches__"]),
+    # Was blocked on the owner's credentials; they exist now, so this is read
+    # from the R2 verification report rather than being permanently unprovable.
+    ("Cloudflare R2: credentials accepted on the real service", True,
+     [r"bucket is reachable and the credentials are accepted"],
+     [r"access denied", r"does not exist at that endpoint"]),
+    ("Cloudflare R2: upload accepted", True, [r"UPLOAD accepted"],
+     [r"upload failed with HTTP"]),
+    ("Cloudflare R2: download is byte-identical", True,
+     [r"DOWNLOAD returned byte-identical content"],
+     [r"download returned \d+ bytes, expected"]),
+    ("Cloudflare R2: ETag usable for verifying copies", True,
+     [r"ETag is a plain MD5 and matches", r"ETag is multipart"],
+     [r"does not match the MD5", r"no ETag was returned"]),
+    ("Cloudflare R2: object appears in a listing", True,
+     [r"LIST shows the object under its prefix"],
+     [r"LIST did not show the object"]),
+    ("Cloudflare R2: delete accepted", True, [r"DELETE accepted"],
+     [r"delete failed with HTTP"]),
+    ("Cloudflare R2: deletion confirmed by a second request", True,
+     [r"the object is gone — confirmed by a second request"],
+     [r"still answers HTTP .* after the delete"]),
+    ("Cloudflare R2: the SDK's default checksum shape, tested for real", True,
+     [r"trailing-checksum upload was ACCEPTED",
+      r"trailing-checksum upload was REFUSED"],
+     [r"WHEN_REQUIRED shape was refused too"]),
 ]
 
 
@@ -293,8 +316,15 @@ REQUIREMENTS = [
         "API answers again after a restart with no intervention",
         "Service health check across applications",
      ]),
-    ("Cloudflare R2, once credentials are supplied", [
-        "Cloudflare R2: real upload, download, integrity, delete",
+    ("Cloudflare R2, verified against the real service", [
+        "Cloudflare R2: credentials accepted on the real service",
+        "Cloudflare R2: upload accepted",
+        "Cloudflare R2: download is byte-identical",
+        "Cloudflare R2: ETag usable for verifying copies",
+        "Cloudflare R2: object appears in a listing",
+        "Cloudflare R2: delete accepted",
+        "Cloudflare R2: deletion confirmed by a second request",
+        "Cloudflare R2: the SDK's default checksum shape, tested for real",
      ]),
     ("The complete deployment re-run from a clean Linux environment", [
         "Docker installed automatically on a clean machine",
@@ -396,6 +426,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--full")
     ap.add_argument("--prereq")
+    ap.add_argument("--extra", action="append", default=[],
+                    help="more evidence files, e.g. the R2 verification report")
     ap.add_argument("--inventory")
     ap.add_argument("--run-id", default="(not given)")
     ap.add_argument("--sizing", help="output of size-from-measurement.py, embedded verbatim")
@@ -405,7 +437,7 @@ def main():
     ap.add_argument("--out", default="-")
     args = ap.parse_args()
 
-    texts = [load(args.full), load(args.prereq)]
+    texts = [load(args.full), load(args.prereq)] + [load(x) for x in args.extra]
     if not any(texts):
         sys.exit("no report given or readable. This script reports only what a "
                  "report proves, so with no report there is nothing to say.")

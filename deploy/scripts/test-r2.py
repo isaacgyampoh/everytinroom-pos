@@ -380,6 +380,12 @@ def main():
              "| # | Check | Result |", "|---|---|---|"]
         for i, (st, msg) in enumerate(RESULTS, 1):
             L.append(f"| {i} | {msg.replace('|', '/')} | **{st}** |")
+        # The same shape readiness-package.py already parses, so this
+        # evidence can be fed to it with --extra instead of being retyped.
+        L += ["", "## Machine-readable", "",
+              "These lines are what readiness-package.py reads.", ""]
+        for st, msg in RESULTS:
+            L.append(f"- {'PASS' if st == 'PASS' else '**FAIL**'} {msg}")
         L += ["",
               "## What this does and does not establish", "",
               "It establishes that this bucket, this endpoint and these credentials",

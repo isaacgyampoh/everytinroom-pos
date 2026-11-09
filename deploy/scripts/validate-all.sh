@@ -195,11 +195,32 @@ else
 fi
 
 hdr "No secret-looking value is committed"
-# A JWT, a private key or a long hex string in a tracked file.
-HITS="$(grep -rIlE 'eyJ[A-Za-z0-9_-]{20,}\.|BEGIN [A-Z ]*PRIVATE KEY|(PASSWORD|SECRET|ACCESS_KEY)=[A-Za-z0-9+/]{16,}' \
-  "$DEPLOY" 2>/dev/null | grep -v VERSIONS.md || true)"
-[ -z "$HITS" ] && ok "nothing that looks like a live credential" \
-               || bad "possible secrets in: $HITS"
+# A JWT, a private key or a long hex string in a file git actually CARRIES.
+#
+# It used to scan the whole directory, which meant it flagged
+# deploy/.r2.env -- a gitignored, untracked, mode-600 file that is SUPPOSED to
+# contain a secret. The check is called "no secret-looking value is
+# committed", so the set it looks at is the set git tracks. Scanning
+# everything made the one file designed to hold a credential into a failure,
+# which would have taught whoever hit it to ignore this check.
+#
+# The ignore rules are verified separately, by name, under "No operator-only
+# material is tracked" -- so an untracked secret file is not unexamined here,
+# it is examined by the check that can actually say something useful about it.
+REPO_ROOT="$(cd "$DEPLOY/.." && pwd)"
+TRACKED="$(cd "$REPO_ROOT" && git ls-files -z -- deploy 2>/dev/null | tr '\0' '\n' | grep -v VERSIONS.md || true)"
+HITS=""
+if [ -n "$TRACKED" ]; then
+  HITS="$(cd "$REPO_ROOT" && printf '%s\n' "$TRACKED" | while IFS= read -r f; do
+    [ -f "$f" ] || continue
+    grep -IlE 'eyJ[A-Za-z0-9_-]{20,}\.|BEGIN [A-Z ]*PRIVATE KEY|(PASSWORD|SECRET|ACCESS_KEY)=[A-Za-z0-9+/]{16,}' "$f" 2>/dev/null
+  done || true)"
+fi
+if [ -z "$HITS" ]; then
+  ok "nothing that looks like a live credential in any tracked file ($(printf '%s\n' "$TRACKED" | grep -c . ) checked)"
+else
+  bad "possible secrets in tracked file(s): $HITS"
+fi
 
 hdr "Every file the scripts reach for actually exists"
 # A path like "$ROOT_DIR/scripts/post-start.sh" or "$DEPLOY/sql/24-storage-grants.sql"

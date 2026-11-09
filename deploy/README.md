@@ -386,12 +386,19 @@ keeps finding — it says so in its own output.
 
 **Not at all, yet.** These are named rather than glossed:
 
-- **uploads to Cloudflare R2.** Needs the account owner's credentials.
-  `deploy/scripts/test-r2.py` runs the full upload, download, integrity, list
-  and delete check the moment they exist. The staging run uses an
-  S3-compatible server instead, which proves this platform's configuration and
-  nothing about R2 — R2 rejects the trailing-checksum headers the AWS SDK
-  sends by default, and no stand-in will ever show that.
+- ~~uploads to Cloudflare R2~~ — **done.** Verified against the real service
+  on 2026-11-09 with the owner's credentials: bucket reachable, upload
+  accepted, download **byte-identical**, ETag a plain MD5 that matches (which
+  is what `migrate-storage.py` relies on to verify a copied image), object
+  listed, deleted, and confirmed gone by a second request. 9 checks, 0
+  failures. The report is in the evidence archive; it records the bucket and
+  the probe prefix, and the account id is replaced by a placeholder.
+
+  One claim this corrected: it used to say here that R2 rejects the
+  trailing-checksum headers the AWS SDK sends by default. It does not — that
+  exact shape was accepted with HTTP 200. `STORAGE_S3_REQUEST_CHECKSUM_CALCULATION`
+  stays at `WHEN_REQUIRED` because it is also accepted and sends less, but it
+  is not the load-bearing setting it was described as.
 - **a restored production database.** Staging generates its own rows. Nothing
   here proves the real dump restores, or that its functions, policies and
   publications survive the trip.

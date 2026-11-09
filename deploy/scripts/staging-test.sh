@@ -624,9 +624,21 @@ done
                       || note "Realtime did not answer its health endpoint; the subscription below will show whether it works"
 
 if command -v node >/dev/null 2>&1; then
+  note "node $(node --version 2>/dev/null || echo '?'), and the client version is recorded below —"
+  note "a client two years older than the server is the kind of thing that should be visible"
   mkdir -p /tmp/rt && cd /tmp/rt
   npm init -y >/dev/null 2>&1
-  if npm install @supabase/supabase-js@2.47.10 >/tmp/npm.log 2>&1; then
+  # 2.118.0, not 2.47.10.
+  #
+  # The old pin was released 2024-12-19; the Realtime server this platform
+  # runs is v2.148.3 from 2026. Two years of protocol between a client and
+  # its server is not a reasonable thing to hold constant, and it is now the
+  # best remaining explanation for what the diagnostic found: list_changes()
+  # returns the row, for the right table, matching one subscription, with no
+  # errors -- so the database side is correct and the change is not reaching
+  # the client. 2.118.0 is the newest stable 2.x at least two weeks old.
+  if npm install @supabase/supabase-js@2.118.0 >/tmp/npm.log 2>&1; then
+    detail bash -c "npm ls @supabase/supabase-js --depth=0 2>/dev/null | tail -2"
     # A real supabase-js client. Parameterised, because one subscription on
     # one tenant is not enough: delivery is checked on two independent
     # tenants, a change in one must NOT appear on the other's channel, and
