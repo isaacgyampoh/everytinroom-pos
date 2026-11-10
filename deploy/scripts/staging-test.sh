@@ -1680,7 +1680,7 @@ fi
 # request "GET http://... — net::ERR_...", neither of which is any of those.
 # Everything this harness prints is indented by two spaces or four, so that is
 # the only thing worth matching on.
-DETAIL_LINES=70 detail bash -c "grep -E '^ {2,8}[^ ]' /tmp/appreal.log | head -70"
+DETAIL_LINES=120 detail bash -c "grep -E '^ {2,8}[^ ]' /tmp/appreal.log | head -120"
 
 # ===========================================================================
 gate_section 9

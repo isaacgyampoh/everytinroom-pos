@@ -88,7 +88,22 @@ async function insertSale(base, key, customer, total) {
 async function enterPin(p, pin) {
   const fields = p.locator('input[inputmode="numeric"], input[type="tel"], input[type="password"], input[maxlength="1"]')
   await fields.first().waitFor({ timeout: 25000 })
-  const count = await fields.count()
+  // A LOGIN SCREEN THAT STAYS.
+  //
+  // The application shows its loader, then the PIN screen, and can swap back
+  // to the loader while its first load is still running -- which unmounts the
+  // boxes and remounts them empty. The second workstation's attempt landed in
+  // that gap: the boxes had been seen, were gone when counted ("0 of 0"), and
+  // the PIN went nowhere. So the screen has to hold still before anything is
+  // typed: the same number of boxes, twice, over a second apart.
+  let count = 0
+  for (let i = 0; i < 20; i++) {
+    const a = await fields.count()
+    await p.waitForTimeout(1200)
+    const b = await fields.count()
+    if (a > 0 && a === b) { count = b; break }
+  }
+  if (count === 0) count = await fields.count()
   const digits = String(pin).split('')
   if (count >= 4) {
     // fill() PER BOX, NOT keyboard.type(), AND THIS WAS MY MISTAKE TO MAKE
@@ -146,6 +161,40 @@ const consoleErrors = [], failedRequests = [], sockets = []
 // because run 42 reported several 401s with no indication of which request
 // they belonged to, and that is the difference between a missing EXECUTE
 // grant on the platform and a bug in the application.
+// WHAT THE PAGE ASKED THE SERVER FOR, AND WHEN.
+//
+// Two sales checks keep reporting about 78ms from insert to display. A poll
+// every three seconds cannot do that twice, and reading the code has not
+// explained it, so the page's own requests are timestamped. For each check
+// the run prints which of them fell between the insert and the figure
+// appearing -- if it was a poll, there is a live_state request in that
+// window; if there is not, something else put the figure on screen and the
+// check is not measuring what it claims to.
+const reqLog = []
+page.on('request', (r) => {
+  const u = r.url()
+  const m = u.match(/\/rest\/v1\/(rpc\/)?([a-z_]+)/)
+  if (m) reqLog.push({ at: Date.now(), what: (m[1] || '') + m[2] })
+})
+const between = (t0, t1) => {
+  const c = {}
+  for (const r of reqLog) if (r.at >= t0 && r.at <= t1) c[r.what] = (c[r.what] || 0) + 1
+  const parts = Object.entries(c).map(([k, v]) => `${k}×${v}`)
+  return parts.length ? parts.join(', ') : 'NONE'
+}
+// What element is showing the figure, so "it appeared" can be checked
+// against where it appeared.
+const whereShown = async (re) => {
+  try {
+    const el = page.locator(`text=${re}`).first()
+    const tag = await el.evaluate((n) => {
+      const cls = (n.className && n.className.toString ? n.className.toString() : '').slice(0, 50)
+      const ctx = (n.parentElement ? n.parentElement.innerText : n.innerText || '').replace(/\s+/g, ' ').slice(0, 90)
+      return `<${n.tagName.toLowerCase()} class="${cls}"> in "${ctx}"`
+    })
+    return scrub(tag)
+  } catch { return 'could not be located afterwards' }
+}
 const pinCalls = []
 page.on('response', async (r) => {
   const u = r.url()
@@ -274,6 +323,8 @@ try {
     if (shown) {
       good('THE APPLICATION RECEIVED THE LIVE EVENT AND SHOWED IT IN THE INTERFACE')
       say(`UI_LATENCY_MS ${uiMs} — from the insert being SENT to the figure being on screen; the insert itself took ${ins.ms}ms`)
+      say(`  requests in that window: ${between(tSent, shownAt)}`)
+      say(`  shown by: ${await whereShown('/42\\.50/')}`)
       try {
         await page.screenshot({ path: '/tmp/app-realtime-popup.png' })
         say('screenshot: /tmp/app-realtime-popup.png (taken after login; no PIN on screen)')
@@ -441,7 +492,12 @@ try {
     if (!r.ok) {
       bad(`could not insert the reconnection probe (HTTP ${r.status}): ${r.body}`)
     } else {
-      if (await w) good(`live updates resumed after a network interruption, unattended (${Date.now() - t}ms from the insert being sent; insert ${r.ms}ms)`)
+      if (await w) {
+        const tShown = Date.now()
+        good(`live updates resumed after a network interruption, unattended (${tShown - t}ms from the insert being sent; insert ${r.ms}ms)`)
+        say(`  requests in that window: ${between(t, tShown)}`)
+        say(`  shown by: ${await whereShown('/88\\.80/')}`)
+      }
       else bad('live updates did NOT resume after a network interruption — a till would go quietly stale')
     }
   } catch (e) {
@@ -467,7 +523,12 @@ try {
       if (!r.ok) {
         bad(`could not insert the restart probe (HTTP ${r.status}): ${r.body}`)
       } else {
-        if (await w) good(`live updates work after the application was restarted (${Date.now() - t}ms from the insert being sent; insert ${r.ms}ms)`)
+        if (await w) {
+          const tShown = Date.now()
+          good(`live updates work after the application was restarted (${tShown - t}ms from the insert being sent; insert ${r.ms}ms)`)
+          say(`  requests in that window: ${between(t, tShown)}`)
+          say(`  shown by: ${await whereShown('/66\\.60/')}`)
+        }
         else bad('live updates did NOT work after the application was restarted')
       }
     }
