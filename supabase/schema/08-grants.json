@@ -1,0 +1,387 @@
+[
+ {
+  "grantee": "anon",
+  "privs": "REFERENCES,SELECT,TRIGGER,TRUNCATE",
+  "table_name": "app_releases"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "REFERENCES,SELECT,TRIGGER,TRUNCATE",
+  "table_name": "app_releases"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "app_releases"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "bundles"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "bundles"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "bundles"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "customers"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "customers"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "customers"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "doc_counters"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "drawer_sessions"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "drawer_sessions"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "drawer_sessions"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "expenses"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "expenses"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "expenses"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "image_rollback_20260831"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "invoices"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "invoices"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "invoices"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "pin_attempts"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "products"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "products"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "products"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "products_sale"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "products_sale"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "products_sale"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "promos"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "promos"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "promos"
+ },
+ {
+  "grantee": "anon",
+  "privs": "INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE",
+  "table_name": "receivings"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE",
+  "table_name": "receivings"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "receivings"
+ },
+ {
+  "grantee": "anon",
+  "privs": "INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE",
+  "table_name": "refunds"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE",
+  "table_name": "refunds"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "refunds"
+ },
+ {
+  "grantee": "anon",
+  "privs": "INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE",
+  "table_name": "sales"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE",
+  "table_name": "sales"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "sales"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "staff"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "staff_safe"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "staff_safe"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "staff_safe"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "staff_sessions"
+ },
+ {
+  "grantee": "anon",
+  "privs": "INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE",
+  "table_name": "stock_adjustments"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE",
+  "table_name": "stock_adjustments"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "stock_adjustments"
+ },
+ {
+  "grantee": "anon",
+  "privs": "REFERENCES,SELECT,TRIGGER,TRUNCATE",
+  "table_name": "stock_ledger"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "REFERENCES,SELECT,TRIGGER,TRUNCATE",
+  "table_name": "stock_ledger"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "stock_ledger"
+ },
+ {
+  "grantee": "anon",
+  "privs": "INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE",
+  "table_name": "stock_takes"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE",
+  "table_name": "stock_takes"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "stock_takes"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "store_settings"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "store_settings"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "store_settings"
+ },
+ {
+  "grantee": "anon",
+  "privs": "REFERENCES,SELECT,TRIGGER,TRUNCATE",
+  "table_name": "suppliers"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "REFERENCES,SELECT,TRIGGER,TRUNCATE",
+  "table_name": "suppliers"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "suppliers"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "terminals"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "terminals"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "terminals"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "ussd_sessions"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "ussd_sessions"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "ussd_sessions"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "wa_agent_settings"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "wa_agent_settings"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "wa_agent_settings"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "wa_conversations"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "wa_conversations"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "wa_conversations"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "wa_messages"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "wa_messages"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "wa_messages"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "grantee": "service_role",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "table_name": "whatsapp_orders"
+ }
+]

@@ -1,0 +1,427 @@
+import { create } from 'zustand'
+import { getSupabase } from '../lib/supabase'
+import { num } from '../lib/utils'
+import { saveCatalogue, loadCatalogue } from '../lib/offlineStore'
+import { isMissingFunction } from '../lib/rpc'
+
+const mapProduct = p => ({ id: p.id, name: p.name, category: p.category || '', costPrice: num(p.cost_price), price: num(p.price), wholesalePrice: num(p.wholesale_price), wholesaleMinQty: num(p.wholesale_min_qty) || 0, quantity: num(p.quantity), image: p.image || '', groupTag: (p.group_tag || '').trim().toLowerCase(), barcode: String(p.barcode || '').trim() })
+
+// Derive a product's base name by stripping the variant suffix
+// e.g. "2 in 1 coloured curtains(type16)" -> "2 in 1 coloured curtains"
+//      "10pcs granite cookware set (ash)" -> "10pcs granite cookware set"
+function baseName(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/\(\s*type\s*\d+\s*\)/g, '')   // (type1), (type 12)
+    .replace(/\btype\s*\d+\b/g, '')          // type1 without brackets
+    .replace(/\(\s*[^)]*\)/g, '')            // any other (...) e.g. (ash), (sky blue)
+    .replace(/[\s_-]+/g, ' ')
+    .trim()
+}
+
+// Recalculate wholesale pricing across the whole cart.
+// Variants of the same product POOL their quantities — grouped automatically
+// by base product name (variant suffix stripped), or by an explicit group_tag
+// if one is set. When the group total reaches the wholesale min qty, every
+// item in that group gets the wholesale price.
+function applyWholesale(cart, products) {
+  // TEMPORARILY DISABLED — everything stays at retail price.
+  // Auto-wholesale grouping is turned off until the dedup/grouping bug is
+  // fully resolved. Each line uses its original retail price.
+  const prodById = {}
+  for (const p of products) prodById[p.id] = p
+  return cart.map(c => {
+    if (c.isBundle) return { ...c, lineTotal: c.qty * c.price }
+    const prod = prodById[c.productId]
+    const retail = c.originalPrice || (prod ? prod.price : c.price)
+    return { ...c, price: retail, lineTotal: c.qty * retail }
+  })
+}
+
+function applyWholesale_DISABLED(cart, products) {
+  const prodById = {}
+  for (const p of products) prodById[p.id] = p
+  const groupKey = (prod) => prod.groupTag ? 'g:' + prod.groupTag : 'n:' + baseName(prod.name)
+  const groupQty = {}
+  for (const c of cart) {
+    if (c.isBundle) continue
+    const prod = prodById[c.productId]; if (!prod) continue
+    const key = groupKey(prod)
+    groupQty[key] = (groupQty[key] || 0) + c.qty
+  }
+  return cart.map(c => {
+    if (c.isBundle) return { ...c, lineTotal: c.qty * c.price }
+    const prod = prodById[c.productId]
+    if (!prod) return { ...c, lineTotal: c.qty * c.price }
+    const totalQty = groupQty[groupKey(prod)] || c.qty
+    const wholesaleOn = prod.wholesalePrice > 0 && prod.wholesaleMinQty > 0 && totalQty >= prod.wholesaleMinQty
+    const newPrice = wholesaleOn ? prod.wholesalePrice : (c.originalPrice || prod.price)
+    return { ...c, price: newPrice, lineTotal: c.qty * newPrice }
+  })
+}
+const mapBundle = b => ({ id: b.id, name: b.name, products: typeof b.products === 'string' ? JSON.parse(b.products) : (b.products || []), bundlePrice: num(b.bundle_price), active: b.active, channel: b.channel || 'both' })
+const mapSale = s => ({ id: s.id, receiptNo: s.receipt_no, date: s.date, items: typeof s.items === 'string' ? JSON.parse(s.items) : (s.items || []), subtotal: num(s.subtotal), discount: num(s.discount), total: num(s.total), profit: num(s.profit), payment: s.payment, splitCash: num(s.split_cash), splitMomo: num(s.split_momo), customer: s.customer || 'Walk-in', type: s.type || 'Retail', cashier: s.cashier || '', voided: s.voided })
+const mapStaff = s => ({ id: s.id, name: s.name, role: s.role, active: s.active, permissions: Array.isArray(s.permissions) ? s.permissions : [] })
+const mapExpense = e => ({ id: e.id, date: e.date, category: e.category, description: e.description, amount: num(e.amount) })
+const mapCustomer = c => ({ id: c.id, phone: c.phone, visitCount: num(c.visit_count), totalSpent: num(c.total_spent), lastVisit: c.last_visit })
+const mapWAOrder = o => ({ id: o.id, orderNo: o.order_no, date: o.date, customerName: o.customer_name, customerPhone: o.customer_phone, items: typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || []), subtotal: num(o.subtotal), deliveryFee: num(o.delivery_fee), total: num(o.total), address: o.address, notes: o.notes, status: o.status, paystackRef: o.paystack_ref, paidAt: o.paid_at, processedBy: o.processed_by, processedAt: o.processed_at, ussdCode: o.ussd_code, trackingNo: o.tracking_no || '', deliveryStatus: o.delivery_status || '', deliveryGuy: o.delivery_guy || '', deliveredAt: o.delivered_at, deliveryNotes: o.delivery_notes || '', source: o.source || (String(o.order_no||'').startsWith('WEB-') ? 'web' : String(o.order_no||'').startsWith('WA-') ? 'whatsapp' : 'walkin'), detailsFilled: !!o.details_filled })
+const mapRefund = r => ({ id: r.id, refundNo: r.refund_no, date: r.date, originalReceiptNo: r.original_receipt_no, items: typeof r.items === 'string' ? JSON.parse(r.items) : (r.items || []), refundAmount: num(r.refund_amount), reason: r.reason, processedBy: r.processed_by, customer: r.customer, status: r.status })
+const mapPromo = p => ({ id: p.id, name: p.name, startDate: p.start_date, endDate: p.end_date, items: typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || []), active: p.active, channel: p.channel || 'both' })
+const mapInvoice = i => ({ id: i.id, invoiceId: i.invoice_id, date: i.date, supplier: i.supplier, amount: num(i.amount), notes: i.notes, image: i.image || '' })
+const mapStockTake = s => ({ id: s.id, date: s.date, items: typeof s.items === 'string' ? JSON.parse(s.items) : (s.items || []), notes: s.notes, conductedBy: s.conducted_by, status: s.status || 'approved', approvedBy: s.approved_by, rejectReason: s.reject_reason })
+const mapStockAdj = a => ({ id: a.id, date: a.date, productId: a.product_id, productName: a.product_name, qty: num(a.qty), reason: a.reason, notes: a.notes, adjustedBy: a.adjusted_by })
+
+// Fast query with select only needed columns where possible
+// One place that actually reports whether a query failed, as opposed to
+// returning nothing. Everything below depends on telling those apart.
+const qTry = async (sb, table, opts = {}) => {
+  try {
+    let query = sb.from(table).select(opts.select || '*')
+    if (opts.order) query = query.order(opts.order, { ascending: opts.asc ?? false })
+    if (opts.limit) query = query.limit(opts.limit)
+    if (opts.gt) query = query.gt(opts.gt[0], opts.gt[1])
+    const { data, error } = await query
+    if (error) return { rows: [], error }
+    return { rows: data || [], error: null }
+  } catch (e) { return { rows: [], error: e } }
+}
+
+const q = async (sb, table, opts = {}) => {
+  const { rows, error } = await qTry(sb, table, opts)
+  // An empty array used to be returned for BOTH "no rows" and "the request
+  // failed", so a permissions or network problem looked exactly like an empty
+  // shop. Log it so the cause is visible in the console.
+  if (error) console.error(`[load] ${table}: ${error.message || error}`)
+  return rows
+}
+
+// Views and columns added by migrations 015-021. If the frontend is live before
+// the SQL has been run, the preferred source fails and the till would show an
+// EMPTY product list — the worst possible failure. Fall back to a select that
+// exists on the old schema.
+//
+// The fallback triggers on the PRIMARY QUERY ERRORING, not on it coming back
+// empty. Probing the table separately is not good enough: `staff_safe` already
+// exists but without the `permissions` column, and `products` exists but
+// without `barcode`, so a `select=*` probe answers 200 while the real query
+// 400s on the missing column.
+const qFallback = async (sb, primary, fallback, opts = {}) => {
+  const { rows, error } = await qTry(sb, primary.table, { ...opts, select: primary.select })
+  if (!error) return rows
+  if (!fallback) { console.error(`[load] ${primary.table}: ${error.message || error}`); return [] }
+  console.warn(`[schema] ${primary.table} (${error.message || error}) — falling back to ${fallback.table}. Run migrations 015-021.`)
+  return q(sb, fallback.table, { ...opts, select: fallback.select })
+}
+
+// ---------------------------------------------------------------------------
+// READING THE BOOKS
+//
+// `sales` is the shop's ledger, and the anon key that reads it is compiled into
+// the browser bundle — so until migration 031 anyone who copied that key out of
+// devtools could read every sale the shop had ever made. Sales now come from
+// `list_sales`, which requires a valid staff session and returns profit only to
+// someone allowed to see cost.
+//
+// The fallback to a direct table read is what makes the rollout safe: this code
+// running against a database that has not had 031 behaves exactly as it did
+// before. It is also why migration 032, which closes the table, must not be run
+// until this function is answering — on the fallback, 032 would quietly return
+// a single day of sales and make every report wrong rather than broken.
+// ---------------------------------------------------------------------------
+const loadSales = async (sb, token, limit, select) => {
+  const { data, error } = await sb.rpc('list_sales', { p_token: token, p_limit: limit })
+  if (!isMissingFunction(error)) {
+    if (error) { console.error(`[load] list_sales: ${error.message || error}`); return [] }
+    return Array.isArray(data) ? data : []
+  }
+  console.warn('list_sales: pre-031 schema — reading the sales table directly. Run migration 031.')
+  return q(sb, 'sales', { select, order: 'date', limit })
+}
+
+export const useStore = create((set, get) => ({
+  products: [], bundles: [], sales: [], staff: [], expenses: [],
+  customers: [], waOrders: [], refunds: [], promos: [], invoices: [], stockTakes: [], stockAdjustments: [],
+  loading: true, loadingText: 'Connecting...',
+  user: null, isAdmin: false, token: null,
+  // When set, the catalogue on screen came from disk, not the server; the
+  // number is when it was captured so the till can say how old it is.
+  offlineCatalogue: null,
+  // Permission check: admins can do everything; others need the specific permission.
+  can: (perm) => {
+    const { user, isAdmin } = get()
+    if (isAdmin) return true
+    const perms = (user && Array.isArray(user.permissions)) ? user.permissions : []
+    return perms.includes('admin') || perms.includes(perm)
+  },
+  // Cost prices and profit go to the browser ONLY for users who are allowed to
+  // see margins. Everyone else reads the `products_sale` view, which has no
+  // cost column at all. Profit is calculated server-side by record_sale, so a
+  // till that cannot see cost still records the right figure.
+  canSeeCost: () => { const { isAdmin, can } = get(); return isAdmin || can('reports') || can('inventory_view') },
+  _productSource: () => get().canSeeCost()
+    ? { table: 'products', select: 'id,name,category,cost_price,price,wholesale_price,wholesale_min_qty,quantity,image,group_tag,barcode' }
+    : { table: 'products_sale', select: 'id,name,category,price,wholesale_price,wholesale_min_qty,quantity,image,group_tag,barcode' },
+  // Pre-migration schema: no products_sale view, no barcode column. Used for
+  // BOTH roles — the admin select names `barcode` too.
+  _productFallback: () => ({ table: 'products', select: 'id,name,category,cost_price,price,wholesale_price,wholesale_min_qty,quantity,image,group_tag' }),
+  _saleSelect: () => get().canSeeCost()
+    ? 'id,receipt_no,date,items,subtotal,discount,total,profit,payment,split_cash,split_momo,customer,type,cashier,voided'
+    : 'id,receipt_no,date,items,subtotal,discount,total,payment,split_cash,split_momo,customer,type,cashier,voided',
+
+  page: 'pos', cart: [], mode: 'retail', selectedCat: 'all', waFilter: 'Pending', perfPeriod: 'today',
+  _secondaryLoaded: false,
+  darkMode: localStorage.getItem('pos-dark') === 'true',
+  toggleDark: () => set(s => { const d = !s.darkMode; localStorage.setItem('pos-dark', d); return { darkMode: d } }),
+
+  setPage: page => {
+    set({ page })
+    // Lazy load secondary data when navigating to those pages
+    const s = get()
+    if (!s._secondaryLoaded && ['reports', 'invoices', 'stocktakes', 'stockadjustments', 'promos', 'customers'].includes(page)) {
+      s._loadSecondary()
+    }
+  },
+  setMode: mode => set({ mode }), setCat: cat => set({ selectedCat: cat }),
+  setWAFilter: f => set({ waFilter: f }), setPerfPeriod: p => set({ perfPeriod: p }),
+  setLoading: (loading, text) => set({ loading, loadingText: text || 'Loading...' }),
+  // Per-cashier carts: when a cashier logs out (incl. auto-logout), their cart
+  // is stashed under their id. When they log back in, it's restored. A DIFFERENT
+  // cashier logging in gets their own cart (fresh if none saved). Kept in memory
+  // + localStorage so it survives the session.
+  login: (user, isAdmin, token) => {
+    let restored = []
+    try {
+      const saved = JSON.parse(localStorage.getItem('carts-by-cashier') || '{}')
+      restored = Array.isArray(saved[user.id]) ? saved[user.id] : []
+    } catch {}
+    set({ user, isAdmin, token: token || null, cart: restored })
+    // The first load happens before anyone has signed in, so it deliberately
+    // asks for the no-cost column set. Now that we know who this is, refetch
+    // with margins if they are allowed to see them.
+    if (get().canSeeCost()) { get().refreshProducts() }
+    // Sales are ALWAYS refetched, not just for someone who can see cost. The
+    // first load runs before sign-in, and since migration 031 reading the
+    // ledger needs a session — so that load comes back empty and
+    // _secondaryLoaded stops it being retried. Without this a cashier's
+    // Receipts page would simply be blank.
+    get().refreshSales()
+  },
+  logout: () => {
+    const { user, cart, token } = get()
+    if (user) {
+      try {
+        const saved = JSON.parse(localStorage.getItem('carts-by-cashier') || '{}')
+        saved[user.id] = cart || []
+        localStorage.setItem('carts-by-cashier', JSON.stringify(saved))
+      } catch {}
+    }
+    // Retire the session server-side so the token can't outlive the shift.
+    if (token) { try { getSupabase().rpc('end_session', { p_token: token }) } catch {} }
+    set({ user: null, isAdmin: false, token: null, cart: [] })
+  },
+
+  // Shop on/off switch (shared with the e-commerce site via store_settings)
+  shopOpen: true,
+  shopSettingLoaded: false,
+  fetchShopOpen: async () => {
+    const sb = getSupabase(); if (!sb) return
+    try {
+      const { data, error } = await sb.from('store_settings').select('shop_open').limit(1)
+      if (error) console.error('store_settings read error:', error.message)
+      const row = Array.isArray(data) ? data[0] : null
+      set({ shopOpen: row ? row.shop_open === true : true, shopSettingLoaded: true })
+    } catch (e) { console.error('fetchShopOpen failed:', e); set({ shopSettingLoaded: true }) }
+  },
+  setShopOpen: async (open) => {
+    const sb = getSupabase(); if (!sb) return { ok: false, error: 'No connection' }
+    set({ shopOpen: open }) // optimistic
+    try {
+      // upsert (not update) so a missing row gets created; select back to verify it actually saved
+      const { data, error } = await sb.from('store_settings')
+        .upsert({ id: 1, shop_open: open, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+        .select('shop_open')
+      if (error) { set({ shopOpen: !open }); console.error('setShopOpen error:', error.message); return { ok: false, error: error.message } }
+      const saved = Array.isArray(data) ? data[0] : null
+      if (!saved || saved.shop_open !== open) { set({ shopOpen: !open }); return { ok: false, error: 'Save did not persist (check table/permissions)' } }
+      return { ok: true }
+    } catch (e) { set({ shopOpen: !open }); console.error('setShopOpen failed:', e); return { ok: false, error: String(e) } }
+  },
+
+  addToCart: (item) => {
+    let cart = [...get().cart]
+    const idx = cart.findIndex(c => c.isBundle ? c.bundleId === item.bundleId : c.productId === item.productId)
+    if (idx >= 0) {
+      const existing = cart[idx]
+      if (!item.isBundle) { const prod = get().products.find(p => p.id === item.productId); if (prod && existing.qty >= prod.quantity) return false }
+      cart[idx] = { ...existing, qty: existing.qty + 1 }
+    } else { cart.push({ ...item, qty: 1, lineTotal: item.price, originalPrice: item.price }) }
+    set({ cart: applyWholesale(cart, get().products) }); return true
+  },
+  updateCartQty: (index, delta) => {
+    let cart = [...get().cart]; const item = cart[index]; if (!item) return
+    const newQty = item.qty + delta
+    if (newQty < 1) { cart.splice(index, 1) }
+    else {
+      if (!item.isBundle) {
+        const prod = get().products.find(p => p.id === item.productId)
+        if (prod && newQty > prod.quantity) return false
+      }
+      cart[index] = { ...item, qty: newQty }
+    }
+    set({ cart: applyWholesale(cart, get().products) }); return true
+  },
+  removeFromCart: index => { const cart = [...get().cart]; cart.splice(index, 1); set({ cart: applyWholesale(cart, get().products) }) },
+  clearCart: () => {
+    const { user } = get()
+    if (user) { try { const saved = JSON.parse(localStorage.getItem('carts-by-cashier') || '{}'); delete saved[user.id]; localStorage.setItem('carts-by-cashier', JSON.stringify(saved)) } catch {} }
+    set({ cart: [] })
+  },
+
+  // PHASE 1: Load only essential data (products, staff, sales, bundles)
+  loadAll: async () => {
+    const sb = getSupabase(); if (!sb) { set({ loading: false }); return }
+    set({ loading: true, loadingText: 'Loading...' })
+    try {
+      // PHASE 1: Only what POS needs immediately
+      const [prodData, staffData, bunData, promoData] = await Promise.all([
+        qFallback(sb, get()._productSource(), get()._productFallback(), { order: 'name', asc: true }),
+        qFallback(sb, { table: 'staff_safe', select: 'id,name,role,active,permissions' }, { table: 'staff', select: 'id,name,role,active' }),
+        q(sb, 'bundles', {}),            // likewise — see mapBundle's channel default
+        q(sb, 'promos', { limit: 50 }),   // no column list: `channel` only exists after migration 033
+      ])
+
+      // A load that comes back with nothing is not a load. Offline, every query
+      // resolves to [] rather than throwing, so an empty product list is the
+      // shape a dead connection takes — fall back to the snapshot instead of
+      // showing a cashier an empty shop.
+      if (!prodData.length) {
+        const snap = loadCatalogue()
+        if (snap) {
+          console.warn('No products from the server — trading from the offline catalogue')
+          set({
+            products: snap.products.map(p => ({ ...p, costPrice: 0 })),
+            bundles: snap.bundles, promos: snap.promos,
+            staff: staffData.map(mapStaff),
+            offlineCatalogue: snap.at, loading: false,
+          })
+          return
+        }
+      }
+
+      const products = prodData.map(mapProduct)
+      set({
+        products,
+        staff: staffData.map(mapStaff),
+        bundles: bunData.map(mapBundle),
+        promos: promoData.map(mapPromo),
+        offlineCatalogue: null,
+        loading: false,
+      })
+      // Keep a copy for the next cold start with no internet.
+      saveCatalogue({ products, bundles: bunData.map(mapBundle), promos: promoData.map(mapPromo) })
+
+      // PHASE 2: Load everything else in background (non-blocking)
+      get()._loadSecondary()
+    } catch (e) {
+      console.error('Load error:', e)
+      set({ loading: false })
+    }
+  },
+
+  // Background load for secondary tables
+  _loadSecondary: async () => {
+    if (get()._secondaryLoaded) return
+    const sb = getSupabase(); if (!sb) return
+    try {
+      const [saleData, expData, custData, waData, refData, invData, stData, adjData] = await Promise.all([
+        loadSales(sb, get().token, 150, get()._saleSelect()),
+        q(sb, 'expenses', { select: 'id,date,category,description,amount', order: 'date', limit: 100 }),
+        q(sb, 'customers', { select: 'id,phone,visit_count,total_spent,last_visit', order: 'total_spent', limit: 300 }),
+        q(sb, 'whatsapp_orders', { select: 'id,order_no,date,customer_name,customer_phone,items,subtotal,delivery_fee,total,status,ussd_code,paystack_ref,address,notes,paid_at,source,details_filled,tracking_no,delivery_status,delivery_guy', order: 'date', limit: 200 }),
+        q(sb, 'refunds', { order: 'date', limit: 50 }),
+        q(sb, 'invoices', { order: 'date', limit: 50 }),
+        q(sb, 'stock_takes', { order: 'date', limit: 20 }),
+        q(sb, 'stock_adjustments', { select: 'id,date,product_id,product_name,qty,reason,notes,adjusted_by', order: 'date', limit: 100 }),
+      ])
+      set({
+        sales: saleData.map(mapSale),
+        expenses: expData.map(mapExpense),
+        customers: custData.map(mapCustomer),
+        waOrders: waData.map(mapWAOrder),
+        refunds: refData.map(mapRefund),
+        invoices: invData.map(mapInvoice),
+        stockTakes: stData.map(mapStockTake),
+        stockAdjustments: adjData.map(mapStockAdj),
+        _secondaryLoaded: true,
+      })
+    } catch (e) { console.warn('Secondary load:', e) }
+  },
+
+  refreshProducts: async () => { const sb = getSupabase(); if (!sb) return; const d = await qFallback(sb, get()._productSource(), get()._productFallback(), { order: 'name', asc: true }); set({ products: d.map(mapProduct) }) },
+  // How many sales are held in memory. Everything that reads `sales` — the
+  // receipts list, the reports, the dashboard — can only see this many, which
+  // is why the number is on screen rather than implied.
+  salesLimit: 300,
+  refreshSales: async (limit) => {
+    const sb = getSupabase(); if (!sb) return
+    const n = Math.max(Number(limit) || get().salesLimit || 300, 1)
+    const d = await loadSales(sb, get().token, n, get()._saleSelect())
+    set({ sales: d.map(mapSale), salesLimit: n })
+  },
+  refreshWAOrders: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'whatsapp_orders', { order: 'date', limit: 500 }); set({ waOrders: d.map(mapWAOrder) }) },
+  refreshStaff: async () => { const sb = getSupabase(); if (!sb) return; const d = await qFallback(sb, { table: 'staff_safe', select: 'id,name,role,active,permissions' }, { table: 'staff', select: 'id,name,role,active' }); set({ staff: d.map(mapStaff) }) },
+  refreshBundles: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'bundles'); set({ bundles: d.map(mapBundle) }) },
+  refreshExpenses: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'expenses', { order: 'date', limit: 200 }); set({ expenses: d.map(mapExpense) }) },
+  refreshCustomers: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'customers', { order: 'total_spent', limit: 500 }); set({ customers: d.map(mapCustomer) }) },
+  refreshRefunds: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'refunds', { order: 'date', limit: 100 }); set({ refunds: d.map(mapRefund) }) },
+  refreshPromos: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'promos', { order: 'created_at', limit: 50 }); set({ promos: d.map(mapPromo) }) },
+  refreshInvoices: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'invoices', { order: 'date', limit: 100 }); set({ invoices: d.map(mapInvoice) }) },
+  refreshStockTakes: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'stock_takes', { order: 'date', limit: 50 }); set({ stockTakes: d.map(mapStockTake) }) },
+  refreshStockAdjustments: async () => { const sb = getSupabase(); if (!sb) return; const d = await q(sb, 'stock_adjustments', { order: 'date', limit: 200 }); set({ stockAdjustments: d.map(mapStockAdj) }) },
+
+  deductStock: (cartItems) => {
+    const products = [...get().products]
+    for (const c of cartItems) {
+      if (c.isBundle && c.bundleItems) { for (const bi of c.bundleItems) { const p = products.find(x => x.id === bi.productId); if (p) p.quantity = Math.max(0, p.quantity - num(bi.qty) * c.qty) } }
+      else if (c.productId) { const p = products.find(x => x.id === c.productId); if (p) p.quantity = Math.max(0, p.quantity - c.qty) }
+    }
+    set({ products })
+  },
+}))
+
+// ---------------------------------------------------------------------------
+// KEEP THE OPEN BASKET ON DISK
+//
+// The cart was only written to localStorage by logout(), so it survived a
+// shift change and nothing else. A crash, an accidentally closed tab or a till
+// losing power took a half-rung basket with it — and a POS basket is somebody
+// standing at the counter with their shopping already on it.
+//
+// Saved on every change now, under the same per-cashier key login() restores
+// from, so nothing else had to change. Writes are coalesced on a short timer:
+// a cashier holding the + button must not touch localStorage on every frame.
+// ---------------------------------------------------------------------------
+let cartSaveTimer = null
+useStore.subscribe((state, prev) => {
+  if (state.cart === prev.cart) return
+  const uid = state.user?.id
+  if (!uid) return                       // nobody signed in; logout() stashed it
+  const snapshot = state.cart || []
+  clearTimeout(cartSaveTimer)
+  cartSaveTimer = setTimeout(() => {
+    // logout() stashes the basket and then clears it. If the shift ended while
+    // this write was still pending, writing the now-empty cart would undo that
+    // — so only write if the same cashier is still signed in.
+    if (useStore.getState().user?.id !== uid) return
+    try {
+      const saved = JSON.parse(localStorage.getItem('carts-by-cashier') || '{}')
+      saved[uid] = snapshot
+      localStorage.setItem('carts-by-cashier', JSON.stringify(saved))
+    } catch {}
+  }, 400)
+})
+
+// Dev-only handle so the running app can be driven from the console or a
+// headless browser (responsive checks, reproducing a state without a PIN).
+// Stripped from production builds by the import.meta.env.DEV guard.
+if (import.meta.env.DEV && typeof window !== 'undefined') window.__store = useStore

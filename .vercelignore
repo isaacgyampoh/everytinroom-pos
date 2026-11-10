@@ -1,0 +1,23 @@
+# What Vercel does NOT need to build the till's web app.
+#
+# The repo also carries the Windows desktop shell and the database, and
+# desktop/ alone is ~890MB of Electron modules and packaged installers. A
+# CLI deploy would otherwise spend minutes uploading all of it to build a
+# 1MB static site.
+
+# The Electron desktop shell — built by the Windows CI workflow, not here.
+desktop/
+
+# Built by Vercel itself; uploading a local copy only risks it going stale.
+dist/
+
+# Database migrations and edge functions — deployed with the Supabase CLI.
+supabase/
+*.sql
+
+# Image tooling and release scripts.
+tools/
+
+# Docs
+*.md
+!README.md

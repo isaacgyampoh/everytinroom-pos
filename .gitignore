@@ -1,0 +1,53 @@
+node_modules/
+dist/
+.env
+.DS_Store
+.vercel
+.env*
+
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/
+
+# Electron desktop build
+desktop/node_modules/
+desktop/app/
+desktop/release/
+
+# ...but the checked-in template that documents them is not a secret.
+!.env.example
+
+# Python bytecode from the studio tools
+__pycache__/
+*.pyc
+
+# --- deploy/ : generated on the server, never committed ---
+# Site files carry a real domain; .env files carry real passwords.
+deploy/compose/caddy-sites/*.caddy
+deploy/compose/.env*
+deploy/compose/postgres/90-central.conf
+deploy/**/.env
+deploy/**/functions.env
+deploy/**/*.local
+
+# Operator files: privilege snapshots, prepared-but-unapplied security SQL,
+# rollback scripts. These are generated against the live database and some of
+# them describe exposures. This repository is PUBLIC, so they must never be
+# swept in by `git add -A`. Keep them locally.
+supabase/AWAITING-APPROVAL/grants-*.json
+supabase/AWAITING-APPROVAL/revoke-*.sql
+supabase/AWAITING-APPROVAL/rollback-*.sql
+
+# Generated inventory and migration plans. These map the infrastructure of
+# several businesses -- project refs, table counts, bucket contents, cron
+# schedules, configured secret names. The tools that produce them are
+# committed; their output is not, because this repository is public.
+deploy/inventory*.json
+deploy/inventory*.md
+migration-plans/
+deploy/migration-plans/
+# Everything left in this directory is local operator material.
+supabase/AWAITING-APPROVAL/
+
+# Cloudflare R2 credentials, entered locally by setup-r2-credentials.sh.
+deploy/.r2.env

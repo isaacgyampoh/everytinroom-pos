@@ -1,0 +1,362 @@
+[
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "releases_read",
+  "roles": "{anon,authenticated}",
+  "tablename": "app_releases",
+  "using_expr": "active"
+ },
+ {
+  "check_expr": "",
+  "cmd": "DELETE",
+  "policyname": "bundles_delete",
+  "roles": "{anon,authenticated}",
+  "tablename": "bundles",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "true",
+  "cmd": "INSERT",
+  "policyname": "bundles_insert",
+  "roles": "{anon,authenticated}",
+  "tablename": "bundles",
+  "using_expr": ""
+ },
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "bundles_select",
+  "roles": "{anon,authenticated}",
+  "tablename": "bundles",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "",
+  "cmd": "UPDATE",
+  "policyname": "bundles_update",
+  "roles": "{anon,authenticated}",
+  "tablename": "bundles",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "true",
+  "cmd": "INSERT",
+  "policyname": "customers_insert",
+  "roles": "{anon,authenticated}",
+  "tablename": "customers",
+  "using_expr": ""
+ },
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "customers_select",
+  "roles": "{anon,authenticated}",
+  "tablename": "customers",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "",
+  "cmd": "UPDATE",
+  "policyname": "customers_update",
+  "roles": "{anon,authenticated}",
+  "tablename": "customers",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "true",
+  "cmd": "ALL",
+  "policyname": "drawer_all",
+  "roles": "{anon,authenticated}",
+  "tablename": "drawer_sessions",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "",
+  "cmd": "DELETE",
+  "policyname": "expenses_delete",
+  "roles": "{anon,authenticated}",
+  "tablename": "expenses",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "true",
+  "cmd": "INSERT",
+  "policyname": "expenses_insert",
+  "roles": "{anon,authenticated}",
+  "tablename": "expenses",
+  "using_expr": ""
+ },
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "expenses_select",
+  "roles": "{anon,authenticated}",
+  "tablename": "expenses",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "",
+  "cmd": "UPDATE",
+  "policyname": "expenses_update",
+  "roles": "{anon,authenticated}",
+  "tablename": "expenses",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "true",
+  "cmd": "ALL",
+  "policyname": "invoices_all",
+  "roles": "{anon,authenticated}",
+  "tablename": "invoices",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "",
+  "cmd": "DELETE",
+  "policyname": "products_delete",
+  "roles": "{anon,authenticated}",
+  "tablename": "products",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "true",
+  "cmd": "INSERT",
+  "policyname": "products_insert",
+  "roles": "{anon,authenticated}",
+  "tablename": "products",
+  "using_expr": ""
+ },
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "products_select",
+  "roles": "{anon,authenticated}",
+  "tablename": "products",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "",
+  "cmd": "UPDATE",
+  "policyname": "products_update",
+  "roles": "{anon,authenticated}",
+  "tablename": "products",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "true",
+  "cmd": "ALL",
+  "policyname": "promos_all",
+  "roles": "{anon,authenticated}",
+  "tablename": "promos",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "public_read_promos",
+  "roles": "{anon}",
+  "tablename": "promos",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "(status = 'pending'::text)",
+  "cmd": "INSERT",
+  "policyname": "receivings_create",
+  "roles": "{anon,authenticated}",
+  "tablename": "receivings",
+  "using_expr": ""
+ },
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "receivings_read",
+  "roles": "{anon,authenticated}",
+  "tablename": "receivings",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "true",
+  "cmd": "INSERT",
+  "policyname": "refunds_insert",
+  "roles": "{anon,authenticated}",
+  "tablename": "refunds",
+  "using_expr": ""
+ },
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "refunds_select",
+  "roles": "{anon,authenticated}",
+  "tablename": "refunds",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "true",
+  "cmd": "INSERT",
+  "policyname": "sales_insert",
+  "roles": "{anon,authenticated}",
+  "tablename": "sales",
+  "using_expr": ""
+ },
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "sales_select",
+  "roles": "{anon,authenticated}",
+  "tablename": "sales",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "true",
+  "cmd": "INSERT",
+  "policyname": "stockadj_create",
+  "roles": "{anon,authenticated}",
+  "tablename": "stock_adjustments",
+  "using_expr": ""
+ },
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "stockadj_read",
+  "roles": "{anon,authenticated}",
+  "tablename": "stock_adjustments",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "ledger_read",
+  "roles": "{anon,authenticated}",
+  "tablename": "stock_ledger",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "(status <> 'approved'::text)",
+  "cmd": "INSERT",
+  "policyname": "stocktakes_create",
+  "roles": "{anon,authenticated}",
+  "tablename": "stock_takes",
+  "using_expr": ""
+ },
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "stocktakes_read",
+  "roles": "{anon,authenticated}",
+  "tablename": "stock_takes",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "true",
+  "cmd": "INSERT",
+  "policyname": "store_settings insert",
+  "roles": "{anon,authenticated}",
+  "tablename": "store_settings",
+  "using_expr": ""
+ },
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "store_settings read",
+  "roles": "{anon,authenticated}",
+  "tablename": "store_settings",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "true",
+  "cmd": "UPDATE",
+  "policyname": "store_settings update",
+  "roles": "{anon,authenticated}",
+  "tablename": "store_settings",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "suppliers_read",
+  "roles": "{anon,authenticated}",
+  "tablename": "suppliers",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "terminals_read",
+  "roles": "{anon,authenticated}",
+  "tablename": "terminals",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "true",
+  "cmd": "ALL",
+  "policyname": "ussd_sessions_all",
+  "roles": "{anon,authenticated}",
+  "tablename": "ussd_sessions",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "staff read settings",
+  "roles": "{public}",
+  "tablename": "wa_agent_settings",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "",
+  "cmd": "UPDATE",
+  "policyname": "staff update settings",
+  "roles": "{public}",
+  "tablename": "wa_agent_settings",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "staff read conversations",
+  "roles": "{public}",
+  "tablename": "wa_conversations",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "",
+  "cmd": "UPDATE",
+  "policyname": "staff update conversations",
+  "roles": "{public}",
+  "tablename": "wa_conversations",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "staff read messages",
+  "roles": "{public}",
+  "tablename": "wa_messages",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "true",
+  "cmd": "INSERT",
+  "policyname": "wa_insert",
+  "roles": "{anon,authenticated}",
+  "tablename": "whatsapp_orders",
+  "using_expr": ""
+ },
+ {
+  "check_expr": "",
+  "cmd": "SELECT",
+  "policyname": "wa_select",
+  "roles": "{anon,authenticated}",
+  "tablename": "whatsapp_orders",
+  "using_expr": "true"
+ },
+ {
+  "check_expr": "",
+  "cmd": "UPDATE",
+  "policyname": "wa_update",
+  "roles": "{anon,authenticated}",
+  "tablename": "whatsapp_orders",
+  "using_expr": "true"
+ }
+]

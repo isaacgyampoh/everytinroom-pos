@@ -1,0 +1,576 @@
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
+import { Toaster } from 'react-hot-toast'
+import { getSupabase, fnUrl } from './lib/supabase'
+import { publicRoute, PAGES_BY_ID, canOpenPage } from './lib/routes'
+import { useStore } from './hooks/useStore'
+import { useCustomerDisplayBroadcast, broadcastDisplay } from './hooks/useCustomerDisplay'
+import Loader from './components/Loader'
+import ErrorBoundary from './components/ErrorBoundary'
+import Login from './components/Login'
+import Navigation from './components/Navigation'
+import CartDrawer from './components/CartDrawer'
+import ReceiptPreview from './components/ReceiptPreview'
+import { startAutoFlush, pendingCount, onPendingChange, flush } from './lib/offlineQueue'
+import { getSettings } from './lib/hardware'
+import { watchForUpdates, onUpdateReady, applyUpdate } from './lib/appUpdate'
+import { startLiveUpdates } from './lib/liveUpdates'
+import { useDockedCart } from './hooks/useDockedCart'
+import { useDesktopUpdate } from './hooks/useDesktopUpdate'
+import toast from 'react-hot-toast'
+
+// Lazy load all pages — only loads when needed
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const POS = lazy(() => import('./pages/POS'))
+const WhatsAppOrders = lazy(() => import('./pages/WhatsAppOrders'))
+const ReceivingPage = lazy(() => import('./pages/ReceivingPage'))
+const Receipts = lazy(() => import('./pages/Receipts'))
+const Products = lazy(() => import('./pages/Products'))
+const CostPricesPage = lazy(() => import('./pages/CostPricesPage'))
+const PhotoStudioPage = lazy(() => import('./pages/PhotoStudioPage'))
+const StaffPage = lazy(() => import('./pages/StaffPage'))
+const ExpensesPage = lazy(() => import('./pages/ExpensesPage'))
+const CustomersPage = lazy(() => import('./pages/CustomersPage'))
+const BundlesPage = lazy(() => import('./pages/BundlesPage'))
+const PerformancePage = lazy(() => import('./pages/PerformancePage'))
+const RefundsPage = lazy(() => import('./pages/RefundsPage'))
+const ReportsPage = lazy(() => import('./pages/ReportsPage'))
+const PromosPage = lazy(() => import('./pages/PromosPage'))
+const InvoicesPage = lazy(() => import('./pages/InvoicesPage'))
+const StockTakesPage = lazy(() => import('./pages/StockTakesPage'))
+const StockAdjustmentsPage = lazy(() => import('./pages/StockAdjustmentsPage'))
+const RestockPage = lazy(() => import('./pages/RestockPage'))
+const StockInsights = lazy(() => import('./pages/StockInsights'))
+const TerminalPage = lazy(() => import('./pages/TerminalPage'))
+const InvoicePay = lazy(() => import('./pages/InvoicePay'))
+const Catalog = lazy(() => import('./pages/Catalog'))
+const DeliveryConfirm = lazy(() => import('./pages/DeliveryConfirm'))
+const DeliveryDetails = lazy(() => import('./pages/DeliveryDetails'))
+const CustomerDisplay = lazy(() => import('./pages/CustomerDisplay'))
+
+// How long the till may sit untouched before it locks. Read per terminal from
+// Terminal & printer, so a counter and a back-office machine can differ without
+// a deploy. Defaults to an hour.
+const idleMs = () => {
+  const m = Number(getSettings().idleMinutes)
+  return (Number.isFinite(m) && m > 0 ? m : 60) * 60 * 1000
+}
+
+export default function App() {
+  const { user, page, setPage, loading, loadAll, logout, isAdmin, can, darkMode } = useStore()
+  const [cartOpen, setCartOpen] = useState(false)
+  // On a wide screen the basket lives beside the grid instead of behind a
+  // button. `cartOpen` stays the user's own intent either way, which is what
+  // the update-when-idle check below reads — docking must not look like a
+  // cashier mid-sale and block every deploy.
+  const cartDockable = useDockedCart()
+  // The Windows till serves its bundle from disk, so a deploy never reaches it.
+  // This is the only thing that tells a shop a newer installer exists.
+  const { update: desktopUpdate, snooze: snoozeUpdate } = useDesktopUpdate()
+  // ...but only where a sale is actually made. Docking it everywhere took 400px
+  // off the Dashboard and the reports to show an empty basket on a page you
+  // cannot sell from. The floating cart button was only ever on the till screen
+  // for the same reason.
+  const cartCount = useStore(st => st.cart.length)
+  // ...and only once there is something in it. An empty 400px panel on a
+  // screen where no sale has started is just a narrower product grid, so the
+  // basket arrives with the first item and leaves when the sale is rung up or
+  // cleared. The floating cart button covers the empty case, which is how a
+  // cashier still reaches the held baskets.
+  const cartDocked = cartDockable && page === 'pos' && cartCount > 0
+
+  // The grid's right-hand gutter is reserved in CSS, which lives outside
+  // React's tree — so it is toggled here, from the state that actually decides
+  // whether a basket is on screen.
+  useEffect(() => {
+    document.body.classList.toggle('cart-docked', cartDocked)
+    return () => document.body.classList.remove('cart-docked')
+  }, [cartDocked])
+  const [receipt, setReceipt] = useState(null)
+  const lastActivityRef = useRef(Date.now())
+  const [salePopup, setSalePopup] = useState(null)
+  const [queued, setQueued] = useState(pendingCount())
+  const [updateReady, setUpdateReady] = useState(false)
+  const offlineCatalogue = useStore(st => st.offlineCatalogue)
+  const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine)
+
+  // Broadcast live cart to the customer-facing display (#/customer-display)
+  useCustomerDisplayBroadcast()
+
+  // Auto-launch the customer screen on the 2nd display once a cashier is in.
+  // Runs after login (which is the user gesture browsers require). Designed so
+  // a non-technical client just opens the app and the customer screen appears.
+  useEffect(() => {
+    if (!user) return
+    if (window.location.hash.includes('/customer-display')) return // don't spawn from the customer window itself
+    let cancelled = false
+    const launch = async () => {
+      try {
+        const { openCustomerScreenAuto } = await import('./hooks/useCustomerDisplay')
+        if (!cancelled) await openCustomerScreenAuto()
+      } catch (e) { console.warn('auto customer screen:', e) }
+    }
+    // slight delay so the POS UI paints first
+    const t = setTimeout(launch, 600)
+    // keep it alive: only relaunch if the customer window was actually closed
+    const keepAlive = setInterval(async () => {
+      if (cancelled || window.location.hash.includes('/customer-display')) return
+      const { isCustomerScreenOpen } = await import('./hooks/useCustomerDisplay')
+      if (!isCustomerScreenOpen()) launch()
+    }, 15000)
+    return () => { cancelled = true; clearTimeout(t); clearInterval(keepAlive) }
+  }, [user])
+
+  // Apply dark mode
+  useEffect(() => {
+    document.body.classList.toggle('dark', darkMode)
+  }, [darkMode])
+
+  // Offline sale queue: drain it whenever the connection comes back, and keep
+  // the count on screen so nobody closes the till with sales still unfiled.
+  useEffect(() => {
+    startAutoFlush()
+    const off = onPendingChange(setQueued)
+    // On reconnect: file what is queued AND catch up on everything that
+    // happened while the line was down. Realtime only delivers events while
+    // connected, so website orders placed during an outage are simply missing
+    // until something re-reads them. This used to refresh only when there were
+    // offline sales to send, so a till that was offline with an empty queue
+    // never picked up the orders it had missed.
+    const up = () => {
+      setOnline(true)
+      flush()
+        .then(r => { if (r.sent) toast.success(`${r.sent} offline sale${r.sent > 1 ? 's' : ''} filed`) })
+        .catch(() => {})
+        .finally(() => {
+          try {
+            loadAll()
+            // loadAll's second phase is guarded by _secondaryLoaded and returns
+            // early once it has run, so it does NOT re-read orders. Website
+            // orders placed during the outage are exactly what we came back
+            // for, so ask for them directly.
+            useStore.getState().refreshWAOrders()
+          } catch {}
+        })
+    }
+    const down = () => setOnline(false)
+    window.addEventListener('online', up)
+    window.addEventListener('offline', down)
+    return () => { off(); window.removeEventListener('online', up); window.removeEventListener('offline', down) }
+  }, []) // eslint-disable-line
+
+  useEffect(() => { loadAll(); watchForUpdates() }, [])
+
+  // LIVE UPDATES, BY POLLING A THREE-ROW TABLE.
+  //
+  // This used to hold a websocket and subscribe to postgres_changes on the
+  // three tables. It was replaced because of how that failed rather than
+  // whether it worked: on the self-hosted stack, for a while after the
+  // Realtime service starts or restarts it accepts subscriptions, answers
+  // "Subscribed to PostgreSQL", and silently loses every change made in that
+  // window -- measured as a row never delivered in 75 seconds while the next
+  // one arrived in 300ms. Nothing is logged and the lost change is not sent
+  // later. A till that has missed a sale looks exactly like a quiet
+  // afternoon.
+  //
+  // Polling cannot fail that way. Every interval is a fresh request through
+  // the same authenticated API the till already uses, so a reconnection, a
+  // service restart and a reboot all recover by themselves: there is no
+  // long-lived connection to break. See src/lib/liveUpdates.js for the cost,
+  // which is three rows every few seconds, and deploy/sql/30-live-state.sql
+  // for the revision counters it reads.
+  //
+  // The handlers here are the same ones the subscriptions called. They always
+  // re-read through the API rather than trusting a pushed row, which is why
+  // the change of mechanism does not change what the till shows.
+  // Which sale was at the top when polling began, so an UPDATE to an existing
+  // sale -- a void, a correction -- does not raise the "sale!" popup as though
+  // somebody had just rung one up.
+  //
+  // It is always a KNOWN value by the time a change can be detected: the
+  // effect below reads the sales once and records the top id (or '' for a
+  // shop with no sales yet) before it starts polling. Seeding it from
+  // whatever the store happened to hold was a race -- sales load in a
+  // background phase -- and treating "not loaded yet" the same as "no sales"
+  // would have suppressed the popup for a new shop's very first sale.
+  const lastSaleId = useRef('')
+
+  const onSalesChanged = async () => {
+    const store = useStore.getState()
+    const before = lastSaleId.current
+    await store.refreshSales()
+    const latest = useStore.getState().sales[0]
+    if (!latest) return
+    lastSaleId.current = latest.id
+    if (latest.id === before) return
+    playSaleSound()
+    setSalePopup({ total: latest.total, customer: latest.customer,
+                   payment: latest.payment, cashier: latest.cashier })
+    setTimeout(() => setSalePopup(null), 4000)
+    // show thank-you on the customer display
+    broadcastDisplay({ status: 'paid', total: latest.total,
+                       receiptNo: latest.receiptNo || null,
+                       items: [], count: 0, subtotal: 0 })
+  }
+
+  const onWAOrdersChanged = async () => {
+    await useStore.getState().refreshWAOrders()
+    const s = useStore.getState()
+    updateBadge(s.waOrders.filter(o => o.status === 'Pending' || o.status === 'Paid').length)
+  }
+
+  // Polling starts when somebody is signed in and stops when they are not.
+  // The old subscription was set up on mount regardless, which meant a
+  // customer opening the public shop or a payment link also opened a
+  // websocket. There is no reason for the storefront to watch the till's
+  // tables, and a request every few seconds is a thing to only do when it is
+  // being used.
+  useEffect(() => {
+    if (!user) return
+    const sb = getSupabase(); if (!sb) return
+    let stop = () => {}
+    let cancelled = false
+    ;(async () => {
+      // The baseline first, then the polling -- in that order, so the first
+      // detected change is compared against something real.
+      try { await useStore.getState().refreshSales() } catch {}
+      if (cancelled) return
+      lastSaleId.current = useStore.getState().sales[0]?.id ?? ''
+      stop = startLiveUpdates(sb, {
+        sales: onSalesChanged,
+        products: () => useStore.getState().refreshProducts(),
+        whatsapp_orders: onWAOrdersChanged,
+      }, {
+        intervalMs: Number(import.meta.env.VITE_LIVE_POLL_MS) || 3000,
+        onDegrade: () => {
+          // Said out loud rather than swallowed: this means live_state is not
+          // on this backend yet, the till has fallen back to refreshing
+          // everything on a slower cycle, and somebody should apply the
+          // migration. It still works; it is just twenty seconds behind.
+          console.warn('[live] live_state is unavailable; falling back to periodic refresh')
+        },
+      })
+    })()
+    return () => { cancelled = true; stop() }
+  }, [user])
+
+  // A new version waits until the till is idle. Swapping the JavaScript under a
+  // cashier mid-sale reloads the page and takes the cart with it.
+  useEffect(() => onUpdateReady(() => setUpdateReady(true)), [])
+  useEffect(() => {
+    if (!updateReady || cartOpen || cartCount > 0) return
+    const t = setTimeout(() => applyUpdate(), 1500)   // settle, then swap
+    return () => clearTimeout(t)
+  }, [updateReady, cartOpen, cartCount])
+
+  // An installed app reopens on whatever URL its window was last left at. If
+  // that was the storefront, the till opened on the customer site — the
+  // reported "I click the app and the customer side appears". Clear a
+  // storefront hash on launch; the genuinely customer-facing links (a payment
+  // or delivery page opened from a message) are left alone.
+  useEffect(() => {
+    // ONLY when this is the till application — launched from its own icon, or
+    // running inside the Windows shell. A customer visiting the website on
+    // #/catalog must still get the shop; clearing the hash unconditionally
+    // broke the storefront, which the route tests caught.
+    const isTillApp =
+      new URLSearchParams(window.location.search).get('source') === 'pwa' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.matchMedia?.('(display-mode: standalone)').matches ||
+      window.matchMedia?.('(display-mode: fullscreen)').matches
+    if (!isTillApp) return
+    if (publicRoute(window.location.hash) === 'catalog') {
+      history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
+  }, [])
+
+  // Global image fallback: any product image that fails to load (e.g. dead
+  // Cloudinary links) is swapped for a clean neutral placeholder instead of
+  // the browser's broken-image icon. Applies app-wide via error capture.
+  useEffect(() => {
+    const PLACEHOLDER = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><rect width="96" height="96" fill="#f1f0ee"/><path d="M30 62l12-14 8 9 6-7 10 12H30z" fill="#d6d3ce"/><circle cx="38" cy="36" r="6" fill="#d6d3ce"/></svg>'
+    )
+    // One failed load used to swap the image for a grey placeholder permanently,
+    // for the rest of the session. On a shop connection that drops constantly
+    // that turns a momentary blip into a POS full of grey boxes. Retry once
+    // before giving up, and only give up on the retry.
+    const onErr = (e) => {
+      const t = e.target
+      if (!t || t.tagName !== 'IMG' || t.src === PLACEHOLDER) return
+      if (!t.dataset.retried) {
+        t.dataset.retried = '1'
+        const src = t.src
+        // Cache-bust the retry so a poisoned entry isn't served straight back.
+        setTimeout(() => { t.src = src + (src.includes('?') ? '&' : '?') + 'r=1' }, 800)
+        return
+      }
+      t.src = PLACEHOLDER
+      t.style.objectFit = 'cover'
+    }
+    window.addEventListener('error', onErr, true) // capture phase catches img errors
+    return () => window.removeEventListener('error', onErr, true)
+  }, [])
+
+  // App-wide payment auto-confirm: ask NaloPay which recent pending orders
+  // actually paid, and mark them Paid, from ANY screen while logged in. This
+  // means orders confirm themselves — staff shouldn't need to mark manually.
+  //
+  // It used to fire every 20 seconds unconditionally: 4,300 edge-function
+  // invocations a day per till, including all night on a till left signed in,
+  // and including while the machine was offline, where every call was a
+  // guaranteed failure. It now only runs when it can do something useful —
+  // online, and with the window actually in use — and eases off when the
+  // function is failing rather than hammering a backend that is already down.
+  useEffect(() => {
+    if (!user) return
+    const BASE_MS = 20000
+    const MAX_MS = 160000
+    let timer = null
+    let stopped = false
+    let delay = BASE_MS
+
+    const schedule = () => {
+      if (stopped) return
+      clearTimeout(timer)
+      timer = setTimeout(run, delay)
+    }
+
+    const run = async () => {
+      if (stopped) return
+      // A hidden window is a till nobody is looking at, and an offline one
+      // cannot reach the function at all. Wait for the next tick either way.
+      if (document.hidden || navigator.onLine === false) return schedule()
+      try {
+        const r = await fetch(fnUrl('charge-momo', 'reconcile-payments'), { method: 'POST' })
+        if (!r.ok) throw new Error(String(r.status))
+        const j = await r.json()
+        delay = BASE_MS                                   // healthy again
+        if (j?.confirmed > 0) { try { loadAll() } catch {} }
+      } catch {
+        delay = Math.min(delay * 2, MAX_MS)               // back off
+      }
+      schedule()
+    }
+
+    // Coming back to the window is exactly when a cashier wants the orders to
+    // be current, so check straight away rather than waiting out the interval.
+    const onWake = () => { if (!document.hidden) { delay = BASE_MS; run() } }
+
+    run()
+    document.addEventListener('visibilitychange', onWake)
+    window.addEventListener('online', onWake)
+    return () => {
+      stopped = true
+      clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onWake)
+      window.removeEventListener('online', onWake)
+    }
+  }, [user]) // eslint-disable-line
+
+  // Auto-logout on inactivity
+  const resetActivity = useCallback(() => { lastActivityRef.current = Date.now() }, [])
+
+  useEffect(() => {
+    if (!user) return
+    lastActivityRef.current = Date.now()
+    const events = ['mousedown', 'keydown', 'touchstart', 'scroll']
+    events.forEach(e => window.addEventListener(e, resetActivity, { passive: true }))
+    const timer = setInterval(() => {
+      if (Date.now() - lastActivityRef.current > idleMs()) {
+        logout()
+        toast('Logged out — enter your PIN to continue')
+      }
+    }, 10000) // check every 10s
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetActivity))
+      clearInterval(timer)
+    }
+  }, [user, logout, resetActivity])
+
+  // Deep links. The desktop app's jump-list shortcuts (right-click the taskbar
+  // icon) and any bookmarked link arrive as #/pos, #/whatsapp, #/terminal. The
+  // app otherwise navigates through store state, so without this a shortcut
+  // just opened the default page and looked broken.
+  useEffect(() => {
+    if (!user) return
+    const apply = () => {
+      const id = (window.location.hash || '').replace(/^#\/?/, '').split('?')[0]
+      if (!id || !PAGES_BY_ID.has(id)) return
+      if (!canOpenPage(id, { isAdmin, can })) return
+      setPage(id)
+    }
+    apply()
+    window.addEventListener('hashchange', apply)
+    return () => window.removeEventListener('hashchange', apply)
+  }, [user, isAdmin, can, setPage])
+
+  // Guard restricted pages — admins pass, everyone else needs the page's permission.
+  useEffect(() => {
+    if (!user) return
+    if (canOpenPage(page, { isAdmin, can })) return
+    setPage('pos')
+    // A page that no longer exists is not a permission problem — telling a
+    // cashier they lack access to a screen that was deleted sends them to ask
+    // an admin for a permission nobody can grant.
+    if (PAGES_BY_ID.has(page)) toast.error('You do not have access to this page')
+  }, [page, user, isAdmin, can, setPage])
+
+  const playSaleSound = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      const osc = ctx.createOscillator(); const gain = ctx.createGain()
+      osc.connect(gain); gain.connect(ctx.destination)
+      osc.frequency.setValueAtTime(800, ctx.currentTime)
+      osc.frequency.setValueAtTime(1000, ctx.currentTime + 0.1)
+      osc.frequency.setValueAtTime(1200, ctx.currentTime + 0.2)
+      gain.gain.setValueAtTime(0.3, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5)
+      osc.start(); osc.stop(ctx.currentTime + 0.5)
+    } catch {}
+  }
+
+
+  // Update PWA app icon badge (shows number on app icon)
+  const updateBadge = (count) => {
+    try {
+      if ('setAppBadge' in navigator) {
+        if (count > 0) navigator.setAppBadge(count)
+        else navigator.clearAppBadge()
+      }
+      // Also tell service worker
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'UPDATE_BADGE', count })
+      }
+    } catch {}
+  }
+
+  // Update badge whenever waOrders changes
+  const waOrders = useStore(s => s.waOrders)
+  useEffect(() => {
+    const badge = waOrders.filter(o => o.status === 'Pending' || o.status === 'Paid').length
+    updateBadge(badge)
+  }, [waOrders])
+
+  // Pages a customer may open without signing in.
+  //
+  // These used to be matched with hash.includes(), which is why the till could
+  // open on the shop's website instead of the POS: any hash CONTAINING
+  // '/catalog' won, so '#/pos?ref=/catalog-promo' rendered the storefront, and
+  // an installed app relaunched on a stale '#/catalog' showed a signed-in
+  // cashier the customer site with no route back to the till. Matched on the
+  // first path segment now, and a signed-in session is never hijacked by the
+  // storefront.
+  const pub = publicRoute(window.location.hash)
+  // Wrapped in a boundary because these are the pages a CUSTOMER sees — a
+  // payment link, a delivery confirmation, the shop. A crash on one of those
+  // used to render a blank page to somebody who was trying to pay us.
+  const publicPage = (Page) => (
+    <ErrorBoundary><Suspense fallback={<Loader />}><Page /></Suspense></ErrorBoundary>
+  )
+  if (pub === 'customer-display') return publicPage(CustomerDisplay)
+  if (pub === 'pay') return publicPage(InvoicePay)
+  if (pub === 'deliver') return publicPage(DeliveryConfirm)
+  if (pub === 'details') return publicPage(DeliveryDetails)
+  if (pub === 'catalog' && !user) return publicPage(Catalog)
+
+  if (loading) return <><Loader /><Toaster /></>
+  if (!user) return <><Login /><Toaster /></>
+
+  const pages = {
+    dash: <Dashboard />,
+    pos: <POS />,
+    whatsapp: <WhatsAppOrders />,
+    receiving: <ReceivingPage />,
+    receipts: <Receipts onPrintReceipt={(s) => setReceipt({ receiptNo: s.receiptNo, date: s.date, customer: s.customer, cashier: s.cashier, payment: s.payment, type: s.type, items: s.items, total: s.total, discount: s.discount })} />,
+    products: <Products />,
+    costs: <CostPricesPage />,
+    studio: <PhotoStudioPage />,
+    staff: <StaffPage />,
+    expenses: <ExpensesPage />,
+    customers: <CustomersPage />,
+    bundles: <BundlesPage />,
+    performance: <PerformancePage />,
+    refunds: <RefundsPage />,
+    reports: <ReportsPage />,
+    promos: <PromosPage />,
+    invoices: <InvoicesPage />,
+    stocktakes: <StockTakesPage />,
+    stockadjustments: <StockAdjustmentsPage />,
+    restock: <RestockPage />,
+    stockinsights: <StockInsights />,
+    terminal: <TerminalPage />,
+  }
+
+  return (
+    <div className="min-h-screen">
+      <Toaster position="top-center" toastOptions={{ duration: 2000, style: { borderRadius: '14px', padding: '12px 20px', fontWeight: 600, fontSize: '13px', background: darkMode ? '#222' : '#fff', color: darkMode ? '#eee' : '#1a1a1a' } }} />
+      <Navigation onOpenCart={cartDocked ? null : () => setCartOpen(true)} />
+      <CartDrawer open={cartOpen || cartDocked} docked={cartDocked} onClose={() => setCartOpen(false)} onReceipt={setReceipt} />
+      {receipt && <ReceiptPreview sale={receipt} onClose={() => setReceipt(null)} />}
+
+      {/* Sale Notification */}
+      {salePopup && (
+        <div className="fixed top-20 md:top-5 left-1/2 -translate-x-1/2 z-[300] animate-fade">
+          <div className="bg-gray-900 text-white rounded-xl px-5 py-3 shadow-lg flex items-center gap-3 min-w-[240px]">
+            <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center text-[13px]">+</div>
+            <div>
+              <div className="text-[13px] font-semibold">GHS {Number(salePopup.total || 0).toFixed(2)}</div>
+              <div className="text-[11px] text-white/50">{salePopup.cashier} · {salePopup.payment}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Connection / unfiled-sales indicator. A till that has been offline for
+          an hour must not look identical to one that is fine. */}
+      {/* Trading from a snapshot is safe, but only if the cashier knows. Stock
+          counts in particular are as of whenever this was captured. */}
+      {offlineCatalogue && (
+        <div className="fixed top-0 inset-x-0 z-[150] bg-[#b3402b] text-white text-center py-1.5 px-3 text-[12px] font-semibold">
+          Offline — prices and stock as of {new Date(offlineCatalogue).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.
+          Sales are saved and will file themselves.
+        </div>
+      )}
+
+      {/* A packaged till cannot update itself. Not a modal and not blocking:
+          a cashier mid-queue should be able to ignore it until closing. */}
+      {desktopUpdate && (
+        <div className={`${offlineCatalogue ? 'top-[30px]' : 'top-0'} fixed inset-x-0 z-[149] bg-[#16181d] text-white px-4 py-2 flex items-center justify-center gap-3 text-[12px] font-semibold`}>
+          <span>
+            A newer till version is available — {desktopUpdate.version}
+            <span className="text-white/50 font-normal"> (this one is {desktopUpdate.running})</span>
+          </span>
+          <button onClick={() => { snoozeUpdate(); setPage('terminal') }}
+            className="h-7 px-3 rounded-lg bg-white text-[#16181d] text-[11px] font-bold">
+            Get it
+          </button>
+          <button onClick={snoozeUpdate} aria-label="Dismiss until next time"
+            className="h-7 px-2 rounded-lg text-white/60 hover:text-white text-[11px] font-bold">
+            Later
+          </button>
+        </div>
+      )}
+
+      {(!online || queued > 0) && (
+        <button onClick={() => setPage('terminal')}
+          className={`fixed bottom-[calc(150px+env(safe-area-inset-bottom))] md:bottom-24 right-4 md:right-6 z-[98] h-10 px-3.5 rounded-xl text-[11px] font-bold shadow-lg flex items-center gap-2 ${online ? 'bg-amber-500 text-white' : 'bg-red-600 text-white'}`}>
+          <span className="w-2 h-2 rounded-full bg-white/90 animate-pulse" />
+          {online ? `${queued} sale${queued > 1 ? 's' : ''} to file` : queued > 0 ? `Offline · ${queued} saved` : 'Offline'}
+        </button>
+      )}
+
+      <main className={`${offlineCatalogue ? "pt-[86px] md:pt-8" : "pt-topbar md:pt-0"} pb-24 md:pb-10 min-h-screen transition-all duration-200 content-shell`}>
+        <div className="px-3 sm:px-4 md:px-7 lg:px-9 py-3 md:py-5 max-w-[1600px] mx-auto">
+          {/* Scoped to the page, not the whole till: a crash in Reports leaves
+              the nav, the basket and the till itself usable, and `key={page}`
+              clears the boundary as soon as the cashier navigates away. */}
+          <ErrorBoundary key={page} onReset={() => setPage('pos')}>
+            <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-7 h-7 border-[2.5px] border-stone-200 border-t-gray-800 rounded-full animate-spin" /></div>}>
+              {pages[page] || <POS />}
+            </Suspense>
+          </ErrorBoundary>
+        </div>
+      </main>
+    </div>
+  )
+}

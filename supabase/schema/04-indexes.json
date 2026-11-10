@@ -1,0 +1,327 @@
+[
+ {
+  "indexdef": "CREATE UNIQUE INDEX app_releases_pkey ON public.app_releases USING btree (id)",
+  "indexname": "app_releases_pkey",
+  "tablename": "app_releases"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_app_releases_latest ON public.app_releases USING btree (platform, published_at DESC) WHERE active",
+  "indexname": "idx_app_releases_latest",
+  "tablename": "app_releases"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX bundles_pkey ON public.bundles USING btree (id)",
+  "indexname": "bundles_pkey",
+  "tablename": "bundles"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX customers_phone_key ON public.customers USING btree (phone)",
+  "indexname": "customers_phone_key",
+  "tablename": "customers"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX customers_pkey ON public.customers USING btree (id)",
+  "indexname": "customers_pkey",
+  "tablename": "customers"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX doc_counters_pkey ON public.doc_counters USING btree (key)",
+  "indexname": "doc_counters_pkey",
+  "tablename": "doc_counters"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX drawer_sessions_pkey ON public.drawer_sessions USING btree (id)",
+  "indexname": "drawer_sessions_pkey",
+  "tablename": "drawer_sessions"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_drawer_open ON public.drawer_sessions USING btree (terminal, closed_at)",
+  "indexname": "idx_drawer_open",
+  "tablename": "drawer_sessions"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX expenses_pkey ON public.expenses USING btree (id)",
+  "indexname": "expenses_pkey",
+  "tablename": "expenses"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_expenses_date ON public.expenses USING btree (date)",
+  "indexname": "idx_expenses_date",
+  "tablename": "expenses"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX image_rollback_20260831_pkey ON public.image_rollback_20260831 USING btree (id)",
+  "indexname": "image_rollback_20260831_pkey",
+  "tablename": "image_rollback_20260831"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_invoices_invoice_id ON public.invoices USING btree (invoice_id)",
+  "indexname": "idx_invoices_invoice_id",
+  "tablename": "invoices"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX invoices_pkey ON public.invoices USING btree (id)",
+  "indexname": "invoices_pkey",
+  "tablename": "invoices"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_pin_attempts_at ON public.pin_attempts USING btree (at)",
+  "indexname": "idx_pin_attempts_at",
+  "tablename": "pin_attempts"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX pin_attempts_pkey ON public.pin_attempts USING btree (id)",
+  "indexname": "pin_attempts_pkey",
+  "tablename": "pin_attempts"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_products_barcode ON public.products USING btree (barcode)",
+  "indexname": "idx_products_barcode",
+  "tablename": "products"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX idx_products_barcode_unique ON public.products USING btree (barcode) WHERE ((barcode IS NOT NULL) AND (barcode <> ''::text))",
+  "indexname": "idx_products_barcode_unique",
+  "tablename": "products"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_products_category ON public.products USING btree (category)",
+  "indexname": "idx_products_category",
+  "tablename": "products"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_products_name_lower ON public.products USING btree (lower(name))",
+  "indexname": "idx_products_name_lower",
+  "tablename": "products"
+ },
+ {
+  "indexdef": "CREATE INDEX products_group_tag_idx ON public.products USING btree (group_tag)",
+  "indexname": "products_group_tag_idx",
+  "tablename": "products"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX products_pkey ON public.products USING btree (id)",
+  "indexname": "products_pkey",
+  "tablename": "products"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX promos_pkey ON public.promos USING btree (id)",
+  "indexname": "promos_pkey",
+  "tablename": "promos"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_receivings_created ON public.receivings USING btree (created_at)",
+  "indexname": "idx_receivings_created",
+  "tablename": "receivings"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_receivings_status ON public.receivings USING btree (status)",
+  "indexname": "idx_receivings_status",
+  "tablename": "receivings"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX receivings_pkey ON public.receivings USING btree (id)",
+  "indexname": "receivings_pkey",
+  "tablename": "receivings"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX receivings_ref_no_key ON public.receivings USING btree (ref_no)",
+  "indexname": "receivings_ref_no_key",
+  "tablename": "receivings"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_refunds_original_receipt ON public.refunds USING btree (original_receipt_no)",
+  "indexname": "idx_refunds_original_receipt",
+  "tablename": "refunds"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX refunds_pkey ON public.refunds USING btree (id)",
+  "indexname": "refunds_pkey",
+  "tablename": "refunds"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_sales_cashier ON public.sales USING btree (cashier)",
+  "indexname": "idx_sales_cashier",
+  "tablename": "sales"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX idx_sales_client_ref ON public.sales USING btree (client_ref) WHERE (client_ref IS NOT NULL)",
+  "indexname": "idx_sales_client_ref",
+  "tablename": "sales"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_sales_date ON public.sales USING btree (date)",
+  "indexname": "idx_sales_date",
+  "tablename": "sales"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_sales_date_voided ON public.sales USING btree (date DESC) WHERE (NOT voided)",
+  "indexname": "idx_sales_date_voided",
+  "tablename": "sales"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_sales_profit_complete ON public.sales USING btree (date DESC) WHERE ((NOT voided) AND profit_complete)",
+  "indexname": "idx_sales_profit_complete",
+  "tablename": "sales"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_sales_receipt ON public.sales USING btree (receipt_no)",
+  "indexname": "idx_sales_receipt",
+  "tablename": "sales"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_sales_terminal ON public.sales USING btree (terminal)",
+  "indexname": "idx_sales_terminal",
+  "tablename": "sales"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX sales_pkey ON public.sales USING btree (id)",
+  "indexname": "sales_pkey",
+  "tablename": "sales"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX sales_receipt_no_key ON public.sales USING btree (receipt_no)",
+  "indexname": "sales_receipt_no_key",
+  "tablename": "sales"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX staff_pkey ON public.staff USING btree (id)",
+  "indexname": "staff_pkey",
+  "tablename": "staff"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_staff_sessions_expiry ON public.staff_sessions USING btree (expires_at)",
+  "indexname": "idx_staff_sessions_expiry",
+  "tablename": "staff_sessions"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX staff_sessions_pkey ON public.staff_sessions USING btree (token)",
+  "indexname": "staff_sessions_pkey",
+  "tablename": "staff_sessions"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX stock_adjustments_pkey ON public.stock_adjustments USING btree (id)",
+  "indexname": "stock_adjustments_pkey",
+  "tablename": "stock_adjustments"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_ledger_product ON public.stock_ledger USING btree (product_id, created_at)",
+  "indexname": "idx_ledger_product",
+  "tablename": "stock_ledger"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_ledger_type ON public.stock_ledger USING btree (action_type)",
+  "indexname": "idx_ledger_type",
+  "tablename": "stock_ledger"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX stock_ledger_pkey ON public.stock_ledger USING btree (id)",
+  "indexname": "stock_ledger_pkey",
+  "tablename": "stock_ledger"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX stock_takes_pkey ON public.stock_takes USING btree (id)",
+  "indexname": "stock_takes_pkey",
+  "tablename": "stock_takes"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX store_settings_pkey ON public.store_settings USING btree (id)",
+  "indexname": "store_settings_pkey",
+  "tablename": "store_settings"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX suppliers_pkey ON public.suppliers USING btree (id)",
+  "indexname": "suppliers_pkey",
+  "tablename": "suppliers"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX terminals_pkey ON public.terminals USING btree (id)",
+  "indexname": "terminals_pkey",
+  "tablename": "terminals"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX ussd_sessions_pkey ON public.ussd_sessions USING btree (session_id)",
+  "indexname": "ussd_sessions_pkey",
+  "tablename": "ussd_sessions"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX wa_agent_settings_pkey ON public.wa_agent_settings USING btree (key)",
+  "indexname": "wa_agent_settings_pkey",
+  "tablename": "wa_agent_settings"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_wa_conv_lastmsg ON public.wa_conversations USING btree (last_message_at)",
+  "indexname": "idx_wa_conv_lastmsg",
+  "tablename": "wa_conversations"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_wa_conv_phone ON public.wa_conversations USING btree (phone)",
+  "indexname": "idx_wa_conv_phone",
+  "tablename": "wa_conversations"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX wa_conversations_phone_key ON public.wa_conversations USING btree (phone)",
+  "indexname": "wa_conversations_phone_key",
+  "tablename": "wa_conversations"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX wa_conversations_pkey ON public.wa_conversations USING btree (id)",
+  "indexname": "wa_conversations_pkey",
+  "tablename": "wa_conversations"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_wa_msg_phone ON public.wa_messages USING btree (phone, created_at)",
+  "indexname": "idx_wa_msg_phone",
+  "tablename": "wa_messages"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX idx_wa_msg_waid ON public.wa_messages USING btree (wa_message_id) WHERE (wa_message_id <> ''::text)",
+  "indexname": "idx_wa_msg_waid",
+  "tablename": "wa_messages"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX wa_messages_pkey ON public.wa_messages USING btree (id)",
+  "indexname": "wa_messages_pkey",
+  "tablename": "wa_messages"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_wa_date ON public.whatsapp_orders USING btree (date)",
+  "indexname": "idx_wa_date",
+  "tablename": "whatsapp_orders"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_wa_paystack_ref ON public.whatsapp_orders USING btree (paystack_ref)",
+  "indexname": "idx_wa_paystack_ref",
+  "tablename": "whatsapp_orders"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_wa_status ON public.whatsapp_orders USING btree (status)",
+  "indexname": "idx_wa_status",
+  "tablename": "whatsapp_orders"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_wa_ussd_code ON public.whatsapp_orders USING btree (ussd_code)",
+  "indexname": "idx_wa_ussd_code",
+  "tablename": "whatsapp_orders"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX idx_wa_ussd_code_live ON public.whatsapp_orders USING btree (ussd_code) WHERE ((ussd_code IS NOT NULL) AND (status = ANY (ARRAY['Pending'::text, 'Paid'::text])))",
+  "indexname": "idx_wa_ussd_code_live",
+  "tablename": "whatsapp_orders"
+ },
+ {
+  "indexdef": "CREATE INDEX idx_whatsapp_orders_nalopay_order_id ON public.whatsapp_orders USING btree (nalopay_order_id)",
+  "indexname": "idx_whatsapp_orders_nalopay_order_id",
+  "tablename": "whatsapp_orders"
+ },
+ {
+  "indexdef": "CREATE UNIQUE INDEX whatsapp_orders_pkey ON public.whatsapp_orders USING btree (id)",
+  "indexname": "whatsapp_orders_pkey",
+  "tablename": "whatsapp_orders"
+ },
+ {
+  "indexdef": "CREATE INDEX whatsapp_orders_source_idx ON public.whatsapp_orders USING btree (source)",
+  "indexname": "whatsapp_orders_source_idx",
+  "tablename": "whatsapp_orders"
+ }
+]
