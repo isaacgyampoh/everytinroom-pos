@@ -227,25 +227,32 @@ by another's API.
 
 It was, and it worked in steady state — measured at 275 ms with the
 application's own client version. It was dropped because of how it fails.
-Restarting the Realtime container left it accepting subscriptions and
-answering `{"message":"Subscribed to PostgreSQL","status":"ok"}` while
-delivering nothing at all, with no error in its log and no recovery after
-ninety-five seconds. A newly provisioned tenant behaved the same way. In its
-own poller:
+After the Realtime container starts or restarts — and for a newly provisioned
+tenant — there is a warm-up window in which it accepts subscriptions, answers
+`{"message":"Subscribed to PostgreSQL","status":"ok"}`, and silently **loses
+every change made in that window**. Measured on the staging server, twice in
+one run:
 
-```elixir
-# Stopping with a :shutdown reason means the :transient child is NOT restarted
-defp retry_or_stop(%{retry_count: retry_count} = state, reason)
-     when retry_count >= @max_retries do
-  log_error("ReplicationPollerMaxRetriesReached", reason)
-  {:stop, {:shutdown, :max_retries_reached}, state}
-end
+```
+the SECOND tenant delivers, after a warm-up gap: a row written 75149ms
+  earlier was missed, the next one arrived in 300ms
+delivery resumed after the restart, with a warm-up gap: a row written
+  75151ms earlier was missed, the next one arrived in 297ms
 ```
 
-The change-data-capture worker stops for good while the channel layer carries
-on acknowledging clients. A till that has silently stopped updating looks
-exactly like a quiet afternoon, and nobody finds out until two cashiers
-disagree about stock.
+Nothing is logged, and the lost change is not delivered later.
+
+An earlier draft of this section said the service never recovers and quoted a
+retry limit in its poller as the reason. That was a conclusion from a test that
+wrote one row and waited; no log line ever confirmed it, and writing a second
+row disproved it. The subscription does come back. What does not come back is
+whatever changed while it was warming up.
+
+That is still disqualifying for a till. A missed sale is invisible — the screen
+simply does not show it, which looks exactly like a quiet afternoon — and
+nobody finds out until two cashiers disagree about stock. A revision counter
+cannot lose a change that way: whenever the till next asks, the number is
+different.
 
 The till now reads revision counters from `public.live_state` — three rows,
 one per watched table, bumped by a statement-level trigger — polled through
@@ -291,11 +298,11 @@ in provisioning, are:
    reads as healthy while delivering nothing. `post-start.sh` applies them as
    the image's superuser from statements extracted verbatim upstream.
 
-One operational fact to know rather than be surprised by: Realtime's
-change-data-capture poller cancels its own timer when it reads an empty
-table-oid list and waits 60 seconds before looking again. A tenant that has
-just started or just been restarted can therefore be silent for up to a minute
-before delivering normally. It recovers unattended; nothing needs doing.
+The operational fact to know before enabling it for any project: changes made
+in the warm-up window after a tenant starts or restarts are lost, not delayed
+(the measurement is at the top of this section). A project that subscribes
+through Realtime should re-read its data after any restart of that container
+rather than trust the stream to have been complete.
 
 ---
 

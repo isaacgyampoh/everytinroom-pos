@@ -82,7 +82,11 @@ TESTS = [
      [r"the JWT secrets are not separating them"]),
     ("Secret files are mode 600", True, [r"\.env is mode 600"]),
     ("Existing password never regenerated on re-run", True,
-     [r"existing password is NOT regenerated", r"existing credentials found"]),
+     # The suite's wording drifted from this pattern, so a passing check read
+     # as "not verified". Both wordings are real assertions in the suite.
+     [r"existing password is NOT regenerated", r"existing credentials found",
+      r"database password was NOT regenerated"],
+     [r"password WAS regenerated", r"password changed on re-run"]),
     ("Provisioning is idempotent", True,
      [r"re-provisioning .* changed nothing", r"re-provisioning kept the existing password"]),
     ("PostgREST answers through the proxy", True,
@@ -111,10 +115,11 @@ TESTS = [
     #
     # These three measure Realtime's own delivery to a tenant that has just
     # been provisioned or just been restarted, and they fail: the service
-    # keeps accepting subscriptions and answering "Subscribed to PostgreSQL"
-    # while delivering nothing, with no error logged and no recovery. Its
-    # change-data-capture poller stops permanently after six failed attempts
-    # to prepare replication and is not restarted.
+    # accepts subscriptions, answers "Subscribed to PostgreSQL", and silently
+    # loses every change made during a warm-up window -- a row never delivered
+    # in 75 seconds while the next one arrived in 300ms. It does recover; the
+    # lost change does not. (An earlier note here said it never recovered,
+    # which a second insert disproved.)
     #
     # They are marked optional rather than deleted. Deleting them would hide
     # a real upstream defect that any project needing Realtime would inherit,
@@ -122,7 +127,10 @@ TESTS = [
     # the mechanism that replaced them.
     ("A second, independent Realtime tenant also delivers", False,
      [r"SECOND tenant also delivers a database change"],
-     [r"second tenant delivered nothing"]),
+     # Delivering only after a warm-up gap is NOT a pass: a change written
+     # while the tenant was starting was silently lost.
+     [r"second tenant delivered nothing",
+      r"SECOND tenant delivers, after a warm-up gap"]),
     ("Each Realtime tenant has its own replication slot", True,
      [r"each Realtime tenant has its own replication slot"],
      [r"only \d+ Realtime replication slot for two tenants"]),
@@ -144,7 +152,8 @@ TESTS = [
      [r"did not become ready after a restart"]),
     ("Delivery resumes after Realtime is restarted", False,
      [r"delivery resumed after the Realtime service was restarted"],
-     [r"nothing was delivered after the restart"]),
+     [r"nothing was delivered after the restart",
+      r"delivery resumed after the restart, with a warm-up gap"]),
     # The three migrations named in the acceptance requirement, each checked
     # by number. I once argued that a count of 91 was my own invented
     # criterion and that the last eight could be left unapplied. That was
@@ -168,19 +177,21 @@ TESTS = [
      [r"may execute realtime\.list_changes"],
      [r"may NOT execute realtime\.list_changes"]),
     ("All 91 tenant migrations applied, which Realtime requires to run CDC", True,
-     [r"realtime\.schema_migrations: 91 of 91"],
-     [r"stops its change-data-capture extension while any",
+     [r"all 91 of Realtime's tenant migrations are applied"],
+     [r"of 91 Realtime tenant migrations are applied",
+      r"stops its change-data-capture extension while any",
       r"could not apply migrations 84-91"]),
     ("Realtime's setup completed before a client subscribed", True,
      [r"post-start completed Realtime's setup"],
      [r"post-start could not complete Realtime's setup"]),
     ("Realtime's role is a member of supabase_realtime_admin", True,
-     [r"member of supabase_realtime_admin, so its migrations can complete"],
+     [r"is a member of supabase_realtime_admin \(asked of the database\)"],
      [r"is NOT a member of supabase_realtime_admin"]),
     ("The Realtime client harness actually ran", True,
-     [r"client 2\.118\.0 installed"],
+     [r"the Realtime client harness ran: CLIENT_VERSION"],
      [r"could not be prepared, so NO delivery test ran",
-      r"could NOT be installed"]),
+      r"could NOT be installed",
+      r"produced no CLIENT_VERSION line"]),
     ("Both client versions tested under identical conditions", True,
      [r"client version WAS the cause", r"both client versions deliver"],
      [r"BOTH client versions fail to receive the event",
@@ -584,7 +595,10 @@ def state_of(patterns, texts, fail_patterns=()):
     for text in texts:
         for line in text.split("\n"):
             st = line.strip()
-            if not ("**FAIL**" in st or st.startswith("FAIL ") or st.startswith("BLOCKED ")):
+            # KNOWN DEFECT lines are the suite's own word for "this optional
+            # component misbehaved". They count against the test they match.
+            if not ("**FAIL**" in st or st.startswith("FAIL ") or st.startswith("BLOCKED ")
+                    or "KNOWN DEFECT" in st):
                 continue
             for p in tuple(fail_patterns) + tuple(patterns):
                 if re.search(p, st, re.I):

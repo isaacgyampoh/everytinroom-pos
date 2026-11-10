@@ -203,8 +203,9 @@ def inspect(project, token):
     # postgres_changes looks from the outside. Everytinroom's three tables are
     # published on Supabase Cloud for exactly that reason -- and its till no
     # longer subscribes. It polls revision counters through PostgREST instead,
-    # because on the self-hosted stack Realtime stops delivering after a
-    # restart while still reporting healthy and acknowledging subscriptions.
+    # because on the self-hosted stack Realtime silently loses the changes
+    # made in a warm-up window after it starts or restarts, while reporting
+    # healthy and acknowledging subscriptions.
     # See supabase/migrations/034_live_state.sql.
     #
     # So a publication is recorded and reported, and decides nothing. Whether

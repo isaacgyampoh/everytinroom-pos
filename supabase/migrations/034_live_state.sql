@@ -7,15 +7,23 @@
 --   by reading the write-ahead log, and on the self-hosted stack it does work
 --   -- measured at 275ms, with this application's own client version.
 --
---   It was replaced because of HOW it fails, not whether it works. Restarting
---   the Realtime service left it accepting subscriptions and answering
---   "Subscribed to PostgreSQL" while delivering nothing at all, with no error
---   in its log and no recovery after ninety-five seconds. Its own
---   change-data-capture poller stops permanently after six failed attempts to
---   prepare replication -- the comment on that code says the child is not
---   restarted -- while the channel layer carries on acknowledging clients. A
---   till that has silently stopped updating looks exactly like a quiet
---   afternoon, and nobody finds out until two cashiers disagree about stock.
+--   It was replaced because of HOW it fails, not whether it works. After the
+--   Realtime service starts or restarts, and for a newly provisioned tenant,
+--   there is a warm-up window in which it accepts subscriptions, answers
+--   "Subscribed to PostgreSQL", and silently LOSES every change made in that
+--   window. Measured: a row written to an acknowledged subscription was never
+--   delivered in seventy-five seconds, and the next row written arrived in
+--   300ms. Nothing is logged, and the lost change is not sent later.
+--
+--   (An earlier version of this note said the service never recovered. That
+--   was wrong -- it came from a test that wrote one row and waited. Writing a
+--   second row showed the subscription does come back; what does not come
+--   back is whatever changed in the meantime.)
+--
+--   A missed sale is invisible: the till simply does not show it, which looks
+--   exactly like a quiet afternoon, and nobody finds out until two cashiers
+--   disagree about stock. A revision counter cannot lose a change that way.
+--   Whenever the till next asks, the number is different.
 --
 --   What the application actually needs is narrow: to know THAT something
 --   changed, so it can call the refresher it already has. It does not need

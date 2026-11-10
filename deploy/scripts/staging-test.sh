@@ -66,7 +66,7 @@ gate_section() {
 # One place that writes the report, so every exit path produces one.
 finish_report() {
   printf '\n\033[1m===== Result =====\033[0m\n'
-  printf '  passed %s   failed %s   skipped %s\n\n' "$PASS" "$FAIL" "$SKIP"
+  printf '  passed %s   failed %s   skipped %s   known defects in optional components %s\n\n' "$PASS" "$FAIL" "$SKIP" "${KNOWN:-0}"
   {
     echo "# Staging validation"
     echo
@@ -74,6 +74,7 @@ finish_report() {
     echo "- Docker: $(docker --version 2>/dev/null | cut -d, -f1)"
     echo "- Scope: ${1:-full run}"
     echo "- Result: **$PASS passed, $FAIL failed, $SKIP skipped**"
+    echo "- Known defects in optional components: ${KNOWN:-0} (not counted above; listed where they occur)"
     echo
     if [ "$UNTIL" != "99" ]; then
       echo "This was the FAST prerequisites job. It stops after section $UNTIL and is"
@@ -94,6 +95,15 @@ pass() { PASS=$((PASS+1)); printf '  %sPASS%s %s\n' "$C_G" "$C_0" "$*"; RESULTS=
 fail() { FAIL=$((FAIL+1)); printf '  %sFAIL%s %s\n' "$C_R" "$C_0" "$*"; RESULTS="$RESULTS- **FAIL** $*\n"; }
 skip() { SKIP=$((SKIP+1)); printf '  %sSKIP%s %s\n' "$C_Y" "$C_0" "$*"; RESULTS="$RESULTS- SKIP $*\n"; }
 note() { printf '       %s\n' "$*"; RESULTS="$RESULTS      $*\n"; }
+# A DEFECT IN A COMPONENT THIS MIGRATION DOES NOT USE.
+#
+# Neither a pass nor a failure of the migration, and it needs to be neither:
+# counted as a pass it would say a silently lost change is fine, and counted
+# as a failure it would hold up a migration over a service the till no longer
+# runs. It is counted on its own line in the result and the roll-up reads it
+# as a failure of the optional test it belongs to.
+KNOWN=0
+known() { KNOWN=$((KNOWN+1)); printf '  %sKNOWN DEFECT%s %s\n' "$C_Y" "$C_0" "$*"; RESULTS="$RESULTS- KNOWN DEFECT (optional component) $*\n"; }
 
 # Diagnostic output belongs in the REPORT, not only in the CI log.
 #
@@ -1055,6 +1065,25 @@ PY
     detail pgq "select 'reserved roles: ' || coalesce(current_setting('supautils.reserved_roles', true), '(not set)')"
     detail pgq "select 'rt_user attributes: createrole=' || rolcreaterole || ' superuser=' || rolsuper || ' bypassrls=' || rolbypassrls from pg_roles where rolname = '${APP}_realtime'"
     detail pgq "select 'supabase_realtime_admin exists: ' || count(*) from pg_roles where rolname='supabase_realtime_admin'"
+    # ASSERTIONS, WHERE THERE WERE ONLY NOTES.
+    #
+    # The acceptance roll-up reads PASS and FAIL lines. These three facts were
+    # printed as detail -- true, visible in the report, and invisible to the
+    # roll-up, which therefore filed three verified things as "nobody looked".
+    # A fact the verdict depends on has to be asserted, not mentioned.
+    RT_MIGS="$(pgq "select count(*) from realtime.schema_migrations" "$APP" | tr -d ' ')"
+    [ "${RT_MIGS:-0}" = "91" ] \
+      && pass "all 91 of Realtime's tenant migrations are applied in $APP" \
+      || fail "only ${RT_MIGS:-0} of 91 Realtime tenant migrations are applied in $APP"
+    RT_MEMBER="$(pgq "select pg_has_role('${APP}_realtime','supabase_realtime_admin','MEMBER')" | tr -d ' ')"
+    [ "$RT_MEMBER" = "t" ] \
+      && pass "Realtime's role is a member of supabase_realtime_admin (asked of the database)" \
+      || fail "Realtime's role is NOT a member of supabase_realtime_admin (got '${RT_MEMBER:-no answer}')"
+    if grep -q '^CLIENT_VERSION ' /tmp/ab-new.log 2>/dev/null; then
+      pass "the Realtime client harness ran: $(grep -m1 '^CLIENT_VERSION ' /tmp/ab-new.log)"
+    else
+      fail "the Realtime client harness produced no CLIENT_VERSION line, so it did not run"
+    fi
     detail pgq "select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='realtime' order by 1" "$APP"
     note "----- what Realtime actually built in ${APP} -----"
     detail pgq "select coalesce((select 'realtime schema: yes' from pg_namespace where nspname='realtime'), 'realtime schema: NO')" "$APP"
@@ -1265,7 +1294,7 @@ EOL
         # because a newly provisioned shop's first minute is a real thing to
         # know about and not a reason to call the platform broken.
         G_DELIVERS=1
-        pass "the SECOND tenant delivers, after a warm-up gap: a row written $(sed -n 's/^SECOND_INSERT after \([0-9]*\)ms.*/\1/p' /tmp/rt-gamma.log | head -1)ms earlier was missed, the next one arrived in $(sed -n 's/^SECOND_DELIVERED_MS //p' /tmp/rt-gamma.log | head -1)ms"
+        known "the SECOND tenant delivers, after a warm-up gap: a row written $(sed -n 's/^SECOND_INSERT after \([0-9]*\)ms.*/\1/p' /tmp/rt-gamma.log | head -1)ms earlier was missed, the next one arrived in $(sed -n 's/^SECOND_DELIVERED_MS //p' /tmp/rt-gamma.log | head -1)ms"
       else
         fail "the second tenant delivered nothing, on two separate inserts: $(tail -2 /tmp/rt-gamma.log | tr '\n' ' ')"
       fi
@@ -1360,7 +1389,7 @@ EOL
     if grep -q '^EVENT_RECEIVED:' /tmp/rt-restart.log; then
       pass "delivery resumed after the Realtime service was restarted, unattended"
     elif grep -q 'EVENT_RECEIVED_ON_SECOND_INSERT' /tmp/rt-restart.log; then
-      pass "delivery resumed after the restart, with a warm-up gap: a row written $(sed -n 's/^SECOND_INSERT after \([0-9]*\)ms.*/\1/p' /tmp/rt-restart.log | head -1)ms earlier was missed, the next one arrived in $(sed -n 's/^SECOND_DELIVERED_MS //p' /tmp/rt-restart.log | head -1)ms"
+      known "delivery resumed after the restart, with a warm-up gap: a row written $(sed -n 's/^SECOND_INSERT after \([0-9]*\)ms.*/\1/p' /tmp/rt-restart.log | head -1)ms earlier was missed, the next one arrived in $(sed -n 's/^SECOND_DELIVERED_MS //p' /tmp/rt-restart.log | head -1)ms"
     else
       fail "nothing was delivered after the restart, on two separate inserts: $(tail -2 /tmp/rt-restart.log | tr '\n' ' ')"
     fi

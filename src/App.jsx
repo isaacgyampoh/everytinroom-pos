@@ -164,13 +164,13 @@ export default function App() {
   //
   // This used to hold a websocket and subscribe to postgres_changes on the
   // three tables. It was replaced because of how that failed rather than
-  // whether it worked: on the self-hosted stack, restarting the Realtime
-  // service left it accepting subscriptions and answering "Subscribed to
-  // PostgreSQL" while delivering nothing at all, with no error logged and no
-  // recovery. Its own poller stops permanently after six failed attempts to
-  // prepare replication, and the comment on that code says the child is not
-  // restarted. A till that has silently stopped updating looks exactly like a
-  // quiet afternoon.
+  // whether it worked: on the self-hosted stack, for a while after the
+  // Realtime service starts or restarts it accepts subscriptions, answers
+  // "Subscribed to PostgreSQL", and silently loses every change made in that
+  // window -- measured as a row never delivered in 75 seconds while the next
+  // one arrived in 300ms. Nothing is logged and the lost change is not sent
+  // later. A till that has missed a sale looks exactly like a quiet
+  // afternoon.
   //
   // Polling cannot fail that way. Every interval is a fresh request through
   // the same authenticated API the till already uses, so a reconnection, a
