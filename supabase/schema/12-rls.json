@@ -1,0 +1,110 @@
+[
+ {
+  "relname": "app_releases",
+  "rls_enabled": true
+ },
+ {
+  "relname": "bundles",
+  "rls_enabled": true
+ },
+ {
+  "relname": "customers",
+  "rls_enabled": true
+ },
+ {
+  "relname": "doc_counters",
+  "rls_enabled": true
+ },
+ {
+  "relname": "drawer_sessions",
+  "rls_enabled": true
+ },
+ {
+  "relname": "expenses",
+  "rls_enabled": true
+ },
+ {
+  "relname": "image_rollback_20260831",
+  "rls_enabled": true
+ },
+ {
+  "relname": "invoices",
+  "rls_enabled": true
+ },
+ {
+  "relname": "pin_attempts",
+  "rls_enabled": true
+ },
+ {
+  "relname": "products",
+  "rls_enabled": true
+ },
+ {
+  "relname": "promos",
+  "rls_enabled": true
+ },
+ {
+  "relname": "receivings",
+  "rls_enabled": true
+ },
+ {
+  "relname": "refunds",
+  "rls_enabled": true
+ },
+ {
+  "relname": "sales",
+  "rls_enabled": true
+ },
+ {
+  "relname": "staff",
+  "rls_enabled": true
+ },
+ {
+  "relname": "staff_sessions",
+  "rls_enabled": true
+ },
+ {
+  "relname": "stock_adjustments",
+  "rls_enabled": true
+ },
+ {
+  "relname": "stock_ledger",
+  "rls_enabled": true
+ },
+ {
+  "relname": "stock_takes",
+  "rls_enabled": true
+ },
+ {
+  "relname": "store_settings",
+  "rls_enabled": true
+ },
+ {
+  "relname": "suppliers",
+  "rls_enabled": true
+ },
+ {
+  "relname": "terminals",
+  "rls_enabled": true
+ },
+ {
+  "relname": "ussd_sessions",
+  "rls_enabled": true
+ },
+ {
+  "relname": "wa_agent_settings",
+  "rls_enabled": true
+ },
+ {
+  "relname": "wa_conversations",
+  "rls_enabled": true
+ },
+ {
+  "relname": "wa_messages",
+  "rls_enabled": true
+ },
+ {
+  "relname": "whatsapp_orders",
+  "rls_enabled": true
+ }
+]

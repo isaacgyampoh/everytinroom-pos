@@ -1,0 +1,56 @@
+{
+  "name": "everytinroom-pos-desktop",
+  "productName": "EVERYTINROOM POS",
+  "version": "2.1.0",
+  "private": true,
+  "description": "Till software for EVERYTINROOM \u2014 sells with or without internet.",
+  "author": "EVERYTINROOM",
+  "main": "main.js",
+  "scripts": {
+    "build-web": "npm --prefix .. run build",
+    "prepare-app": "npm run build-web && node prepare.js",
+    "start": "npm run prepare-app && electron .",
+    "build:win": "npm run prepare-app && electron-builder --win --publish never",
+    "build:dir": "npm run prepare-app && electron-builder --dir --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "shop.everytinroom.pos",
+    "productName": "EVERYTINROOM POS",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "app/**/*",
+      "build/icon.ico"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "EVERYTINROOM-POS-${version}-x64.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "EVERYTINROOM POS",
+      "deleteAppDataOnUninstall": false,
+      "allowElevation": true,
+      "runAfterFinish": true
+    }
+  }
+}

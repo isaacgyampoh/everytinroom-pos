@@ -1,0 +1,32 @@
+[
+ {
+  "active": true,
+  "jobname": "etr-payment-reminders",
+  "schedule": "0 */4 * * *"
+ },
+ {
+  "active": true,
+  "jobname": "etr-report-monthly",
+  "schedule": "0 7 1 * *"
+ },
+ {
+  "active": true,
+  "jobname": "sms-afternoon",
+  "schedule": "0 13 * * *"
+ },
+ {
+  "active": true,
+  "jobname": "sms-evening",
+  "schedule": "0 20 * * *"
+ },
+ {
+  "active": true,
+  "jobname": "sms-morning",
+  "schedule": "0 6 * * *"
+ },
+ {
+  "active": true,
+  "jobname": "sms-weekly",
+  "schedule": "0 6 * * 1"
+ }
+]

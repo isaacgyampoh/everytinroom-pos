@@ -1,0 +1,76 @@
+/**
+ * EVERYTINROOM — typographic logo system (SVG, sharp at any size).
+ *   <Logo />      arched "crest" wordmark (default) — EVERYTINROOM on a
+ *                 gentle arc.
+ *   <LogoFlat />  straight one-line wordmark (clipping fixed).
+ *   <LogoMark />  compact "E" monogram for square slots.
+ */
+
+const INK = '#16181d'
+const GOLD = '#9a9da3'
+
+let _id = 0
+const uid = () => `arc${++_id}`
+
+export function Logo({ height = 96, color = INK, accent = GOLD, tagline = false, className = '' }) {
+  const id = uid()
+  // viewBox is wide; the arc path spans almost the full width so its arc-
+  // length comfortably EXCEEDS the word — otherwise textPath clips the
+  // letters that fall past the path ends (which was cutting the E and M).
+  const W = 600, H = tagline ? 150 : 120
+  const cx = W / 2
+  const arcY = 92, arcLift = 30
+  const pad = 24
+  const arcPath = `M ${pad} ${arcY} Q ${cx} ${arcY - arcLift} ${W - pad} ${arcY}`
+  const ruleY = arcY + 22
+  return (
+    <svg className={className} height={height} viewBox={`0 0 ${W} ${H}`} fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EVERYTINROOM">
+      <defs><path id={id} d={arcPath} /></defs>
+      <text fill={color} fontFamily="'Inter', system-ui, sans-serif" fontWeight="700" fontSize="40" letterSpacing="3" style={{ fontOpticalSizing: 'auto' }}>
+        <textPath href={`#${id}`} startOffset="50%" textAnchor="middle">EVERYTINROOM</textPath>
+      </text>
+      <line x1={cx - 80} y1={ruleY} x2={cx - 14} y2={ruleY} stroke={accent} strokeWidth="1.4" />
+      <rect x={cx - 3.5} y={ruleY - 3.5} width="7" height="7" fill={accent} transform={`rotate(45 ${cx} ${ruleY})`} />
+      <line x1={cx + 14} y1={ruleY} x2={cx + 80} y2={ruleY} stroke={accent} strokeWidth="1.4" />
+      {tagline && (
+        <text x={cx} y={ruleY + 26} textAnchor="middle" fill={color} opacity="0.6"
+          fontFamily="'Inter', system-ui, sans-serif" fontWeight="600" fontSize="12" letterSpacing="6"></text>
+      )}
+    </svg>
+  )
+}
+
+export function LogoFlat({ height = 44, color = INK, accent = GOLD, tagline = false, className = '' }) {
+  const id = uid()
+  const W = 460, H = tagline ? 96 : 66
+  const cx = W / 2
+  const ruleY = 58
+  return (
+    <svg className={className} height={height} viewBox={`0 0 ${W} ${H}`} fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EVERYTINROOM">
+      <text x={cx} y={tagline ? 38 : 44} textAnchor="middle" fill={color}
+        fontFamily="'Inter', system-ui, sans-serif" fontWeight="700" fontSize="38" letterSpacing="3.5"
+        style={{ fontOpticalSizing: 'auto' }}>EVERYTINROOM</text>
+      <line x1={cx - 78} y1={ruleY} x2={cx - 14} y2={ruleY} stroke={accent} strokeWidth="1.4" />
+      <rect x={cx - 3.5} y={ruleY - 3.5} width="7" height="7" fill={accent} transform={`rotate(45 ${cx} ${ruleY})`} />
+      <line x1={cx + 14} y1={ruleY} x2={cx + 78} y2={ruleY} stroke={accent} strokeWidth="1.4" />
+      {tagline && (
+        <text x={cx} y={84} textAnchor="middle" fill={color} opacity="0.6"
+          fontFamily="'Inter', system-ui, sans-serif" fontWeight="600" fontSize="12" letterSpacing="6"></text>
+      )}
+    </svg>
+  )
+}
+
+export function LogoMark({ size = 40, bg = INK, fg = '#ffffff', accent = GOLD, rounded = 12, className = '' }) {
+  return (
+    <svg className={className} width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EVERYTINROOM">
+      <rect width="48" height="48" rx={rounded} fill={bg} />
+      <text x="24" y="33" textAnchor="middle" fill={fg}
+        fontFamily="'Inter', system-ui, sans-serif" fontWeight="700" fontSize="26"
+        style={{ fontOpticalSizing: 'auto' }}>E</text>
+      <line x1="17" y1="37" x2="31" y2="37" stroke={accent} strokeWidth="1.6" />
+    </svg>
+  )
+}
+
+export default Logo

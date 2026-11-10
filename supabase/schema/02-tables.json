@@ -1,0 +1,1731 @@
+[
+ {
+  "column_name": "id",
+  "data_type": "text",
+  "default_value": "short_id()",
+  "is_nullable": "NO",
+  "table_name": "app_releases"
+ },
+ {
+  "column_name": "platform",
+  "data_type": "text",
+  "default_value": "'windows'::text",
+  "is_nullable": "NO",
+  "table_name": "app_releases"
+ },
+ {
+  "column_name": "version",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "app_releases"
+ },
+ {
+  "column_name": "object_path",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "app_releases"
+ },
+ {
+  "column_name": "size_bytes",
+  "data_type": "bigint",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "app_releases"
+ },
+ {
+  "column_name": "notes",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "app_releases"
+ },
+ {
+  "column_name": "published_by",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "app_releases"
+ },
+ {
+  "column_name": "published_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "app_releases"
+ },
+ {
+  "column_name": "active",
+  "data_type": "boolean",
+  "default_value": "true",
+  "is_nullable": "YES",
+  "table_name": "app_releases"
+ },
+ {
+  "column_name": "id",
+  "data_type": "text",
+  "default_value": "short_id()",
+  "is_nullable": "NO",
+  "table_name": "bundles"
+ },
+ {
+  "column_name": "name",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "bundles"
+ },
+ {
+  "column_name": "products",
+  "data_type": "jsonb",
+  "default_value": "'[]'::jsonb",
+  "is_nullable": "YES",
+  "table_name": "bundles"
+ },
+ {
+  "column_name": "bundle_price",
+  "data_type": "numeric",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "bundles"
+ },
+ {
+  "column_name": "active",
+  "data_type": "boolean",
+  "default_value": "true",
+  "is_nullable": "YES",
+  "table_name": "bundles"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "bundles"
+ },
+ {
+  "column_name": "id",
+  "data_type": "text",
+  "default_value": "short_id()",
+  "is_nullable": "NO",
+  "table_name": "customers"
+ },
+ {
+  "column_name": "phone",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "customers"
+ },
+ {
+  "column_name": "visit_count",
+  "data_type": "integer",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "customers"
+ },
+ {
+  "column_name": "total_spent",
+  "data_type": "numeric",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "customers"
+ },
+ {
+  "column_name": "last_visit",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "customers"
+ },
+ {
+  "column_name": "key",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "doc_counters"
+ },
+ {
+  "column_name": "value",
+  "data_type": "integer",
+  "default_value": "0",
+  "is_nullable": "NO",
+  "table_name": "doc_counters"
+ },
+ {
+  "column_name": "id",
+  "data_type": "text",
+  "default_value": "short_id()",
+  "is_nullable": "NO",
+  "table_name": "drawer_sessions"
+ },
+ {
+  "column_name": "terminal",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "drawer_sessions"
+ },
+ {
+  "column_name": "opened_by",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "drawer_sessions"
+ },
+ {
+  "column_name": "opened_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "drawer_sessions"
+ },
+ {
+  "column_name": "opening_float",
+  "data_type": "numeric",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "drawer_sessions"
+ },
+ {
+  "column_name": "closed_by",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "drawer_sessions"
+ },
+ {
+  "column_name": "closed_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "drawer_sessions"
+ },
+ {
+  "column_name": "counted_cash",
+  "data_type": "numeric",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "drawer_sessions"
+ },
+ {
+  "column_name": "expected_cash",
+  "data_type": "numeric",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "drawer_sessions"
+ },
+ {
+  "column_name": "variance",
+  "data_type": "numeric",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "drawer_sessions"
+ },
+ {
+  "column_name": "note",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "drawer_sessions"
+ },
+ {
+  "column_name": "id",
+  "data_type": "text",
+  "default_value": "short_id()",
+  "is_nullable": "NO",
+  "table_name": "expenses"
+ },
+ {
+  "column_name": "date",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "expenses"
+ },
+ {
+  "column_name": "category",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "expenses"
+ },
+ {
+  "column_name": "description",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "expenses"
+ },
+ {
+  "column_name": "amount",
+  "data_type": "numeric",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "expenses"
+ },
+ {
+  "column_name": "id",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "image_rollback_20260831"
+ },
+ {
+  "column_name": "name",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "image_rollback_20260831"
+ },
+ {
+  "column_name": "original_image",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "image_rollback_20260831"
+ },
+ {
+  "column_name": "captured_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "image_rollback_20260831"
+ },
+ {
+  "column_name": "id",
+  "data_type": "text",
+  "default_value": "short_id()",
+  "is_nullable": "NO",
+  "table_name": "invoices"
+ },
+ {
+  "column_name": "invoice_id",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "invoices"
+ },
+ {
+  "column_name": "date",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "invoices"
+ },
+ {
+  "column_name": "supplier",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "invoices"
+ },
+ {
+  "column_name": "amount",
+  "data_type": "numeric",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "invoices"
+ },
+ {
+  "column_name": "notes",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "invoices"
+ },
+ {
+  "column_name": "image",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "invoices"
+ },
+ {
+  "column_name": "photo_index",
+  "data_type": "integer",
+  "default_value": "1",
+  "is_nullable": "YES",
+  "table_name": "invoices"
+ },
+ {
+  "column_name": "total_photos",
+  "data_type": "integer",
+  "default_value": "1",
+  "is_nullable": "YES",
+  "table_name": "invoices"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "invoices"
+ },
+ {
+  "column_name": "id",
+  "data_type": "bigint",
+  "default_value": "nextval('pin_attempts_id_seq'::regclass)",
+  "is_nullable": "NO",
+  "table_name": "pin_attempts"
+ },
+ {
+  "column_name": "at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "NO",
+  "table_name": "pin_attempts"
+ },
+ {
+  "column_name": "succeeded",
+  "data_type": "boolean",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "pin_attempts"
+ },
+ {
+  "column_name": "id",
+  "data_type": "text",
+  "default_value": "short_id()",
+  "is_nullable": "NO",
+  "table_name": "products"
+ },
+ {
+  "column_name": "name",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "products"
+ },
+ {
+  "column_name": "category",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "products"
+ },
+ {
+  "column_name": "cost_price",
+  "data_type": "numeric",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "products"
+ },
+ {
+  "column_name": "price",
+  "data_type": "numeric",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "products"
+ },
+ {
+  "column_name": "wholesale_price",
+  "data_type": "numeric",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "products"
+ },
+ {
+  "column_name": "quantity",
+  "data_type": "integer",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "products"
+ },
+ {
+  "column_name": "image",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "products"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "products"
+ },
+ {
+  "column_name": "wholesale_min_qty",
+  "data_type": "integer",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "products"
+ },
+ {
+  "column_name": "group_tag",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "products"
+ },
+ {
+  "column_name": "barcode",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "products"
+ },
+ {
+  "column_name": "id",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "products_sale"
+ },
+ {
+  "column_name": "name",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "products_sale"
+ },
+ {
+  "column_name": "category",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "products_sale"
+ },
+ {
+  "column_name": "price",
+  "data_type": "numeric",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "products_sale"
+ },
+ {
+  "column_name": "wholesale_price",
+  "data_type": "numeric",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "products_sale"
+ },
+ {
+  "column_name": "wholesale_min_qty",
+  "data_type": "integer",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "products_sale"
+ },
+ {
+  "column_name": "quantity",
+  "data_type": "integer",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "products_sale"
+ },
+ {
+  "column_name": "image",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "products_sale"
+ },
+ {
+  "column_name": "group_tag",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "products_sale"
+ },
+ {
+  "column_name": "barcode",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "products_sale"
+ },
+ {
+  "column_name": "id",
+  "data_type": "text",
+  "default_value": "short_id()",
+  "is_nullable": "NO",
+  "table_name": "promos"
+ },
+ {
+  "column_name": "name",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "promos"
+ },
+ {
+  "column_name": "start_date",
+  "data_type": "date",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "promos"
+ },
+ {
+  "column_name": "end_date",
+  "data_type": "date",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "promos"
+ },
+ {
+  "column_name": "items",
+  "data_type": "jsonb",
+  "default_value": "'[]'::jsonb",
+  "is_nullable": "YES",
+  "table_name": "promos"
+ },
+ {
+  "column_name": "active",
+  "data_type": "boolean",
+  "default_value": "true",
+  "is_nullable": "YES",
+  "table_name": "promos"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "promos"
+ },
+ {
+  "column_name": "id",
+  "data_type": "uuid",
+  "default_value": "gen_random_uuid()",
+  "is_nullable": "NO",
+  "table_name": "receivings"
+ },
+ {
+  "column_name": "ref_no",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "receivings"
+ },
+ {
+  "column_name": "supplier_name",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "receivings"
+ },
+ {
+  "column_name": "supplier_id",
+  "data_type": "uuid",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "receivings"
+ },
+ {
+  "column_name": "status",
+  "data_type": "text",
+  "default_value": "'pending'::text",
+  "is_nullable": "YES",
+  "table_name": "receivings"
+ },
+ {
+  "column_name": "items",
+  "data_type": "jsonb",
+  "default_value": "'[]'::jsonb",
+  "is_nullable": "YES",
+  "table_name": "receivings"
+ },
+ {
+  "column_name": "total_expected",
+  "data_type": "integer",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "receivings"
+ },
+ {
+  "column_name": "total_received",
+  "data_type": "integer",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "receivings"
+ },
+ {
+  "column_name": "note",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "receivings"
+ },
+ {
+  "column_name": "created_by",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "receivings"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "receivings"
+ },
+ {
+  "column_name": "approved_by",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "receivings"
+ },
+ {
+  "column_name": "approved_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "receivings"
+ },
+ {
+  "column_name": "reject_reason",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "receivings"
+ },
+ {
+  "column_name": "id",
+  "data_type": "text",
+  "default_value": "short_id()",
+  "is_nullable": "NO",
+  "table_name": "refunds"
+ },
+ {
+  "column_name": "refund_no",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "refunds"
+ },
+ {
+  "column_name": "date",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "refunds"
+ },
+ {
+  "column_name": "original_receipt_no",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "refunds"
+ },
+ {
+  "column_name": "original_sale_id",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "refunds"
+ },
+ {
+  "column_name": "items",
+  "data_type": "jsonb",
+  "default_value": "'[]'::jsonb",
+  "is_nullable": "YES",
+  "table_name": "refunds"
+ },
+ {
+  "column_name": "refund_amount",
+  "data_type": "numeric",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "refunds"
+ },
+ {
+  "column_name": "reason",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "refunds"
+ },
+ {
+  "column_name": "processed_by",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "refunds"
+ },
+ {
+  "column_name": "customer",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "refunds"
+ },
+ {
+  "column_name": "status",
+  "data_type": "text",
+  "default_value": "'Completed'::text",
+  "is_nullable": "YES",
+  "table_name": "refunds"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "refunds"
+ },
+ {
+  "column_name": "id",
+  "data_type": "text",
+  "default_value": "short_id()",
+  "is_nullable": "NO",
+  "table_name": "sales"
+ },
+ {
+  "column_name": "receipt_no",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "sales"
+ },
+ {
+  "column_name": "date",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "sales"
+ },
+ {
+  "column_name": "items",
+  "data_type": "jsonb",
+  "default_value": "'[]'::jsonb",
+  "is_nullable": "YES",
+  "table_name": "sales"
+ },
+ {
+  "column_name": "subtotal",
+  "data_type": "numeric",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "sales"
+ },
+ {
+  "column_name": "discount",
+  "data_type": "numeric",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "sales"
+ },
+ {
+  "column_name": "total",
+  "data_type": "numeric",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "sales"
+ },
+ {
+  "column_name": "profit",
+  "data_type": "numeric",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "sales"
+ },
+ {
+  "column_name": "payment",
+  "data_type": "text",
+  "default_value": "'Cash'::text",
+  "is_nullable": "YES",
+  "table_name": "sales"
+ },
+ {
+  "column_name": "split_cash",
+  "data_type": "numeric",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "sales"
+ },
+ {
+  "column_name": "split_momo",
+  "data_type": "numeric",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "sales"
+ },
+ {
+  "column_name": "customer",
+  "data_type": "text",
+  "default_value": "'Walk-in'::text",
+  "is_nullable": "YES",
+  "table_name": "sales"
+ },
+ {
+  "column_name": "type",
+  "data_type": "text",
+  "default_value": "'Retail'::text",
+  "is_nullable": "YES",
+  "table_name": "sales"
+ },
+ {
+  "column_name": "cashier",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "sales"
+ },
+ {
+  "column_name": "voided",
+  "data_type": "boolean",
+  "default_value": "false",
+  "is_nullable": "YES",
+  "table_name": "sales"
+ },
+ {
+  "column_name": "terminal",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "sales"
+ },
+ {
+  "column_name": "client_ref",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "sales"
+ },
+ {
+  "column_name": "profit_complete",
+  "data_type": "boolean",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "sales"
+ },
+ {
+  "column_name": "id",
+  "data_type": "text",
+  "default_value": "short_id()",
+  "is_nullable": "NO",
+  "table_name": "staff"
+ },
+ {
+  "column_name": "name",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "staff"
+ },
+ {
+  "column_name": "role",
+  "data_type": "text",
+  "default_value": "'Cashier'::text",
+  "is_nullable": "YES",
+  "table_name": "staff"
+ },
+ {
+  "column_name": "active",
+  "data_type": "boolean",
+  "default_value": "true",
+  "is_nullable": "YES",
+  "table_name": "staff"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "staff"
+ },
+ {
+  "column_name": "permissions",
+  "data_type": "jsonb",
+  "default_value": "'[]'::jsonb",
+  "is_nullable": "YES",
+  "table_name": "staff"
+ },
+ {
+  "column_name": "pin_hash",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "staff"
+ },
+ {
+  "column_name": "id",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "staff_safe"
+ },
+ {
+  "column_name": "name",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "staff_safe"
+ },
+ {
+  "column_name": "role",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "staff_safe"
+ },
+ {
+  "column_name": "active",
+  "data_type": "boolean",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "staff_safe"
+ },
+ {
+  "column_name": "permissions",
+  "data_type": "jsonb",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "staff_safe"
+ },
+ {
+  "column_name": "token",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "staff_sessions"
+ },
+ {
+  "column_name": "staff_id",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "staff_sessions"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "NO",
+  "table_name": "staff_sessions"
+ },
+ {
+  "column_name": "expires_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "staff_sessions"
+ },
+ {
+  "column_name": "last_seen",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "NO",
+  "table_name": "staff_sessions"
+ },
+ {
+  "column_name": "id",
+  "data_type": "text",
+  "default_value": "short_id()",
+  "is_nullable": "NO",
+  "table_name": "stock_adjustments"
+ },
+ {
+  "column_name": "date",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "stock_adjustments"
+ },
+ {
+  "column_name": "product_id",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "stock_adjustments"
+ },
+ {
+  "column_name": "product_name",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "stock_adjustments"
+ },
+ {
+  "column_name": "qty",
+  "data_type": "integer",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "stock_adjustments"
+ },
+ {
+  "column_name": "reason",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "stock_adjustments"
+ },
+ {
+  "column_name": "notes",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "stock_adjustments"
+ },
+ {
+  "column_name": "adjusted_by",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "stock_adjustments"
+ },
+ {
+  "column_name": "id",
+  "data_type": "uuid",
+  "default_value": "gen_random_uuid()",
+  "is_nullable": "NO",
+  "table_name": "stock_ledger"
+ },
+ {
+  "column_name": "product_id",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "stock_ledger"
+ },
+ {
+  "column_name": "product_name",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "stock_ledger"
+ },
+ {
+  "column_name": "previous_qty",
+  "data_type": "integer",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "stock_ledger"
+ },
+ {
+  "column_name": "change_qty",
+  "data_type": "integer",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "stock_ledger"
+ },
+ {
+  "column_name": "new_qty",
+  "data_type": "integer",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "stock_ledger"
+ },
+ {
+  "column_name": "reason",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "stock_ledger"
+ },
+ {
+  "column_name": "action_type",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "stock_ledger"
+ },
+ {
+  "column_name": "staff",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "stock_ledger"
+ },
+ {
+  "column_name": "reference",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "stock_ledger"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "stock_ledger"
+ },
+ {
+  "column_name": "id",
+  "data_type": "text",
+  "default_value": "short_id()",
+  "is_nullable": "NO",
+  "table_name": "stock_takes"
+ },
+ {
+  "column_name": "date",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "stock_takes"
+ },
+ {
+  "column_name": "items",
+  "data_type": "jsonb",
+  "default_value": "'[]'::jsonb",
+  "is_nullable": "YES",
+  "table_name": "stock_takes"
+ },
+ {
+  "column_name": "notes",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "stock_takes"
+ },
+ {
+  "column_name": "conducted_by",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "stock_takes"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "stock_takes"
+ },
+ {
+  "column_name": "status",
+  "data_type": "text",
+  "default_value": "'approved'::text",
+  "is_nullable": "YES",
+  "table_name": "stock_takes"
+ },
+ {
+  "column_name": "approved_by",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "stock_takes"
+ },
+ {
+  "column_name": "approved_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "stock_takes"
+ },
+ {
+  "column_name": "reject_reason",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "stock_takes"
+ },
+ {
+  "column_name": "id",
+  "data_type": "integer",
+  "default_value": "1",
+  "is_nullable": "NO",
+  "table_name": "store_settings"
+ },
+ {
+  "column_name": "shop_open",
+  "data_type": "boolean",
+  "default_value": "true",
+  "is_nullable": "NO",
+  "table_name": "store_settings"
+ },
+ {
+  "column_name": "closed_message",
+  "data_type": "text",
+  "default_value": "'We are currently closed. Please check back soon.'::text",
+  "is_nullable": "NO",
+  "table_name": "store_settings"
+ },
+ {
+  "column_name": "updated_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "NO",
+  "table_name": "store_settings"
+ },
+ {
+  "column_name": "id",
+  "data_type": "uuid",
+  "default_value": "gen_random_uuid()",
+  "is_nullable": "NO",
+  "table_name": "suppliers"
+ },
+ {
+  "column_name": "name",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "suppliers"
+ },
+ {
+  "column_name": "phone",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "suppliers"
+ },
+ {
+  "column_name": "notes",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "suppliers"
+ },
+ {
+  "column_name": "active",
+  "data_type": "boolean",
+  "default_value": "true",
+  "is_nullable": "YES",
+  "table_name": "suppliers"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "suppliers"
+ },
+ {
+  "column_name": "id",
+  "data_type": "text",
+  "default_value": "short_id()",
+  "is_nullable": "NO",
+  "table_name": "terminals"
+ },
+ {
+  "column_name": "name",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "terminals"
+ },
+ {
+  "column_name": "location",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "terminals"
+ },
+ {
+  "column_name": "active",
+  "data_type": "boolean",
+  "default_value": "true",
+  "is_nullable": "YES",
+  "table_name": "terminals"
+ },
+ {
+  "column_name": "last_seen",
+  "data_type": "timestamp with time zone",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "terminals"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "terminals"
+ },
+ {
+  "column_name": "session_id",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "ussd_sessions"
+ },
+ {
+  "column_name": "order_code",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "ussd_sessions"
+ },
+ {
+  "column_name": "phone",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "ussd_sessions"
+ },
+ {
+  "column_name": "updated_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "ussd_sessions"
+ },
+ {
+  "column_name": "step",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "ussd_sessions"
+ },
+ {
+  "column_name": "paystack_ref",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "ussd_sessions"
+ },
+ {
+  "column_name": "order_no",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "ussd_sessions"
+ },
+ {
+  "column_name": "key",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "wa_agent_settings"
+ },
+ {
+  "column_name": "value",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "wa_agent_settings"
+ },
+ {
+  "column_name": "id",
+  "data_type": "uuid",
+  "default_value": "gen_random_uuid()",
+  "is_nullable": "NO",
+  "table_name": "wa_conversations"
+ },
+ {
+  "column_name": "phone",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "wa_conversations"
+ },
+ {
+  "column_name": "customer_name",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "wa_conversations"
+ },
+ {
+  "column_name": "summary",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "wa_conversations"
+ },
+ {
+  "column_name": "stage",
+  "data_type": "text",
+  "default_value": "'chatting'::text",
+  "is_nullable": "YES",
+  "table_name": "wa_conversations"
+ },
+ {
+  "column_name": "last_order_no",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "wa_conversations"
+ },
+ {
+  "column_name": "agent_enabled",
+  "data_type": "boolean",
+  "default_value": "true",
+  "is_nullable": "YES",
+  "table_name": "wa_conversations"
+ },
+ {
+  "column_name": "needs_human",
+  "data_type": "boolean",
+  "default_value": "false",
+  "is_nullable": "YES",
+  "table_name": "wa_conversations"
+ },
+ {
+  "column_name": "flag_reason",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "wa_conversations"
+ },
+ {
+  "column_name": "last_message_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "wa_conversations"
+ },
+ {
+  "column_name": "last_agent_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "wa_conversations"
+ },
+ {
+  "column_name": "followed_up",
+  "data_type": "boolean",
+  "default_value": "false",
+  "is_nullable": "YES",
+  "table_name": "wa_conversations"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "wa_conversations"
+ },
+ {
+  "column_name": "id",
+  "data_type": "uuid",
+  "default_value": "gen_random_uuid()",
+  "is_nullable": "NO",
+  "table_name": "wa_messages"
+ },
+ {
+  "column_name": "phone",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "wa_messages"
+ },
+ {
+  "column_name": "role",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "wa_messages"
+ },
+ {
+  "column_name": "content",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "wa_messages"
+ },
+ {
+  "column_name": "media_url",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "wa_messages"
+ },
+ {
+  "column_name": "wa_message_id",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "wa_messages"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "wa_messages"
+ },
+ {
+  "column_name": "id",
+  "data_type": "text",
+  "default_value": "short_id()",
+  "is_nullable": "NO",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "order_no",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "NO",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "date",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "customer_name",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "customer_phone",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "items",
+  "data_type": "jsonb",
+  "default_value": "'[]'::jsonb",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "subtotal",
+  "data_type": "numeric",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "delivery_fee",
+  "data_type": "numeric",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "total",
+  "data_type": "numeric",
+  "default_value": "0",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "address",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "notes",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "status",
+  "data_type": "text",
+  "default_value": "'Pending'::text",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "paystack_ref",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "paid_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "processed_by",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "processed_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "now()",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "ussd_code",
+  "data_type": "integer",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "tracking_no",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "delivery_status",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "delivery_guy",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "delivered_at",
+  "data_type": "timestamp with time zone",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "delivery_photo",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "delivery_notes",
+  "data_type": "text",
+  "default_value": "''::text",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "nalopay_order_id",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "source",
+  "data_type": "text",
+  "default_value": "",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "details_filled",
+  "data_type": "boolean",
+  "default_value": "false",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ },
+ {
+  "column_name": "stock_deducted",
+  "data_type": "boolean",
+  "default_value": "false",
+  "is_nullable": "YES",
+  "table_name": "whatsapp_orders"
+ }
+]

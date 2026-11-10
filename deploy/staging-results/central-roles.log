@@ -1,0 +1,16 @@
+ set_config 
+------------
+ on
+(1 row)
+
+DO
+DO
+GRANT ROLE
+REVOKE
+CREATE SCHEMA
+CREATE TABLE
+NOTICE:  column "needs_auth" of relation "applications" already exists, skipping
+ALTER TABLE
+COMMENT
+GRANT
+GRANT

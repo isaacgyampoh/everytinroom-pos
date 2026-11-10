@@ -1,0 +1,409 @@
+# ===========================================================================
+# ONE APPLICATION — the same file for every application on the server.
+#
+# Nothing here is generated or templated. Each application has its own
+# directory holding its own .env, and runs as its own compose project:
+#
+#   cd /srv/central/apps/everytinroom
+#   docker compose -p app_everytinroom --env-file .env \
+#     -f /srv/central/compose/app.compose.yml up -d
+#
+# provision-app.sh writes that .env and a small Makefile-style wrapper, so in
+# practice nobody types the above.
+#
+# OPTIONAL SERVICES ARE PROFILES, not copies of this file. The .env sets
+# COMPOSE_PROFILES=realtime,storage and only then do those containers exist.
+# An application that needs neither runs one container and ~25 MB.
+#
+# WHAT IS NOT HERE, AND WHY
+#   gotrue (Supabase Auth)   Everytinroom signs staff in with a PIN checked by
+#                            verify_pin() against its own staff_sessions table.
+#                            There is not one call to supabase.auth in the
+#                            codebase, so running GoTrue would cost ~256 MB to
+#                            serve nothing.
+#   studio / postgres-meta   A database admin panel on the public internet is
+#                            the single most attacked thing you can host. Use
+#                            psql over an SSH tunnel; see deploy/README.md.
+#   kong / envoy             Caddy already terminates TLS and does the path
+#                            routing, and it gets certificates by itself.
+# ===========================================================================
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-app-env: &app-env
+  APP_NAME: ${APP_NAME:?APP_NAME is not set - are you using the app .env file?}
+
+services:
+  # -------------------------------------------------------------------------
+  # PostgREST — the data API. This is what supabase-js talks to for every
+  # sb.from(...) and sb.rpc(...) call, which is 73 of the 76 call sites in
+  # Everytinroom.
+  # -------------------------------------------------------------------------
+  rest:
+    image: postgrest/postgrest:v14.18
+    container_name: ${APP_DNS}-rest
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      <<: *app-env
+      PGRST_DB_URI: postgres://${APP_DB_USER}:${APP_DB_PASSWORD}@postgres:5432/${APP_DB}
+      PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS:-public}
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_DB_EXTRA_SEARCH_PATH: public, extensions
+      PGRST_JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is not set}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_DB_POOL: ${PGRST_DB_POOL:-10}
+      PGRST_SERVER_PORT: "3000"
+      PGRST_ADMIN_SERVER_PORT: "3001"
+      # Declared explicitly: `postgrest --ready`, which is the healthcheck,
+      # probes the admin server, and leaving the host to a default is one more
+      # thing that can differ between versions.
+      PGRST_ADMIN_SERVER_HOST: "0.0.0.0"
+      # The schema introspection endpoint lists every table and function to
+      # anyone holding the anon key, which ships in the browser bundle.
+      # supabase-js never reads it -- it builds its own URLs.
+      PGRST_OPENAPI_MODE: disabled
+      # PGRST_DB_MAX_ROWS is deliberately NOT set. A cap here does not error;
+      # it silently returns fewer rows, so a catalogue of 690 products would
+      # quietly become 1000-row pages and a stock report would be wrong with
+      # no sign that anything had happened.
+    healthcheck:
+      test: ["CMD", "postgrest", "--ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      # Generous, because a schema-cache reload makes --ready report not-ready
+      # for a moment and a restored production database takes longer to cache
+      # than an empty one.
+      start_period: 60s
+    deploy:
+      resources:
+        limits: { memory: 512M }
+    networks:
+      central_db:
+      central_edge:
+        aliases: ["${APP_DNS}-rest"]
+
+  # -------------------------------------------------------------------------
+  # Realtime — the WAL listener behind the three sb.channel() subscriptions
+  # (products, sales, whatsapp_orders) that drive the sale confirmation, the
+  # till sound and the customer display.
+  #
+  # APP_DNS, not APP_NAME. An application name may contain underscores
+  # because it becomes a PostgreSQL database and role name, and `alpha_shop`
+  # is a valid identifier. An underscore is NOT valid in a hostname, and this
+  # value ends up in a Host header, a container name and a DNS label. So
+  # provision-app.sh derives APP_DNS by turning underscores into hyphens, and
+  # the database keeps the underscore form.
+  #
+  # Realtime is multi-tenant even when self-hosted, and it reads the tenant
+  # from the FIRST LABEL OF THE HOST HEADER. That is why this container is
+  # named "<app>.realtime" and why the Caddy site file sends that exact name
+  # upstream. Get it wrong and the websocket connects, authenticates, and then
+  # never delivers an event -- no error anywhere.
+  # -------------------------------------------------------------------------
+  realtime:
+    image: supabase/realtime:v2.148.3
+    container_name: ${APP_DNS}.realtime
+    profiles: ["realtime"]
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      <<: *app-env
+      PORT: "4000"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${APP_DB}
+      DB_USER: ${APP_REALTIME_USER}
+      DB_PASSWORD: ${APP_REALTIME_PASSWORD}
+      DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
+      DB_ENC_KEY: ${REALTIME_ENC_KEY:?REALTIME_ENC_KEY is not set}
+      API_JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${REALTIME_SECRET_KEY_BASE:?REALTIME_SECRET_KEY_BASE is not set}
+      # Required, not optional. Realtime's runtime.exs calls fetch_env! on it,
+      # so a missing value is not a warning -- the release terminates during
+      # boot with a crash dump and the container restarts forever:
+      #   (System.EnvError) could not fetch environment variable
+      #   "METRICS_JWT_SECRET" because it is not set
+      METRICS_JWT_SECRET: ${REALTIME_METRICS_JWT_SECRET:?REALTIME_METRICS_JWT_SECRET is not set}
+      # The seed names the tenant after the application, so two applications
+      # on this server never share one.
+      # EVERY TENANT NEEDS ITS OWN REPLICATION SLOT NAME.
+      #
+      # Realtime composes the slot as extension["slot_name"] <> SLOT_NAME_SUFFIX.
+      # With the suffix unset, every tenant on this server computes the same
+      # name -- `supabase_realtime_replication_slot_` -- and a PostgreSQL
+      # replication slot is CLUSTER-wide, not per database. So two
+      # applications fought over one slot:
+      #
+      #   error_code=ReplicationSlotBeingUsed  replication slot
+      #   "supabase_realtime_replication_slot_" is active for PID 1652
+      #
+      # Both reported healthy, both accepted subscriptions, and neither
+      # delivered reliably. On Supabase's own platform there is one project per
+      # cluster, so the suffix is never needed and never set.
+      SLOT_NAME_SUFFIX: ${REALTIME_SLOT_SUFFIX}
+      SELF_HOST_TENANT_NAME: ${APP_DNS}
+      SEED_SELF_HOST: "true"
+      RUN_JANITOR: "true"
+      APP_NAME: realtime
+      ERL_AFLAGS: -proto_dist inet_tcp
+      DNS_NODES: "''"
+      RLIMIT_NOFILE: "10000"
+      DISABLE_HEALTHCHECK_LOGGING: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sSfL --head -o /dev/null -H \"Authorization: Bearer ${ANON_KEY}\" http://127.0.0.1:4000/api/tenants/${APP_DNS}/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits: { memory: 1G }
+    networks:
+      central_db:
+      central_edge:
+        aliases: ["${APP_DNS}.realtime"]
+
+  # -------------------------------------------------------------------------
+  # Supabase Auth (GoTrue) — only for applications that actually use it.
+  #
+  # Everytinroom does NOT: it signs staff in with a PIN checked by
+  # verify_pin() against its own staff_sessions table, and `grep` finds not
+  # one call to supabase.auth in its source. Running GoTrue for it would
+  # spend ~256 MB serving nothing.
+  #
+  # But two other projects DO. deploy/scripts/inspect-supabase.py counts rows
+  # in auth.users for each one, and found 9 users in one and more in another,
+  # so the platform has to be able to run it. That is the whole point of
+  # profiles: the decision is per application and based on a measurement, not
+  # on what a standard Supabase install happens to include.
+  # -------------------------------------------------------------------------
+  auth:
+    image: supabase/gotrue:v2.197.0
+    container_name: ${APP_DNS}-auth
+    profiles: ["auth"]
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      <<: *app-env
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: https://${APP_DOMAIN}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://${APP_AUTH_USER}:${APP_AUTH_PASSWORD}@postgres:5432/${APP_DB}
+      GOTRUE_SITE_URL: ${AUTH_SITE_URL:-https://${APP_DOMAIN}}
+      GOTRUE_URI_ALLOW_LIST: ${AUTH_REDIRECT_URLS:-}
+      # Signup is CLOSED by default. These are back-office applications with a
+      # known set of staff; an open signup endpoint on a public URL is how
+      # strangers end up with accounts.
+      GOTRUE_DISABLE_SIGNUP: ${AUTH_DISABLE_SIGNUP:-true}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: ${AUTH_JWT_EXPIRY:-3600}
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_ISSUER: https://${APP_DOMAIN}/auth/v1
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: ${AUTH_EMAIL_ENABLED:-true}
+      GOTRUE_EXTERNAL_PHONE_ENABLED: ${AUTH_PHONE_ENABLED:-false}
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: "false"
+      # Without SMTP configured, autoconfirm is the only way a sign-in can
+      # complete. Set the SMTP_* values in the app's .env and turn this off
+      # for a real deployment that must verify an address.
+      GOTRUE_MAILER_AUTOCONFIRM: ${AUTH_MAILER_AUTOCONFIRM:-true}
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:-}
+      # 587, not empty. GoTrue parses this as an integer during configuration
+      # load, so an empty value is FATAL and the container crash-loops with
+      #   Failed to load configuration: assigning GOTRUE_SMTP_PORT to Port:
+      #   converting '' to type int
+      # Every application with auth and no SMTP configured hit that, which is
+      # all of them until someone sets up mail. The value is unused while
+      # GOTRUE_SMTP_HOST is empty and GOTRUE_MAILER_AUTOCONFIRM is true, so a
+      # valid default costs nothing and the service starts.
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-587}
+      GOTRUE_SMTP_USER: ${SMTP_USER:-}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:-${APP_NAME}}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:9999/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits: { memory: 512M }
+    networks:
+      central_db:
+      central_edge:
+        aliases: ["${APP_DNS}-auth"]
+
+  # -------------------------------------------------------------------------
+  # Storage — kept so that sb.storage.from(...).upload() keeps working
+  # unchanged, with Cloudflare R2 underneath instead of Supabase's disks.
+  # -------------------------------------------------------------------------
+  storage:
+    image: supabase/storage-api:v1.89.12
+    container_name: ${APP_DNS}-storage
+    profiles: ["storage"]
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      <<: *app-env
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      POSTGREST_URL: http://${APP_DNS}-rest:3000
+      DATABASE_URL: postgres://${APP_STORAGE_USER}:${APP_STORAGE_PASSWORD}@postgres:5432/${APP_DB}
+      DB_SUPER_USER: ${APP_STORAGE_USER}
+      DB_ANON_ROLE: anon
+      DB_SERVICE_ROLE: service_role
+      DB_AUTHENTICATED_ROLE: authenticated
+      # false. Both values have now been tried on a real server and the
+      # evidence is in deploy/staging-results:
+      #
+      #   true  -> the 'storage-schema' migration is rolled back with
+      #            `"authenticator" is a reserved role, only superusers can
+      #            modify it`, no further migration runs, and the server never
+      #            starts. supautils guards the reserved roles in this image
+      #            and nothing short of superuser gets past it.
+      #   false -> the migrations run and create the tables, but the roles
+      #            storage-api switches into have no rights on them, so every
+      #            request fails with `permission denied for schema storage`.
+      #
+      # The grants are therefore applied by this platform, AFTER the
+      # migrations have created the tables -- which is the only moment they
+      # can be applied, since the tables do not exist before and are owned by
+      # a role whose default privileges nothing here may set. See
+      # deploy/sql/24-storage-grants.sql and deploy/scripts/post-start.sh.
+      DB_INSTALL_ROLES: "false"
+      TENANT_ID: ${APP_NAME}
+      STORAGE_PUBLIC_URL: https://${APP_DOMAIN}
+      REQUEST_ALLOW_X_FORWARDED_PATH: "true"
+      FILE_SIZE_LIMIT: ${STORAGE_FILE_SIZE_LIMIT:-52428800}
+      # --- Cloudflare R2, which is S3-compatible ---
+      STORAGE_BACKEND: s3
+      STORAGE_S3_BUCKET: ${R2_BUCKET}
+      STORAGE_S3_ENDPOINT: ${R2_ENDPOINT}
+      STORAGE_S3_FORCE_PATH_STYLE: "true"
+      # 'auto' is R2's region. Other S3-compatible servers reject it and need
+      # a real one, so the staging run can set a different value without the
+      # production default changing.
+      STORAGE_S3_REGION: ${R2_REGION:-auto}
+      # KEPT, but not for the reason originally written here.
+      #
+      # This said "R2 rejects the trailing-checksum headers the AWS SDK adds
+      # by default. Without this, uploads fail with an opaque signature
+      # error." That was carried for weeks on the strength of a report
+      # elsewhere, and the real service has now contradicted it: tested
+      # against everytinroom-media on 2026-11-09, an upload in the SDK's
+      # default shape -- aws-chunked framing, x-amz-trailer naming a CRC32
+      # that arrives after the data, signed with
+      # STREAMING-UNSIGNED-PAYLOAD-TRAILER -- was ACCEPTED with HTTP 200.
+      #
+      # So the setting is not load-bearing on this bucket today. It stays
+      # because WHEN_REQUIRED is also accepted, it sends less, and R2's
+      # behaviour here is not something this platform controls. What has
+      # changed is the claim: deploy/scripts/test-r2.py now sends both shapes
+      # to the real bucket on every run and reports which one it is.
+      STORAGE_S3_REQUEST_CHECKSUM_CALCULATION: WHEN_REQUIRED
+      STORAGE_S3_RESPONSE_CHECKSUM_VALIDATION: WHEN_REQUIRED
+      AWS_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      # Thumbnails, resizing and format conversion, done by imgproxy below.
+      # On Supabase this is a billed add-on; here it is CPU we already pay for.
+      ENABLE_IMAGE_TRANSFORMATION: "true"
+      IMGPROXY_URL: http://${APP_DNS}-imgproxy:5001
+    healthcheck:
+      # 127.0.0.1, not localhost. storage-api binds IPv4, and `localhost`
+      # inside the container can resolve to ::1 first, so the probe failed
+      # against a service whose own log said "Started Successfully".
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:5000/status"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits: { memory: 768M }
+    networks:
+      central_db:
+      central_edge:
+        aliases: ["${APP_DNS}-storage"]
+
+  imgproxy:
+    image: darthsim/imgproxy:v4.0.21
+    container_name: ${APP_DNS}-imgproxy
+    profiles: ["storage"]
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      IMGPROXY_BIND: ":5001"
+      IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
+      IMGPROXY_USE_ETAG: "true"
+      IMGPROXY_ENABLE_WEBP_DETECTION: "true"
+      # A resize is CPU-bound; left unbounded, a burst of thumbnail requests
+      # starves PostgREST and the till goes slow for everybody.
+      IMGPROXY_WORKERS: "2"
+      IMGPROXY_MAX_SRC_RESOLUTION: "50"
+    healthcheck:
+      test: ["CMD", "imgproxy", "health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits: { memory: 512M }
+    networks:
+      central_edge:
+        aliases: ["${APP_DNS}-imgproxy"]
+
+  # -------------------------------------------------------------------------
+  # Edge functions — the Deno runtime for charge-momo, paystack-webhook,
+  # sms-reports and ussd-handler. wa-agent and whatsapp-bot are gone.
+  # -------------------------------------------------------------------------
+  functions:
+    image: supabase/edge-runtime:v1.77.9
+    container_name: ${APP_DNS}-functions
+    profiles: ["functions"]
+    restart: unless-stopped
+    logging: *logging
+    command: ["start", "--main-service", "/home/deno/functions/main"]
+    volumes:
+      - ./functions:/home/deno/functions:ro
+    environment:
+      <<: *app-env
+      JWT_SECRET: ${JWT_SECRET}
+      SUPABASE_URL: http://${APP_DNS}-rest:3000
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: postgres://${APP_DB_USER}:${APP_DB_PASSWORD}@postgres:5432/${APP_DB}
+      # Each function's own secrets (payment keys, SMS credentials) come from
+      # this file, which is mode 600 and never committed.
+      VERIFY_JWT: "${FUNCTIONS_VERIFY_JWT:-false}"
+    env_file:
+      - path: ./functions.env
+        required: false
+    deploy:
+      resources:
+        limits: { memory: 512M }
+    networks:
+      central_db:
+      central_edge:
+        aliases: ["${APP_DNS}-functions"]
+
+networks:
+  # Created by the shared stack. `external` means an application never
+  # accidentally brings up a second, isolated copy of the network and then
+  # cannot see the database.
+  central_db:
+    external: true
+    name: central_db
+  central_edge:
+    external: true
+    name: central_edge

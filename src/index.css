@@ -1,0 +1,389 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+html, body, #root { min-height: 100vh; min-height: 100dvh; }
+/* The mobile menu is an off-canvas panel parked at translate-x-full. A fixed
+   element sitting past the right edge still extends the document, so every
+   phone page could be dragged ~50px sideways into empty space. Clipping the
+   root is the standard fix; nothing in this app uses position:sticky, so
+   there is no side effect. */
+html, body { overflow-x: hidden; max-width: 100%; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 15px; background: #f6f6f5; color: #16181d; letter-spacing: -0.011em; transition: background .2s ease, color .2s ease; }
+/* Fill correctly in fullscreen/kiosk and on mobile browsers (handles the address bar). */
+.fill-screen { height: 100vh; height: 100dvh; }
+:fullscreen, :-webkit-full-screen { width: 100vw; height: 100vh; }
+h1, h2, h3, h4, h5, h6 { font-family: 'Inter', -apple-system, system-ui, sans-serif; letter-spacing: -0.022em; font-weight: 700; }
+@media (min-width: 768px) { body { font-size: 16px; } }
+
+::selection { background: #1a1a24; color: #fff; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: #d1d1d1; border-radius: 10px; }
+
+/* ── Numerals ──────────────────────────────────────────────────────────────
+   Money and counts sit in columns and get compared against each other, so
+   digits must be the same width. Without this the totals visibly jitter as
+   they update, which on a till reads as the number being unstable. */
+.tnum, table td, table th, input[inputmode="decimal"], input[type="number"] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'cv01' 1;
+}
+/* Headline figures: tight, dark, unmistakably the thing you came to read. */
+.figure { font-variant-numeric: tabular-nums; letter-spacing: -0.03em; font-weight: 700; line-height: 1; }
+
+/* ── Touch targets ─────────────────────────────────────────────────────────
+   On a finger-driven device the chips, filter pills and icon buttons measured
+   28-36px. Apple's guidance is 44px and Material's is 48; below ~40 a POS gets
+   mis-taps at the counter. `pointer: coarse` scopes this to touch input, so
+   mouse-driven desktop layouts keep their tighter proportions. */
+@media (pointer: coarse) {
+  button, [role="button"], select,
+  input:not([type="checkbox"]):not([type="radio"]) { min-height: 40px; }
+  /* Chips and segmented tabs sit in rows — give them width to match. */
+  button.rounded-full, [role="tab"] { padding-left: 14px; padding-right: 14px; }
+}
+
+/* ── Data tables on small screens ──────────────────────────────────────────
+   Every list in the app was a table with a min-width, so on a phone you either
+   scrolled sideways through it or (in one case) it was clipped outright. Below
+   640px each row becomes a card and each cell is labelled from its `data-label`,
+   which is how a table is meant to degrade. Above 640px it is an ordinary table.
+
+   Cells with data-label="" are omitted on mobile — for columns like a thumbnail
+   that carry no meaning once stacked. */
+@media (max-width: 639px) {
+  .rtable, .rtable tbody, .rtable tr, .rtable td { display: block; width: 100%; }
+  .rtable thead { display: none; }
+  .rtable { min-width: 0 !important; }
+  .rtable tr {
+    border: 1px solid rgba(16,24,29,.09);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    background: #fff;
+  }
+  body.dark .rtable tr { background: #191b1f; border-color: rgba(255,255,255,.08); }
+  .rtable td {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 5px 0 !important;
+    border: 0 !important;
+    text-align: right;
+  }
+  .rtable td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #9aa0a6;
+    text-align: left;
+  }
+  /* First cell is the row's identity — full width, no label, reads as a title. */
+  .rtable td:first-child {
+    display: block !important;
+    text-align: left;
+    padding: 0 0 8px !important;
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(16,24,29,.07) !important;
+  }
+  .rtable td:first-child::before { display: none; }
+  .rtable td[data-label=""] { display: none !important; }
+  /* Action buttons get the full width so they stay tappable. */
+  .rtable td:last-child { padding-top: 10px !important; }
+  .rtable td:last-child::before { display: none; }
+  .rtable td:last-child > div { width: 100%; justify-content: stretch; }
+  .rtable td:last-child button { flex: 1; }
+  /* The wrapper's horizontal scroll is meaningless once rows are cards. */
+  .rtable-wrap { overflow-x: visible !important; }
+}
+
+/* ── Product imagery ───────────────────────────────────────────────────────
+   The photos are ecommerce shots: median aspect ratio 1.00, a third of them
+   portrait (down to 0.67). They were being forced into a 4:3 landscape box
+   with object-cover, which cropped up to HALF the height off — bedsheets and
+   baskets were showing as a band from the middle of the product.
+
+   Square box + contain shows the whole product whatever shape it is, which is
+   what a catalogue does. The tile background is the same near-white as the
+   typical product-shot backdrop, so the letterboxing is invisible. */
+.product-shot {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: #f4f4f2;
+  overflow: hidden;
+}
+.product-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 4%;
+  display: block;
+}
+
+/* `aspect-ratio` is unsupported on Android WebView before Chrome 88 and on
+   Safari before 15 — phones still very much in use. Without it the tile has no
+   height at all and every photo silently disappears. The padding-top trick
+   reserves the same square box on those devices. */
+@supports not (aspect-ratio: 1 / 1) {
+  .product-shot { height: 0; padding-top: 100%; }
+  .product-shot > * { position: absolute; inset: 0; }
+  .product-shot img { position: absolute; top: 0; left: 0; }
+}
+body.dark .product-shot { background: #202329; }
+
+/* Small square thumbnails in tables and lists — same rule, less padding. */
+.thumb-shot { background: #f4f4f2; overflow: hidden; }
+.thumb-shot img { width: 100%; height: 100%; object-fit: contain; padding: 8%; display: block; }
+@supports not (object-fit: contain) {
+  .product-shot img, .thumb-shot img { width: auto; height: auto; max-width: 100%; max-height: 100%; margin: auto; }
+}
+body.dark .thumb-shot { background: #202329; }
+
+/* ── Panels ────────────────────────────────────────────────────────────────
+   One surface treatment instead of five hand-rolled ones. */
+.panel { background: #fff; border: 1px solid rgba(16,24,29,.07); border-radius: 14px; }
+body.dark .panel { background: #191b1f; border-color: rgba(255,255,255,.07); }
+.panel-pad { padding: 18px 20px; }
+.panel-head { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: #9aa0a6; }
+body.dark .panel-head { color: #7d838d; }
+
+/* Hairline dividers that don't shout */
+.rule { border-top: 1px solid rgba(16,24,29,.07); }
+body.dark .rule { border-color: rgba(255,255,255,.07); }
+
+@layer utilities {
+  .safe-top { padding-top: env(safe-area-inset-top); }
+
+  /* The mobile header is h-14 PLUS the safe-area inset, but the page below it
+     was padded by a flat 3.5rem — so on any phone with a notch the two did not
+     agree and the first row of products slid under the header. One value, used
+     by both, and by the sticky toolbar that has to sit directly beneath it. */
+  :root { --topbar-h: calc(3.5rem + env(safe-area-inset-top, 0px)); }
+  .pt-topbar { padding-top: var(--topbar-h); }
+  .top-topbar { top: var(--topbar-h); }
+
+  /* The surface behind the sticky POS toolbar. A class rather than a Tailwind
+     arbitrary colour because it has to follow dark mode — products scrolling
+     under a hardcoded light band is exactly the sort of thing that only shows
+     up after the shop switches the theme. */
+  .content-band { background: rgba(246,246,245,.94); }
+  @supports (backdrop-filter: blur(8px)) {
+    .content-band { background: rgba(246,246,245,.82); backdrop-filter: blur(10px); }
+  }
+  body.dark .content-band { background: rgba(16,17,21,.94); }
+  @supports (backdrop-filter: blur(8px)) {
+    body.dark .content-band { background: rgba(16,17,21,.82); }
+  }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  .glass { background: rgba(245,245,243,.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+}
+
+/* Refined surfaces — crisp hairline + whisper shadow on the common card
+   pattern, the way Square/Linear-class apps do it. */
+.bg-white.rounded-2xl { box-shadow: 0 1px 2px rgba(16,24,29,.04), 0 1px 1px rgba(16,24,29,.03); border: 1px solid rgba(16,24,29,.05); }
+body.dark .bg-white.rounded-2xl { box-shadow: none; border-color: rgba(255,255,255,.06); }
+
+@media print {
+  @page { size: 80mm auto; margin: 0 4mm; }
+  body * { visibility: hidden; }
+  #print-receipt, #print-receipt * { visibility: visible; }
+  #print-receipt { position: absolute; left: 0; top: 0; width: 72mm; }
+}
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.animate-fade { animation: fadeIn .2s ease-out; }
+.animate-slide-up { animation: slideUp .25s ease-out; }
+
+/* Idle customer-screen motion — calm, classy breathing + drift */
+@keyframes idleBreath {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 1; }
+  50% { transform: translateY(-10px) scale(1.012); opacity: .94; }
+}
+@keyframes idleDrift {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(8px); }
+}
+@keyframes idleRise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes idleHalo {
+  0%, 100% { opacity: .35; transform: scale(1); }
+  50% { opacity: .6; transform: scale(1.08); }
+}
+.idle-breath { animation: idleBreath 7s ease-in-out infinite; }
+.idle-drift { animation: idleDrift 9s ease-in-out infinite; }
+.idle-rise { animation: idleRise .9s ease-out both; }
+.idle-halo { animation: idleHalo 8s ease-in-out infinite; }
+
+/* ════════════════════════════════════════════════════════════
+   DARK THEME
+   Implemented as utility overrides scoped to body.dark so we get a
+   professional dark mode WITHOUT rewriting Tailwind classes across
+   ~100 components. Surgical: colors only, no layout changes.
+   ════════════════════════════════════════════════════════════ */
+body.dark {
+  background: #0e0f12;
+  color: #f0f0f1;
+}
+body.dark ::-webkit-scrollbar-thumb { background: #33363d; }
+body.dark ::selection { background: #e6e7eb; color: #0f1115; }
+
+/* surfaces */
+body.dark .bg-white { background-color: #191b1f !important; }
+body.dark .bg-stone-50,
+body.dark .bg-stone-100,
+body.dark .bg-gray-50,
+body.dark .bg-gray-100 { background-color: #212329 !important; }
+body.dark .bg-stone-200,
+body.dark .bg-gray-200 { background-color: #2c2f35 !important; }
+body.dark .bg-cream { background-color: #1a1d24 !important; }
+body.dark .bg-stone-100\/60,
+body.dark .bg-stone-100\/50,
+body.dark .bg-gray-50\/80,
+body.dark .bg-gray-50\/50,
+body.dark .bg-gray-50\/30 { background-color: rgba(255,255,255,.04) !important; }
+
+/* product image placeholders */
+body.dark .bg-stone-100.overflow-hidden { background-color: #21242c !important; }
+
+/* dark stays dark — keep the near-black accent surfaces, but lift slightly so they read on a dark bg */
+body.dark .bg-gray-900 { background-color: #2b2f3a !important; }
+body.dark .bg-gray-800 { background-color: #323743 !important; }
+
+/* text — brightened for readability */
+body.dark .text-gray-900,
+body.dark .text-gray-800,
+body.dark .text-black { color: #f4f5f7 !important; }
+body.dark .text-gray-700,
+body.dark .text-gray-600,
+body.dark .text-stone-700,
+body.dark .text-stone-600,
+body.dark .text-stone-500,
+body.dark .text-gray-500 { color: #c9ccd4 !important; }
+body.dark .text-stone-400,
+body.dark .text-stone-300,
+body.dark .text-gray-400,
+body.dark .text-gray-300 { color: #9499a3 !important; }
+body.dark .text-stone-200,
+body.dark .text-gray-200 { color: #6b7280 !important; }
+
+/* text that sits ON the accent (gray-900/800) surfaces must stay light */
+body.dark .bg-gray-900 .text-white,
+body.dark .bg-gray-800 .text-white,
+body.dark .bg-gray-900 .text-gray-900,
+body.dark .bg-gray-800 .text-gray-900 { color: #fff !important; }
+
+/* borders */
+body.dark .border-stone-200,
+body.dark .border-stone-200\/60,
+body.dark .border-stone-200\/30,
+body.dark .border-stone-100,
+body.dark .border-gray-100,
+body.dark .border-gray-200 { border-color: rgba(255,255,255,.08) !important; }
+body.dark .border-dashed.border-gray-200 { border-color: rgba(255,255,255,.14) !important; }
+
+/* inputs */
+body.dark input,
+body.dark textarea,
+body.dark select { background-color: #21242c !important; color: #e6e7eb !important; border-color: rgba(255,255,255,.08) !important; }
+body.dark input::placeholder,
+body.dark textarea::placeholder { color: #6b6f7a !important; }
+
+/* glass header/footer on mobile */
+body.dark .glass { background: rgba(20,22,28,.92) !important; }
+
+/* Gaps the audit found — utilities the screens added this week use that the
+   block above never covered. Each one is a light surface or an invisible
+   outline on a dark page, not a nicety.
+
+   The translucent ones matter most: a `/70` or `/95` opacity variant is a
+   DIFFERENT class name, so `.bg-stone-200` never matched `bg-stone-200/70`
+   and every segmented control stayed a pale pill on a dark screen. */
+body.dark .bg-white\/95,
+body.dark .bg-white\/90 { background-color: rgba(25,27,31,.95) !important; }
+body.dark .bg-stone-200\/70 { background-color: rgba(44,47,53,.75) !important; }
+body.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+body.dark .divide-stone-100 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(255,255,255,.08) !important; }
+body.dark .border-gray-300,
+body.dark .border-gray-400,
+body.dark .border-stone-300,
+body.dark .border-stone-400 { border-color: rgba(255,255,255,.14) !important; }
+
+/* A near-black focus ring is invisible on a near-black page. Focus has to be
+   visible for anyone driving this from a keyboard, and the cost-price screen
+   is entirely keyboard-driven. */
+body.dark .focus\:border-gray-900:focus,
+body.dark .border-gray-900 { border-color: rgba(255,255,255,.55) !important; }
+body.dark .hover\:border-gray-900:hover,
+body.dark .hover\:border-gray-400:hover,
+body.dark .hover\:border-stone-400:hover { border-color: rgba(255,255,255,.3) !important; }
+
+/* hover states */
+body.dark .hover\:bg-stone-100:hover,
+body.dark .hover\:bg-stone-50:hover,
+body.dark .hover\:bg-gray-100:hover,
+body.dark .hover\:bg-gray-50:hover { background-color: #262a33 !important; }
+
+/* keep colored accent chips readable (amber/red/green badges) — leave as-is, they work on dark */
+
+/* sidebar explicit surface (the dark-sidebar helper referenced in Navigation) */
+body.dark .dark-sidebar { background-color: #14161b !important; }
+.dark-sidebar { background: transparent; }
+
+/* shadows softer in dark */
+body.dark .shadow-lg,
+body.dark .shadow-md,
+body.dark .shadow-sm { box-shadow: 0 4px 20px rgba(0,0,0,.4) !important; }
+
+/* tinted info/alert backgrounds — muted in dark so they don't glare */
+body.dark .bg-green-50 { background-color: rgba(16,185,129,.12) !important; }
+body.dark .bg-blue-50 { background-color: rgba(59,130,246,.12) !important; }
+body.dark .bg-red-50 { background-color: rgba(239,68,68,.12) !important; }
+body.dark .bg-amber-50 { background-color: rgba(245,158,11,.12) !important; }
+body.dark .bg-violet-50 { background-color: rgba(139,92,246,.12) !important; }
+body.dark .bg-orange-50 { background-color: rgba(249,115,22,.12) !important; }
+body.dark .bg-green-50\/30,
+body.dark .bg-red-50\/30 { background-color: rgba(255,255,255,.03) !important; }
+/* tinted borders */
+body.dark .border-green-100,body.dark .border-green-200,body.dark .border-green-300 { border-color: rgba(16,185,129,.25) !important; }
+body.dark .border-blue-100,body.dark .border-blue-200 { border-color: rgba(59,130,246,.25) !important; }
+body.dark .border-red-100,body.dark .border-red-200,body.dark .border-red-300 { border-color: rgba(239,68,68,.25) !important; }
+body.dark .border-amber-100,body.dark .border-amber-200 { border-color: rgba(245,158,11,.25) !important; }
+body.dark .border-violet-100,body.dark .border-violet-200 { border-color: rgba(139,92,246,.25) !important; }
+/* keep colored TEXT vivid in dark (green-600, red-500 etc stay as-is — they read fine) */
+
+/* Main content offsets by the sidebar width (desktop only) */
+@media (min-width: 768px) {
+  .content-shell { margin-left: var(--sidebar-w, 68px); transition: margin-left 0.2s; }
+}
+
+/* When the basket is docked it is still position:fixed, so the grid has to be
+   told not to run underneath it. Reserving the gutter here rather than on the
+   element keeps the transition from fighting the sidebar's own margin. */
+body.cart-docked .content-shell { margin-right: var(--cart-w, 400px); }
+/* Matched to the panel's own 300ms slide so the grid and the basket finish
+   together rather than the gutter snapping open ahead of it. */
+.content-shell { transition: margin-left 0.2s, margin-right 0.3s; }
+
+/* The product grid's column counts are viewport breakpoints, but a docked
+   basket takes 400px out of the row. Left alone, a 1280px till would try to
+   fit six columns into ~780px and hand the cashier 130px-wide tiles. These
+   override the Tailwind counts whenever the basket is docked. */
+@media (min-width: 1280px) {
+  body.cart-docked .product-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-width: 1600px) {
+  body.cart-docked .product-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+@media (min-width: 1900px) {
+  body.cart-docked .product-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}

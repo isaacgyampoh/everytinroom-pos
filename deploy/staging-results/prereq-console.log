@@ -1,0 +1,59 @@
+
+[1m===== 1. The machine =====[0m
+       Ubuntu 24.04.5 LTS  (noble)
+       4 processors, 15983 MB RAM, 86 GB free on /
+  [32mPASS[0m running on Ubuntu, which is what bootstrap.sh supports
+       Docker is pre-installed; removing it so the install path is genuinely tested
+  [32mPASS[0m starting from a machine with no Docker
+
+[1m===== 2. bootstrap.sh installs Docker and the Compose plugin =====[0m
+  [32mPASS[0m bootstrap.sh completed
+  [32mPASS[0m Docker Engine installed and responding: Docker version 29.9.3
+  [32mPASS[0m Compose plugin installed: 5.7.0
+  [32mPASS[0m installed from Docker's official apt repository (docker-ce)
+  [32mPASS[0m bootstrap verified nothing unexpected is publicly exposed
+
+[1m===== 3. The shared stack =====[0m
+  [32mPASS[0m central-postgres is running
+  [32mPASS[0m central-caddy is running
+  [32mPASS[0m central-postgres reports healthy
+  [32mPASS[0m PostgreSQL answers queries
+       version: PostgreSQL 17.6 on x86_64-pc-linux-gnu, compi
+  [32mPASS[0m postgres config generated for this machine, no placeholders left
+       max_connections=150  shared_buffers=3955MB  work_mem=9MB
+  [32mPASS[0m wal_level is logical, which Realtime requires
+  [32mPASS[0m the image's preloaded libraries survived the config override
+  [32mPASS[0m pg_cron is preloaded
+  [32mPASS[0m the central.applications registry exists
+  [32mPASS[0m PostgreSQL is bound to 127.0.0.1 only
+  [32mPASS[0m the stack is up, so the remaining checks can mean something
+
+[1m===== 4. Startup, health, restart recovery and resource usage =====[0m
+       restarting central-postgres to check it recovers unattended
+  [32mPASS[0m central-postgres returned to healthy after a restart
+  [32mPASS[0m it answers queries again after the restart
+  [32mPASS[0m restart policy is unless-stopped, so it survives a reboot
+
+[1m===== 5. Two independent applications, and isolation between them =====[0m
+  [32mPASS[0m provisioned alpha_shop (realtime + storage, no auth)
+  [32mPASS[0m provisioned beta_shop (auth, no realtime or storage)
+  [32mPASS[0m alpha_shop's profiles are 'realtime,storage' — no auth, as measured
+  [32mPASS[0m beta_shop's profiles are 'auth' — auth only
+  [32mPASS[0m alpha_shop's compose configuration is valid, so every service it uses can start
+  [32mPASS[0m beta_shop's compose configuration is valid, so every service it uses can start
+  [32mPASS[0m beta_shop's database has an auth schema
+  [32mPASS[0m alpha_shop's database has NO auth schema — nothing provisioned that it does not use
+  [32mPASS[0m alpha_shop's credentials open alpha_shop's own database
+  [32mPASS[0m beta_shop's credentials open beta_shop's own database
+  [32mPASS[0m beta_shop's credentials are REFUSED by alpha_shop's database
+  [32mPASS[0m beta_shop cannot read alpha_shop's data
+  [32mPASS[0m the two applications have different JWT secrets
+  [32mPASS[0m alpha_shop/.env is mode 600
+  [32mPASS[0m beta_shop/.env is mode 600
+
+  stopping after section 5 as asked (--until 5)
+
+[1m===== Result =====[0m
+  passed 36   failed 0   skipped 0   known defects in optional components 0
+
+  report written to /tmp/prereq-report.md
